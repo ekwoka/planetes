@@ -1,0 +1,18 @@
+# Rust builds
+/target
+.DS_Store
+
+# TrenchBroom
+assets/**/autosave/
+assets/**/*.log
+assets/**/*.pts
+assets/**/*.texinfo.json
+assets/**/*.prt
+assets/**/*.bsp
+
+# Tooling
+.bin
+
+# Temp Binary Assets
+assets/**/*.glb
+assets/models

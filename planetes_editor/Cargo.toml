@@ -1,0 +1,17 @@
+[package]
+name = "planetes_editor"
+version = "0.0.1"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bevy.workspace = true
+avian3d = { workspace = true, optional = true }
+
+[features]
+# feature for avian3d support
+avian = ["avian3d"]
+
+[lints]
+workspace = true
