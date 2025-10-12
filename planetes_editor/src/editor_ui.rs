@@ -18,9 +18,13 @@ use avian3d::schedule::{Physics, PhysicsTime};
 pub fn plugin(app: &mut App) {
     app.add_plugins(InfiniteGridPlugin)
         .init_state::<EditorMode>()
+        .register_type_data::<Transform, ReflectPlanetesComponent>()
+        .register_type_data::<ChildOf, ReflectPlanetesComponent>()
         .add_systems(
             OnEnter(EditorMode::Edit),
-            (setup_camera_system, build_ui).chain().before(save_scene),
+            (setup_camera_system, build_ui, build_demo_scene)
+                .chain()
+                .before(save_scene),
         )
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(Update, update_viewport.run_if(in_state(EditorMode::Edit)))
@@ -33,29 +37,56 @@ pub fn plugin(app: &mut App) {
     }
 }
 
-pub fn save_scene(world: &mut World) {
-    let registry = world.resource::<AppTypeRegistry>().clone();
+pub fn build_demo_scene(mut commands: Commands) {
+    commands.spawn((
+        EditorScene,
+        children![
+            (Transform::from_xyz(30.0, 0.0, 30.0)),
+            (Transform::from_xyz(10.0, 0.0, 10.0)),
+            (
+                Transform::from_xyz(20.0, 0.0, 20.0),
+                children![(Thingy, Transform::default())]
+            )
+        ],
+    ));
+}
+
+pub fn save_scene(
+    world: &World,
+    scene_root: Single<&Children, With<EditorScene>>,
+    children: Query<&Children, Without<EditorScene>>,
+    registry: Res<AppTypeRegistry>,
+) {
+    let registry = registry.clone();
     let registry = registry.read();
     let mut filter = SceneFilter::deny_all();
     for type_id in registry
-        .iter_with_data::<ReflectSerialize>()
+        .iter_with_data::<ReflectPlanetesComponent>()
         .map(|(registration, _)| registration.type_id())
     {
         filter = filter.allow_by_id(type_id);
     }
-    let all_nodes = world
-        .query::<Entity>()
-        .iter(world)
-        .map(|entity| entity.clone())
-        .collect::<Vec<_>>();
-    let scene = DynamicSceneBuilder::from_world(world).with_component_filter(filter);
 
-    info!("All Nodes: {:?}", all_nodes);
+    let mut scene = DynamicSceneBuilder::from_world(world)
+        .with_component_filter(filter)
+        .deny_component::<ChildOf>()
+        .extract_entities(scene_root.into_iter().map(|entity| entity.clone()))
+        .allow_component::<ChildOf>();
 
-    let scene = scene
-        .extract_entities(all_nodes.into_iter())
-        .remove_empty_entities()
-        .build();
+    let mut stack = scene_root.iter().collect::<Vec<_>>();
+
+    while let Some(entity) = stack.pop() {
+        info!("Checking entity: {:?}", entity);
+        scene = scene.extract_entity(entity);
+        if let Ok(children) = children.get(entity) {
+            for child in children.iter() {
+                info!("Child entity: {:?}", child);
+                stack.push(child);
+            }
+        }
+    }
+
+    let scene = scene.remove_empty_entities().build();
 
     let serialized_scene = scene.serialize(&registry).unwrap();
     info!("Saving Scene");
@@ -309,3 +340,6 @@ struct ThingyBundle {
     transform: Transform,
     camera: Camera3d,
 }
+
+#[derive(Component)]
+pub struct EditorScene;
