@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::{
-    EditorMode,
+    EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
 };
 
@@ -76,8 +76,14 @@ pub fn unhover_menu_item(
 pub fn build_ui(mut commands: Commands, type_registry: Res<AppTypeRegistry>) {
     let registry = type_registry.read();
     let component_info = registry
-        .iter_with_data::<ReflectComponent>()
-        .map(|(registration, _)| {
+        .iter_with_data::<ReflectPlanetesComponent>()
+        .map(|(registration, _)| registration)
+        .chain(
+            registry
+                .iter_with_data::<ReflectPlanetesBundle>()
+                .map(|(registration, _)| registration),
+        )
+        .map(|registration| {
             registration
                 .type_info()
                 .ty()
@@ -85,7 +91,6 @@ pub fn build_ui(mut commands: Commands, type_registry: Res<AppTypeRegistry>) {
                 .path()
                 .to_string()
         })
-        .filter(|path| path.contains("planetes"))
         .collect::<Vec<_>>();
     commands.spawn((
         Node {
@@ -246,4 +251,16 @@ fn bottom_bar() -> impl Bundle {
             RenderLayers::layer(1)
         )],
     )
+}
+
+#[derive(Component, Reflect)]
+#[reflect(PlanetesComponent)]
+struct Thingy;
+
+#[derive(Bundle, Reflect)]
+#[reflect(PlanetesBundle)]
+struct ThingyBundle {
+    thingy: Thingy,
+    transform: Transform,
+    camera: Camera3d,
 }

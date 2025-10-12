@@ -10,3 +10,13 @@ pub enum EditorMode {
     Edit,
     View,
 }
+
+#[reflect_trait]
+pub trait PlanetesComponent {}
+
+impl<T: Reflect + Component> PlanetesComponent for T {}
+
+#[reflect_trait]
+pub trait PlanetesBundle {}
+
+impl<T: Reflect + Bundle> PlanetesBundle for T {}
