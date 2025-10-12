@@ -1,9 +1,11 @@
 use bevy::{
     camera::{Viewport, visibility::RenderLayers},
-    dev_tools::states::log_transitions,
     math::Affine2,
     prelude::*,
+    tasks::IoTaskPool,
 };
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::Write};
 
 use crate::{
     EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
@@ -16,8 +18,11 @@ use avian3d::schedule::{Physics, PhysicsTime};
 pub fn plugin(app: &mut App) {
     app.add_plugins(InfiniteGridPlugin)
         .init_state::<EditorMode>()
-        .add_systems(Update, log_transitions::<EditorMode>)
-        .add_systems(OnEnter(EditorMode::Edit), (setup_camera_system, build_ui))
+        .add_systems(
+            OnEnter(EditorMode::Edit),
+            (setup_camera_system, build_ui).chain().before(save_scene),
+        )
+        .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(Update, update_viewport.run_if(in_state(EditorMode::Edit)))
         .add_observer(hover_menu_item)
         .add_observer(unhover_menu_item);
@@ -26,6 +31,43 @@ pub fn plugin(app: &mut App) {
         app.add_systems(OnEnter(EditorMode::Edit), pause_physics);
         app.add_systems(OnExit(EditorMode::Edit), resume_physics);
     }
+}
+
+pub fn save_scene(world: &mut World) {
+    let registry = world.resource::<AppTypeRegistry>().clone();
+    let registry = registry.read();
+    let mut filter = SceneFilter::deny_all();
+    for type_id in registry
+        .iter_with_data::<ReflectSerialize>()
+        .map(|(registration, _)| registration.type_id())
+    {
+        filter = filter.allow_by_id(type_id);
+    }
+    let all_nodes = world
+        .query::<Entity>()
+        .iter(world)
+        .map(|entity| entity.clone())
+        .collect::<Vec<_>>();
+    let scene = DynamicSceneBuilder::from_world(world).with_component_filter(filter);
+
+    info!("All Nodes: {:?}", all_nodes);
+
+    let scene = scene
+        .extract_entities(all_nodes.into_iter())
+        .remove_empty_entities()
+        .build();
+
+    let serialized_scene = scene.serialize(&registry).unwrap();
+    info!("Saving Scene");
+    info!("{}", serialized_scene);
+    IoTaskPool::get()
+        .spawn(async move {
+            // Write the scene RON data to file
+            File::create(format!("assets/test.scn.ron"))
+                .and_then(|mut file| file.write(serialized_scene.as_bytes()))
+                .expect("Error while writing scene to file");
+        })
+        .detach();
 }
 
 #[cfg(feature = "avian")]
@@ -92,6 +134,9 @@ pub fn build_ui(mut commands: Commands, type_registry: Res<AppTypeRegistry>) {
                 .to_string()
         })
         .collect::<Vec<_>>();
+
+    commands.spawn((Thingy, Transform::default()));
+    info!("Spawned Thingy");
     commands.spawn((
         Node {
             padding: px(1.0).all(),
@@ -253,8 +298,8 @@ fn bottom_bar() -> impl Bundle {
     )
 }
 
-#[derive(Component, Reflect)]
-#[reflect(PlanetesComponent)]
+#[derive(Component, Reflect, Serialize, Deserialize, Debug)]
+#[reflect(Component, PlanetesComponent, Serialize, Deserialize)]
 struct Thingy;
 
 #[derive(Bundle, Reflect)]

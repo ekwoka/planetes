@@ -4487,6 +4487,7 @@ version = "0.0.1"
 dependencies = [
  "avian3d",
  "bevy",
+ "serde",
 ]
 
 [[package]]
@@ -4501,6 +4502,7 @@ dependencies = [
  "bevy_ui_anchor",
  "getrandom",
  "planetes_editor",
+ "serde",
 ]
 
 [[package]]
