@@ -70,7 +70,7 @@ pub fn save_scene(
     let mut scene = DynamicSceneBuilder::from_world(world)
         .with_component_filter(filter)
         .deny_component::<ChildOf>()
-        .extract_entities(scene_root.into_iter().map(|entity| entity.clone()))
+        .extract_entities(scene_root.into_iter().copied())
         .allow_component::<ChildOf>();
 
     let mut stack = scene_root.iter().collect::<Vec<_>>();
@@ -94,7 +94,7 @@ pub fn save_scene(
     IoTaskPool::get()
         .spawn(async move {
             // Write the scene RON data to file
-            File::create(format!("assets/test.scn.ron"))
+            File::create("assets/test.scn.ron")
                 .and_then(|mut file| file.write(serialized_scene.as_bytes()))
                 .expect("Error while writing scene to file");
         })
