@@ -2,6 +2,6 @@
 make = ["bin", "cargo-make"]
 nextest = ["bin", "cargo-nextest", "run"]
 remove = ["bin", "cargo-rm"]
-upgrade-local = ["bin", "cargo-upgrade"]
+upgrade-local = ["bin", "cargo-upgrade", "--verbose"]
 watch = ["bin", "cargo-watch"]
 dx = ["bin", "dx", "serve", "--hot-patch"]
