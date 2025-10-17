@@ -1,7 +1,8 @@
 use bevy::prelude::*;
-mod editor_ui;
+pub mod editor_ui;
 mod infinite_grid;
-mod nodes;
+pub mod nodes;
+pub mod scene;
 
 pub use editor_ui::{MainView, plugin};
 

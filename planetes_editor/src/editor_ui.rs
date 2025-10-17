@@ -2,10 +2,8 @@ use bevy::{
     camera::{Viewport, visibility::RenderLayers},
     math::Affine2,
     prelude::*,
-    tasks::IoTaskPool,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Write};
 
 use crate::{
     EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
@@ -17,17 +15,14 @@ use crate::{
 use avian3d::schedule::{Physics, PhysicsTime};
 
 pub fn plugin(app: &mut App) {
-    app.add_plugins(InfiniteGridPlugin)
+    app.add_plugins((InfiniteGridPlugin, crate::scene::plugin))
         .init_state::<EditorMode>()
         .register_type_data::<Transform, ReflectPlanetesComponent>()
-        .register_type_data::<ChildOf, ReflectPlanetesComponent>()
+        .register_type_data::<Children, ReflectPlanetesComponent>()
         .add_systems(
             OnEnter(EditorMode::Edit),
-            (setup_camera_system, build_ui, build_demo_scene)
-                .chain()
-                .before(save_scene),
+            (setup_camera_system, build_ui).chain(),
         )
-        .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(
             Update,
             (update_viewport, scene_tree::update)
@@ -41,70 +36,6 @@ pub fn plugin(app: &mut App) {
         app.add_systems(OnEnter(EditorMode::Edit), pause_physics);
         app.add_systems(OnExit(EditorMode::Edit), resume_physics);
     }
-}
-
-pub fn build_demo_scene(mut commands: Commands) {
-    commands.spawn((
-        EditorScene,
-        children![
-            (Transform::from_xyz(30.0, 0.0, 30.0)),
-            (Transform::from_xyz(10.0, 0.0, 10.0)),
-            (
-                Transform::from_xyz(20.0, 0.0, 20.0),
-                children![(Thingy, Transform::default())]
-            )
-        ],
-    ));
-}
-
-pub fn save_scene(
-    world: &World,
-    scene_root: Single<&Children, With<EditorScene>>,
-    children: Query<&Children, Without<EditorScene>>,
-    registry: Res<AppTypeRegistry>,
-) {
-    let registry = registry.clone();
-    let registry = registry.read();
-    let mut filter = SceneFilter::deny_all();
-    for type_id in registry
-        .iter_with_data::<ReflectPlanetesComponent>()
-        .map(|(registration, _)| registration.type_id())
-    {
-        filter = filter.allow_by_id(type_id);
-    }
-
-    let mut scene = DynamicSceneBuilder::from_world(world)
-        .with_component_filter(filter)
-        .deny_component::<ChildOf>()
-        .extract_entities(scene_root.into_iter().copied())
-        .allow_component::<ChildOf>();
-
-    let mut stack = scene_root.iter().collect::<Vec<_>>();
-
-    while let Some(entity) = stack.pop() {
-        info!("Checking entity: {:?}", entity);
-        scene = scene.extract_entity(entity);
-        if let Ok(children) = children.get(entity) {
-            for child in children.iter() {
-                info!("Child entity: {:?}", child);
-                stack.push(child);
-            }
-        }
-    }
-
-    let scene = scene.remove_empty_entities().build();
-
-    let serialized_scene = scene.serialize(&registry).unwrap();
-    info!("Saving Scene");
-    info!("{}", serialized_scene);
-    IoTaskPool::get()
-        .spawn(async move {
-            // Write the scene RON data to file
-            File::create("assets/test.scn.ron")
-                .and_then(|mut file| file.write(serialized_scene.as_bytes()))
-                .expect("Error while writing scene to file");
-        })
-        .detach();
 }
 
 #[cfg(feature = "avian")]
@@ -322,6 +253,3 @@ struct ThingyBundle {
     transform: Transform,
     camera: Camera3d,
 }
-
-#[derive(Component)]
-pub struct EditorScene;

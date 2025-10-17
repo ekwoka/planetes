@@ -1,5 +1,6 @@
-use crate::{ReflectPlanetesComponent, editor_ui::EditorScene};
+use crate::{ReflectPlanetesComponent, scene::EditorScene};
 use bevy::{camera::visibility::RenderLayers, prelude::*};
+
 #[derive(Component)]
 pub struct SceneTreeView;
 
