@@ -10,6 +10,7 @@ use std::{fs::File, io::Write};
 use crate::{
     EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
+    nodes::*,
 };
 
 #[cfg(feature = "avian")]
@@ -29,7 +30,7 @@ pub fn plugin(app: &mut App) {
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(
             Update,
-            (update_viewport, update_scene_tree)
+            (update_viewport, scene_tree::update)
                 .chain()
                 .run_if(in_state(EditorMode::Edit)),
         )
@@ -206,7 +207,7 @@ pub fn build_ui(mut commands: Commands) {
                             ..default()
                         },
                         RenderLayers::layer(1),
-                        children![scene_tree_view()]
+                        children![scene_tree::view()]
                     ),
                     (
                         Node {
@@ -228,86 +229,6 @@ pub fn build_ui(mut commands: Commands) {
             bottom_bar()
         ],
     ));
-}
-
-#[derive(Component)]
-pub struct SceneTreeView;
-
-pub fn scene_tree_view() -> impl Bundle {
-    (
-        SceneTreeView,
-        Node {
-            padding: px(8.0).all(),
-            flex_grow: 1.0,
-            flex_shrink: 1.0,
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            column_gap: px(8.0),
-            width: percent(100.0),
-            height: percent(100.0),
-            ..default()
-        },
-        RenderLayers::layer(1),
-    )
-}
-
-pub fn update_scene_tree(
-    mut commands: Commands,
-    scene_tree_view: Query<Entity, With<SceneTreeView>>,
-    _registry: Res<AppTypeRegistry>,
-    scene_root: Single<(Entity, &Children), (With<EditorScene>, Without<SceneTreeView>)>,
-    world: &World,
-) {
-    let (root_entity, scene_children) = *scene_root;
-    let entities = [root_entity]
-        .iter()
-        .copied()
-        .chain(scene_children.iter())
-        .map(|entity| {
-            let component_names: String = world
-                .inspect_entity(entity)
-                .ok()
-                .map(|component_iter| {
-                    component_iter
-                        .map(|component| format!("{}", (component.name().shortname())))
-                        .collect::<Vec<_>>()
-                        .join("\n   - ")
-                })
-                .unwrap_or("No Components".to_string());
-            let text = if component_names.contains("ChildOf") {
-                format!("> {entity}:\n   - {component_names}")
-            } else {
-                format!("{entity}:\n   - {component_names}")
-            };
-            commands
-                .spawn((
-                    Node {
-                        padding: if text.contains("ChildOf") {
-                            px(8.0).left()
-                        } else {
-                            px(0.0).all()
-                        },
-                        ..default()
-                    },
-                    children![(
-                        Text::new(text),
-                        TextFont {
-                            font_size: 12.0,
-                            ..default()
-                        },
-                        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                        TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
-                        RenderLayers::layer(1),
-                    )],
-                ))
-                .id()
-        })
-        .collect::<Vec<_>>();
-    for view in scene_tree_view.iter() {
-        if let Ok(mut view_commands) = commands.get_entity(view) {
-            view_commands.despawn_children().replace_children(&entities);
-        }
-    }
 }
 
 fn menu_button(test: impl Into<String>) -> impl Bundle {
