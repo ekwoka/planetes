@@ -27,7 +27,12 @@ pub fn plugin(app: &mut App) {
                 .before(save_scene),
         )
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
-        .add_systems(Update, update_viewport.run_if(in_state(EditorMode::Edit)))
+        .add_systems(
+            Update,
+            (update_viewport, update_scene_tree)
+                .chain()
+                .run_if(in_state(EditorMode::Edit)),
+        )
         .add_observer(hover_menu_item)
         .add_observer(unhover_menu_item);
     #[cfg(feature = "avian")]
@@ -146,28 +151,7 @@ pub fn unhover_menu_item(
     }
 }
 
-pub fn build_ui(mut commands: Commands, type_registry: Res<AppTypeRegistry>) {
-    let registry = type_registry.read();
-    let component_info = registry
-        .iter_with_data::<ReflectPlanetesComponent>()
-        .map(|(registration, _)| registration)
-        .chain(
-            registry
-                .iter_with_data::<ReflectPlanetesBundle>()
-                .map(|(registration, _)| registration),
-        )
-        .map(|registration| {
-            registration
-                .type_info()
-                .ty()
-                .type_path_table()
-                .path()
-                .to_string()
-        })
-        .collect::<Vec<_>>();
-
-    commands.spawn((Thingy, Transform::default()));
-    info!("Spawned Thingy");
+pub fn build_ui(mut commands: Commands) {
     commands.spawn((
         Node {
             padding: px(1.0).all(),
@@ -222,14 +206,7 @@ pub fn build_ui(mut commands: Commands, type_registry: Res<AppTypeRegistry>) {
                             ..default()
                         },
                         RenderLayers::layer(1),
-                        children![(
-                            Text::new(component_info.join("\n")),
-                            RenderLayers::layer(1),
-                            TextFont {
-                                font_size: 12.0,
-                                ..default()
-                            }
-                        )]
+                        children![scene_tree_view()]
                     ),
                     (
                         Node {
@@ -237,16 +214,100 @@ pub fn build_ui(mut commands: Commands, type_registry: Res<AppTypeRegistry>) {
                             flex_shrink: 1.0,
                             width: percent(50.0),
                             height: percent(100.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: px(1.0).left(),
                             ..default()
                         },
+                        BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
                         RenderLayers::layer(1),
-                        ViewPort
+                        children![Text::new("Viewport")]
                     )
                 ]
             ),
             bottom_bar()
         ],
     ));
+}
+
+#[derive(Component)]
+pub struct SceneTreeView;
+
+pub fn scene_tree_view() -> impl Bundle {
+    (
+        SceneTreeView,
+        Node {
+            padding: px(8.0).all(),
+            flex_grow: 1.0,
+            flex_shrink: 1.0,
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            column_gap: px(8.0),
+            width: percent(100.0),
+            height: percent(100.0),
+            ..default()
+        },
+        RenderLayers::layer(1),
+    )
+}
+
+pub fn update_scene_tree(
+    mut commands: Commands,
+    scene_tree_view: Query<Entity, With<SceneTreeView>>,
+    _registry: Res<AppTypeRegistry>,
+    scene_root: Single<(Entity, &Children), (With<EditorScene>, Without<SceneTreeView>)>,
+    world: &World,
+) {
+    let (root_entity, scene_children) = *scene_root;
+    let entities = [root_entity]
+        .iter()
+        .copied()
+        .chain(scene_children.iter())
+        .map(|entity| {
+            let component_names: String = world
+                .inspect_entity(entity)
+                .ok()
+                .map(|component_iter| {
+                    component_iter
+                        .map(|component| format!("{}", (component.name().shortname())))
+                        .collect::<Vec<_>>()
+                        .join("\n   - ")
+                })
+                .unwrap_or("No Components".to_string());
+            let text = if component_names.contains("ChildOf") {
+                format!("> {entity}:\n   - {component_names}")
+            } else {
+                format!("{entity}:\n   - {component_names}")
+            };
+            commands
+                .spawn((
+                    Node {
+                        padding: if text.contains("ChildOf") {
+                            px(8.0).left()
+                        } else {
+                            px(0.0).all()
+                        },
+                        ..default()
+                    },
+                    children![(
+                        Text::new(text),
+                        TextFont {
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+                        TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
+                        RenderLayers::layer(1),
+                    )],
+                ))
+                .id()
+        })
+        .collect::<Vec<_>>();
+    for view in scene_tree_view.iter() {
+        if let Ok(mut view_commands) = commands.get_entity(view) {
+            view_commands.despawn_children().replace_children(&entities);
+        }
+    }
 }
 
 fn menu_button(test: impl Into<String>) -> impl Bundle {
