@@ -66,7 +66,7 @@ pub fn update(
                     .join("\n  - ")
             })
             .unwrap_or("No Components".to_string());
-        let text = if component_names.len() > 0 {
+        let text = if !component_names.is_empty() {
             if depth > 0.0 {
                 format!("> {entity}:\n  - {component_names}")
             } else {
