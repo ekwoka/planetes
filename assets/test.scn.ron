@@ -47,6 +47,7 @@
     ),
     4294967167: (
       components: {
+        "bevy_ecs::name::Name": "Items",
         "bevy_ecs::hierarchy::Children": ([
           4294967163,
           4294967162,

@@ -1,4 +1,7 @@
-use crate::{ReflectPlanetesComponent, scene::EditorScene};
+use crate::{
+    ReflectPlanetesComponent,
+    scene::{EditorScene, InScene},
+};
 use bevy::{camera::visibility::RenderLayers, prelude::*};
 
 #[derive(Component)]
@@ -26,8 +29,9 @@ pub fn update(
     mut commands: Commands,
     scene_tree_view: Query<Entity, With<SceneTreeView>>,
     registry: Res<AppTypeRegistry>,
-    scene_root: Single<Entity, (With<EditorScene>, Without<SceneTreeView>)>,
-    children: Query<&Children>,
+    scene_root: Single<Entity, With<EditorScene>>,
+    children: Query<&Children, With<InScene>>,
+    names: Query<&Name, With<InScene>>,
     world: &World,
 ) {
     let registry = registry.read();
@@ -40,7 +44,10 @@ pub fn update(
     let mut entities = Vec::<Entity>::new();
 
     while let Some((entity, depth)) = entity_stack.pop() {
-        info!("Checking entity: {:?}", entity);
+        let name = names
+            .get(entity)
+            .map(|name| format!("{name} ({entity})"))
+            .unwrap_or(format!("{entity}"));
         let component_names: String = world
             .inspect_entity(entity)
             .ok()
@@ -48,7 +55,9 @@ pub fn update(
                 component_iter
                     .filter_map(|component| {
                         component.type_id().and_then(|type_id| {
-                            if allowed_types.contains(&type_id) {
+                            if allowed_types.contains(&type_id)
+                                && component.name() != "bevy_ecs::name::Name".into()
+                            {
                                 Some((format!("{}", component.name().shortname()), type_id))
                             } else {
                                 None
@@ -68,12 +77,12 @@ pub fn update(
             .unwrap_or("No Components".to_string());
         let text = if !component_names.is_empty() {
             if depth > 0.0 {
-                format!("> {entity}:\n  - {component_names}")
+                format!("> {name}:\n  - {component_names}")
             } else {
-                format!("{entity}:\n  - {component_names}")
+                format!("{name}:\n  - {component_names}")
             }
         } else {
-            format!("{entity}:")
+            format!("{name}:")
         };
         let text_entity = commands
             .spawn((
@@ -96,7 +105,6 @@ pub fn update(
         entities.push(text_entity);
         if let Ok(children) = children.get(entity) {
             for child in children.iter() {
-                info!("Child entity: {:?}", child);
                 entity_stack.push((child, depth + 1.0));
             }
         }
