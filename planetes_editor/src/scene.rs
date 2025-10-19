@@ -46,7 +46,9 @@ pub fn save_scene(
         .remove_empty_entities()
         .build();
 
-    if let Ok(serialized_scene) = scene.serialize(&registry) {
+    if let Ok(serialized_scene) = scene.serialize(&registry)
+        && false
+    {
         info!("Saving Scene");
         info!("{}", serialized_scene);
         IoTaskPool::get()

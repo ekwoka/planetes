@@ -15,7 +15,7 @@ use crate::{
 use avian3d::schedule::{Physics, PhysicsTime};
 
 pub fn plugin(app: &mut App) {
-    app.add_plugins((InfiniteGridPlugin, crate::scene::plugin))
+    app.add_plugins((InfiniteGridPlugin, crate::scene::plugin, scene_tree::plugin))
         .init_state::<EditorMode>()
         .register_type_data::<Transform, ReflectPlanetesComponent>()
         .register_type_data::<Children, ReflectPlanetesComponent>()
@@ -25,9 +25,7 @@ pub fn plugin(app: &mut App) {
         )
         .add_systems(
             Update,
-            (update_viewport, scene_tree::update)
-                .chain()
-                .run_if(in_state(EditorMode::Edit)),
+            (update_viewport).chain().run_if(in_state(EditorMode::Edit)),
         )
         .add_observer(hover_menu_item)
         .add_observer(unhover_menu_item);
