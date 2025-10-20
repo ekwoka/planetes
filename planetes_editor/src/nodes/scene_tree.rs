@@ -35,7 +35,6 @@ pub fn update_tree(
     scene_root: Single<&Children, (With<EditorScene>, Changed<Children>)>,
 ) {
     info!("Updating scene tree");
-
     if let Ok(mut view_commands) = commands.get_entity(*scene_tree_view) {
         view_commands.despawn_children().with_children(|parent| {
             parent.spawn((
@@ -111,7 +110,15 @@ pub fn update_branches(
                                 .get_type_info(type_id)
                                 .and_then(|type_info| type_info.as_struct().ok())
                                 .map(|struct_info| struct_info.field_names().join(", "));
-                            format!("{name}: {type_info:?}")
+                            type_info
+                                .and_then(|fields| {
+                                    if fields.is_empty() {
+                                        None
+                                    } else {
+                                        Some(format!("{name}: {fields}"))
+                                    }
+                                })
+                                .unwrap_or(name.to_string())
                         })
                         .collect::<Vec<_>>()
                         .join("\n  - ")
@@ -156,15 +163,18 @@ pub fn branch(target_entity: Entity) -> impl Bundle {
     (
         SceneTreeBranch,
         Node {
-            padding: px(16.0).left().with_top(px(8.0)),
+            padding: px(4.0).left(),
+            margin: px(12.0).left().with_top(px(8.0)),
             flex_grow: 0.0,
             flex_shrink: 1.0,
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
             row_gap: px(8.0),
             width: percent(100.0),
+            border: px(1.0).left(),
             ..default()
         },
+        BorderColor::from(Color::WHITE.with_alpha(0.25)),
         RenderLayers::layer(1),
         Represents(target_entity),
         children![(

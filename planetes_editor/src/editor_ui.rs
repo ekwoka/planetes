@@ -230,7 +230,11 @@ fn bottom_bar() -> impl Bundle {
         },
         RenderLayers::layer(1),
         children![(
-            Text::new("Planetes Editor v0.0.1"),
+            Text::new(format!(
+                "{} v{}",
+                env!("CARGO_PKG_NAME").capitalize_words(),
+                env!("CARGO_PKG_VERSION")
+            )),
             TextFont {
                 font_size: 10.0,
                 ..default()
@@ -250,4 +254,41 @@ struct ThingyBundle {
     thingy: Thingy,
     transform: Transform,
     camera: Camera3d,
+}
+
+pub trait Capitalize {
+    fn capitalize(&self) -> String;
+    fn capitalize_words(&self) -> String;
+}
+
+impl Capitalize for String {
+    fn capitalize(&self) -> String {
+        let mut chars = self.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
+    fn capitalize_words(&self) -> String {
+        self.split_whitespace()
+            .map(|word| word.capitalize())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+}
+
+impl Capitalize for &str {
+    fn capitalize(&self) -> String {
+        let mut chars = self.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
+    fn capitalize_words(&self) -> String {
+        self.split_whitespace()
+            .map(|word| word.capitalize())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
 }
