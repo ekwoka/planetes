@@ -1,0 +1,119 @@
+use std::borrow::Cow;
+
+use bevy::{
+    app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
+    camera::visibility::RenderLayers,
+    prelude::*,
+};
+
+pub fn plugin(app: &mut App) {
+    app.add_plugins(HierarchyPropagatePlugin::<AccordionState>::new(Update))
+        .add_systems(
+            Update,
+            update_accordion.after(PropagateSet::<AccordionState>::default()),
+        )
+        .add_observer(actuate_accordion);
+}
+
+pub fn update_accordion(
+    mut query: Query<
+        (&mut Node, &AccordionState),
+        (With<AccordionContainer>, Changed<AccordionState>),
+    >,
+) {
+    for (mut node, state) in query.iter_mut() {
+        info!("checking state: {:?}", state);
+        node.display = match state {
+            AccordionState::Closed => Display::None,
+            AccordionState::Open => Display::Flex,
+        };
+    }
+}
+
+pub fn actuate_accordion(
+    mut event: On<Pointer<Click>>,
+    mut commands: Commands,
+    accordions: Query<&Propagate<AccordionState>>,
+) {
+    info!("Click Detected on {:?}", event.entity);
+    if let Ok(state) = accordions.get(event.entity) {
+        info!("Actuating Accordion: {:?}", state.0);
+        commands
+            .entity(event.entity)
+            .try_insert(Propagate(state.0.toggled()));
+        event.propagate(false);
+    }
+}
+
+pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
+    label: impl Into<String> + Clone,
+    content: SpawnIter<I>,
+) -> impl Bundle {
+    (
+        Name::new(Cow::from(Into::<String>::into(label.clone()))),
+        Node {
+            padding: px(8.0).left(),
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            row_gap: px(8.0),
+            ..default()
+        },
+        RenderLayers::layer(1),
+        Propagate(AccordionState::Closed),
+        children![
+            (
+                Node {
+                    padding: px(4.0).all(),
+                    ..default()
+                },
+                RenderLayers::layer(1),
+                children![(
+                    Text::new(label),
+                    TextFont {
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+                    TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
+                    RenderLayers::layer(1),
+                )]
+            ),
+            (
+                Node {
+                    padding: px(4.0).all(),
+                    display: Display::None,
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(8.0),
+                    ..default()
+                },
+                AccordionContainer,
+                RenderLayers::layer(1),
+                Children::spawn(content)
+            )
+        ],
+    )
+}
+
+#[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum AccordionState {
+    Open,
+    Closed,
+}
+
+impl AccordionState {
+    pub fn toggle(&mut self) {
+        *self = match *self {
+            AccordionState::Closed => AccordionState::Open,
+            AccordionState::Open => AccordionState::Closed,
+        };
+    }
+    pub fn toggled(&self) -> Self {
+        match *self {
+            AccordionState::Closed => AccordionState::Open,
+            AccordionState::Open => AccordionState::Closed,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct AccordionContainer;

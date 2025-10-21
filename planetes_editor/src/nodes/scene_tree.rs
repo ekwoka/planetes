@@ -1,4 +1,4 @@
-use crate::{ReflectPlanetesComponent, scene::EditorScene};
+use crate::{ReflectPlanetesComponent, nodes::accordion, scene::EditorScene};
 use bevy::{camera::visibility::RenderLayers, prelude::*};
 
 pub fn plugin(app: &mut App) {
@@ -35,30 +35,13 @@ pub fn update_tree(
     scene_root: Single<&Children, (With<EditorScene>, Changed<Children>)>,
 ) {
     info!("Updating scene tree");
+    let branch_entities = scene_root.iter().collect::<Vec<_>>();
     if let Ok(mut view_commands) = commands.get_entity(*scene_tree_view) {
         view_commands.despawn_children().with_children(|parent| {
-            parent.spawn((
-                Node {
-                    padding: px(8.0).left(),
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    row_gap: px(8.0),
-                    ..default()
-                },
-                children![(
-                    Text::new("Root:"),
-                    TextFont {
-                        font_size: 12.0,
-                        ..default()
-                    },
-                    TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                    TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
-                    RenderLayers::layer(1),
-                )],
+            parent.spawn(accordion::view(
+                "Root:",
+                SpawnIter(branch_entities.into_iter().map(branch)),
             ));
-            scene_root.iter().for_each(|child| {
-                parent.spawn(branch(child));
-            })
         });
     }
 }
@@ -84,6 +67,9 @@ pub fn update_branches(
         .collect::<Vec<_>>();
 
     for (entity, name, children, represented_by) in elements_in_scene.iter() {
+        let child_entities = children
+            .map(|children| children.iter().collect::<Vec<_>>())
+            .unwrap_or_default();
         if let Some(represented_by) = represented_by.iter().next()
             && let Ok(mut branch_view) = commands.get_entity(represented_by)
         {
@@ -130,30 +116,10 @@ pub fn update_branches(
                 format!("{name}:")
             };
             branch_view.despawn_children().with_children(|parent| {
-                parent.spawn((
-                    Node {
-                        padding: px(8.0).left(),
-                        display: Display::Flex,
-                        flex_direction: FlexDirection::Column,
-                        row_gap: px(8.0),
-                        ..default()
-                    },
-                    children![(
-                        Text::new(text),
-                        TextFont {
-                            font_size: 12.0,
-                            ..default()
-                        },
-                        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                        TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
-                        RenderLayers::layer(1),
-                    )],
+                parent.spawn(accordion::view(
+                    text,
+                    SpawnIter(child_entities.into_iter().map(branch)),
                 ));
-                if let Some(children) = children {
-                    children.iter().for_each(|child| {
-                        parent.spawn(branch(child));
-                    });
-                }
             });
         };
     }

@@ -15,20 +15,25 @@ use crate::{
 use avian3d::schedule::{Physics, PhysicsTime};
 
 pub fn plugin(app: &mut App) {
-    app.add_plugins((InfiniteGridPlugin, crate::scene::plugin, scene_tree::plugin))
-        .init_state::<EditorMode>()
-        .register_type_data::<Transform, ReflectPlanetesComponent>()
-        .register_type_data::<Children, ReflectPlanetesComponent>()
-        .add_systems(
-            OnEnter(EditorMode::Edit),
-            (setup_camera_system, build_ui).chain(),
-        )
-        .add_systems(
-            Update,
-            (update_viewport).chain().run_if(in_state(EditorMode::Edit)),
-        )
-        .add_observer(hover_menu_item)
-        .add_observer(unhover_menu_item);
+    app.add_plugins((
+        InfiniteGridPlugin,
+        crate::scene::plugin,
+        scene_tree::plugin,
+        accordion::plugin,
+    ))
+    .init_state::<EditorMode>()
+    .register_type_data::<Transform, ReflectPlanetesComponent>()
+    .register_type_data::<Children, ReflectPlanetesComponent>()
+    .add_systems(
+        OnEnter(EditorMode::Edit),
+        (setup_camera_system, build_ui).chain(),
+    )
+    .add_systems(
+        Update,
+        (update_viewport).chain().run_if(in_state(EditorMode::Edit)),
+    )
+    .add_observer(hover_menu_item)
+    .add_observer(unhover_menu_item);
     #[cfg(feature = "avian")]
     {
         app.add_systems(OnEnter(EditorMode::Edit), pause_physics);
