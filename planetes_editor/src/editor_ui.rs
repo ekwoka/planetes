@@ -1,4 +1,5 @@
 use bevy::{
+    asset::embedded_asset,
     camera::{Viewport, visibility::RenderLayers},
     math::Affine2,
     prelude::*,
@@ -15,6 +16,9 @@ use crate::{
 use avian3d::schedule::{Physics, PhysicsTime};
 
 pub fn plugin(app: &mut App) {
+    embedded_asset!(app, "assets/directory_icon.png");
+    embedded_asset!(app, "assets/file_icon.png");
+
     app.add_plugins((
         InfiniteGridPlugin,
         crate::scene::plugin,

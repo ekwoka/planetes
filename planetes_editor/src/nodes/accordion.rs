@@ -51,6 +51,7 @@ pub fn actuate_accordion(
 pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     label: impl Into<String> + Clone,
     content: SpawnIter<I>,
+    asset_server: AssetServer,
 ) -> impl Bundle {
     (
         Name::new(Cow::from(Into::<String>::into(label.clone()))),
@@ -66,19 +67,35 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
             (
                 Node {
                     padding: px(2.0).all(),
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: px(8.0),
                     ..default()
                 },
                 RenderLayers::layer(1),
-                children![(
-                    Text::new(label),
-                    TextFont {
-                        font_size: 12.0,
-                        ..default()
-                    },
-                    TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                    TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
-                    RenderLayers::layer(1),
-                )]
+                children![
+                    (
+                        ImageNode::new(
+                            asset_server
+                                .load("embedded://planetes_editor/assets/directory_icon.png")
+                        ),
+                        Node {
+                            height: Val::Px(10.0),
+                            ..default()
+                        }
+                    ),
+                    (
+                        Text::new(label),
+                        TextFont {
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+                        TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
+                        RenderLayers::layer(1),
+                    )
+                ]
             ),
             (
                 Node {
