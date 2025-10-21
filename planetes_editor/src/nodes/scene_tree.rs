@@ -1,4 +1,4 @@
-use crate::{ReflectPlanetesComponent, nodes::accordion, scene::EditorScene};
+use crate::{nodes::accordion, scene::EditorScene};
 use bevy::{camera::visibility::RenderLayers, prelude::*};
 
 pub fn plugin(app: &mut App) {
@@ -48,23 +48,16 @@ pub fn update_tree(
 
 pub fn update_branches(
     mut commands: Commands,
-    registry: Res<AppTypeRegistry>,
     elements_in_scene: Query<
         (Entity, Option<&Name>, Option<&Children>, &RepresentedBy),
         Or<(Changed<Children>, Changed<RepresentedBy>)>,
     >,
-    world: &World,
 ) {
     if elements_in_scene.is_empty() {
         return;
     }
 
     info!("Updating ChangedBranches");
-    let registry = registry.read();
-    let allowed_types = registry
-        .iter_with_data::<ReflectPlanetesComponent>()
-        .map(|(type_reg, _)| type_reg.type_id())
-        .collect::<Vec<_>>();
 
     for (entity, name, children, represented_by) in elements_in_scene.iter() {
         let child_entities = children
@@ -75,51 +68,37 @@ pub fn update_branches(
         {
             let name =
                 name.map_or_else(|| format!("{entity}"), |name| format!("{name} ({entity})"));
-            let component_names: String = world
-                .inspect_entity(entity)
-                .ok()
-                .map(|component_iter| {
-                    component_iter
-                        .filter_map(|component| {
-                            component.type_id().and_then(|type_id| {
-                                if allowed_types.contains(&type_id)
-                                    && component.name() != "bevy_ecs::name::Name".into()
-                                {
-                                    Some((format!("{}", component.name().shortname()), type_id))
-                                } else {
-                                    None
-                                }
-                            })
-                        })
-                        .map(|(name, type_id)| {
-                            let type_info = registry
-                                .get_type_info(type_id)
-                                .and_then(|type_info| type_info.as_struct().ok())
-                                .map(|struct_info| struct_info.field_names().join(", "));
-                            type_info
-                                .and_then(|fields| {
-                                    if fields.is_empty() {
-                                        None
-                                    } else {
-                                        Some(format!("{name}: {fields}"))
-                                    }
-                                })
-                                .unwrap_or(name.to_string())
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n  - ")
-                })
-                .unwrap_or("No Components".to_string());
-            let text = if !component_names.is_empty() {
-                format!("> {name}:\n  - {component_names}")
-            } else {
+            let text = if child_entities.is_empty() {
                 format!("{name}:")
+            } else {
+                format!("> {name}:")
             };
             branch_view.despawn_children().with_children(|parent| {
-                parent.spawn(accordion::view(
-                    text,
-                    SpawnIter(child_entities.into_iter().map(branch)),
-                ));
+                if child_entities.is_empty() {
+                    parent.spawn((
+                        Name::new(text.clone()),
+                        Node {
+                            padding: px(4.0).all(),
+                            ..default()
+                        },
+                        RenderLayers::layer(1),
+                        children![(
+                            Text::new(text),
+                            TextFont {
+                                font_size: 12.0,
+                                ..default()
+                            },
+                            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+                            TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
+                            RenderLayers::layer(1),
+                        )],
+                    ));
+                } else {
+                    parent.spawn(accordion::view(
+                        text,
+                        SpawnIter(child_entities.into_iter().map(branch)),
+                    ));
+                }
             });
         };
     }
@@ -129,18 +108,15 @@ pub fn branch(target_entity: Entity) -> impl Bundle {
     (
         SceneTreeBranch,
         Node {
-            padding: px(4.0).left(),
-            margin: px(12.0).left().with_top(px(8.0)),
+            padding: px(2.0).left(),
             flex_grow: 0.0,
             flex_shrink: 1.0,
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
             row_gap: px(8.0),
             width: percent(100.0),
-            border: px(1.0).left(),
             ..default()
         },
-        BorderColor::from(Color::WHITE.with_alpha(0.25)),
         RenderLayers::layer(1),
         Represents(target_entity),
         children![(

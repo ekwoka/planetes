@@ -34,9 +34,12 @@ pub fn actuate_accordion(
     mut event: On<Pointer<Click>>,
     mut commands: Commands,
     accordions: Query<&Propagate<AccordionState>>,
+    containers: Query<&AccordionContainer>,
 ) {
     info!("Click Detected on {:?}", event.entity);
-    if let Ok(state) = accordions.get(event.entity) {
+    if containers.contains(event.entity) {
+        event.propagate(false);
+    } else if let Ok(state) = accordions.get(event.entity) {
         info!("Actuating Accordion: {:?}", state.0);
         commands
             .entity(event.entity)
@@ -52,18 +55,17 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     (
         Name::new(Cow::from(Into::<String>::into(label.clone()))),
         Node {
-            padding: px(8.0).left(),
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
             row_gap: px(8.0),
             ..default()
         },
         RenderLayers::layer(1),
-        Propagate(AccordionState::Closed),
+        Propagate(AccordionState::Open),
         children![
             (
                 Node {
-                    padding: px(4.0).all(),
+                    padding: px(2.0).all(),
                     ..default()
                 },
                 RenderLayers::layer(1),
@@ -80,12 +82,15 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
             ),
             (
                 Node {
-                    padding: px(4.0).all(),
+                    padding: px(2.0).all(),
+                    margin: px(8.0).left(),
+                    border: px(1.0).left(),
                     display: Display::None,
                     flex_direction: FlexDirection::Column,
                     row_gap: px(8.0),
                     ..default()
                 },
+                BorderColor::from(Color::WHITE.with_alpha(0.25)),
                 AccordionContainer,
                 RenderLayers::layer(1),
                 Children::spawn(content)
