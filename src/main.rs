@@ -41,6 +41,7 @@ impl Plugin for AppPlugin {
                             "Planetes".to_string()
                         },
                         fit_canvas_to_parent: true,
+                        position: WindowPosition::At(IVec2::new(100, 600)),
                         ..default()
                     }
                     .into(),

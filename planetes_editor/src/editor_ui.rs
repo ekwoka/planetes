@@ -27,6 +27,7 @@ pub fn plugin(app: &mut App) {
         crate::scene::plugin,
         scene_tree::plugin,
         accordion::plugin,
+        entity_viewer::plugin,
         HierarchyPropagatePlugin::<TextFont>::new(Update),
         HierarchyPropagatePlugin::<TextColor>::new(Update),
     ))
@@ -149,29 +150,33 @@ pub fn build_ui(mut commands: Commands) {
                 children![
                     (
                         Node {
-                            padding: px(1.0).all(),
-                            flex_grow: 0.0,
-                            width: percent(50.0),
-                            ..default()
-                        },
-                        RenderLayers::layer(1),
-                        children![scene_tree::view()]
-                    ),
-                    (
-                        Node {
                             flex_grow: 1.0,
                             flex_shrink: 1.0,
                             width: percent(50.0),
                             height: percent(100.0),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
-                            border: px(1.0).left(),
+                            border: px(1.0).all(),
                             ..default()
                         },
                         BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
                         RenderLayers::layer(1),
                         children![Text::new("Viewport")]
-                    )
+                    ),
+                    (
+                        Node {
+                            padding: px(1.0).all(),
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            flex_grow: 0.0,
+                            width: percent(20.0),
+                            border: px(1.0).all(),
+                            ..default()
+                        },
+                        BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
+                        RenderLayers::layer(1),
+                        children![scene_tree::view(), entity_viewer::view()]
+                    ),
                 ]
             ),
             bottom_bar()

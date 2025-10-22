@@ -3,7 +3,13 @@ use std::borrow::Cow;
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
     camera::visibility::RenderLayers,
+    ecs::relationship::AncestorIter,
     prelude::*,
+};
+
+use crate::nodes::{
+    entity_viewer::{EntityEditor, Viewing},
+    scene_tree::Represents,
 };
 
 pub fn plugin(app: &mut App) {
@@ -21,10 +27,9 @@ pub fn update_accordion(
         (With<AccordionContainer>, Changed<AccordionState>),
     >,
     mut icons: Query<
-        (&mut UiTransform, &mut ImageNode, &AccordionState),
+        (&mut UiTransform, &AccordionState),
         (With<AccordionIcon>, Changed<AccordionState>),
     >,
-    asset_server: Res<AssetServer>,
 ) {
     for (mut node, state) in containers.iter_mut() {
         info!("checking state: {:?}", state);
@@ -33,7 +38,7 @@ pub fn update_accordion(
             AccordionState::Open => Display::Flex,
         };
     }
-    for (mut transform, mut image, state) in icons.iter_mut() {
+    for (mut transform, state) in icons.iter_mut() {
         match state {
             AccordionState::Closed => {
                 transform.rotation = Rot2::degrees(90.0);
@@ -50,6 +55,9 @@ pub fn actuate_accordion(
     mut commands: Commands,
     accordions: Query<&Propagate<AccordionState>>,
     containers: Query<&AccordionContainer>,
+    parents: Query<&ChildOf>,
+    representations: Query<&Represents>,
+    editors: Query<Entity, With<EntityEditor>>,
 ) {
     info!("Click Detected on {:?}", event.entity);
     if containers.contains(event.entity) {
@@ -60,6 +68,15 @@ pub fn actuate_accordion(
             .entity(event.entity)
             .try_insert(Propagate(state.0.toggled()));
         event.propagate(false);
+        for ancestor in AncestorIter::new(&parents, event.entity) {
+            if let Ok(&Represents(scene_entity)) = representations.get(ancestor) {
+                info!("Found representing ancestor");
+                if let Ok(editor) = editors.single() {
+                    commands.entity(editor).insert(Viewing(scene_entity));
+                }
+                break;
+            }
+        }
     }
 }
 
@@ -80,6 +97,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
         Propagate(AccordionState::Open),
         children![
             (
+                Button,
                 Node {
                     padding: px(2.0).all(),
                     display: Display::Flex,
