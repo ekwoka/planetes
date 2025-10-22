@@ -1,4 +1,5 @@
 use bevy::{
+    app::{HierarchyPropagatePlugin, Propagate, PropagateStop},
     asset::embedded_asset,
     camera::{Viewport, visibility::RenderLayers},
     math::Affine2,
@@ -18,12 +19,16 @@ use avian3d::schedule::{Physics, PhysicsTime};
 pub fn plugin(app: &mut App) {
     embedded_asset!(app, "assets/directory_icon.png");
     embedded_asset!(app, "assets/file_icon.png");
+    embedded_asset!(app, "assets/empty_triangle.png");
+    embedded_asset!(app, "assets/filled_triangle.png");
 
     app.add_plugins((
         InfiniteGridPlugin,
         crate::scene::plugin,
         scene_tree::plugin,
         accordion::plugin,
+        HierarchyPropagatePlugin::<TextFont>::new(Update),
+        HierarchyPropagatePlugin::<TextColor>::new(Update),
     ))
     .init_state::<EditorMode>()
     .register_type_data::<Transform, ReflectPlanetesComponent>()
@@ -103,6 +108,11 @@ pub fn build_ui(mut commands: Commands) {
             min_height: px(0.0),
             ..default()
         },
+        Propagate(TextFont {
+            font_size: 12.0,
+            ..default()
+        }),
+        Propagate(TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7))),
         RenderLayers::layer(1),
         children![
             (
@@ -178,14 +188,7 @@ fn menu_button(test: impl Into<String>) -> impl Bundle {
         MenuButton,
         BackgroundColor::DEFAULT,
         BorderRadius::all(px(2.0)),
-        children![(
-            Text::new(test),
-            TextFont {
-                font_size: 12.0,
-                ..default()
-            },
-            TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7))
-        )],
+        children![(Text::new(test))],
     )
 }
 
@@ -237,6 +240,7 @@ fn bottom_bar() -> impl Bundle {
             width: percent(100.0),
             ..default()
         },
+        PropagateStop::<TextFont>::default(),
         RenderLayers::layer(1),
         children![(
             Text::new(format!(

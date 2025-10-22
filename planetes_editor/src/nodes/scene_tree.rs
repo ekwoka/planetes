@@ -71,15 +71,11 @@ pub fn update_branches(
         {
             let name =
                 name.map_or_else(|| format!("{entity}"), |name| format!("{name} ({entity})"));
-            let text = if child_entities.is_empty() {
-                format!("{name}:")
-            } else {
-                format!("> {name}:")
-            };
+            let text = format!("{name}:");
             branch_view.despawn_children().with_children(|parent| {
                 if child_entities.is_empty() {
                     parent.spawn((
-                        Name::new(text.clone()),
+                        Name::new(name),
                         Node {
                             padding: px(2.0).all(),
                             display: Display::Flex,
@@ -102,12 +98,7 @@ pub fn update_branches(
                             ),
                             (
                                 Text::new(text),
-                                TextFont {
-                                    font_size: 12.0,
-                                    ..default()
-                                },
                                 TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                                TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
                                 RenderLayers::layer(1),
                             )
                         ],
@@ -141,12 +132,7 @@ pub fn branch(target_entity: Entity) -> impl Bundle {
         Represents(target_entity),
         children![(
             Text::new(format!("Child {target_entity}")),
-            TextFont {
-                font_size: 12.0,
-                ..default()
-            },
             TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-            TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
             RenderLayers::layer(1),
         )],
     )

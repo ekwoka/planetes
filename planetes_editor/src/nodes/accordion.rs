@@ -16,17 +16,32 @@ pub fn plugin(app: &mut App) {
 }
 
 pub fn update_accordion(
-    mut query: Query<
+    mut containers: Query<
         (&mut Node, &AccordionState),
         (With<AccordionContainer>, Changed<AccordionState>),
     >,
+    mut icons: Query<
+        (&mut UiTransform, &mut ImageNode, &AccordionState),
+        (With<AccordionIcon>, Changed<AccordionState>),
+    >,
+    asset_server: Res<AssetServer>,
 ) {
-    for (mut node, state) in query.iter_mut() {
+    for (mut node, state) in containers.iter_mut() {
         info!("checking state: {:?}", state);
         node.display = match state {
             AccordionState::Closed => Display::None,
             AccordionState::Open => Display::Flex,
         };
+    }
+    for (mut transform, mut image, state) in icons.iter_mut() {
+        match state {
+            AccordionState::Closed => {
+                transform.rotation = Rot2::degrees(90.0);
+            }
+            AccordionState::Open => {
+                transform.rotation = Rot2::degrees(180.0);
+            }
+        }
     }
 }
 
@@ -76,38 +91,34 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
                 RenderLayers::layer(1),
                 children![
                     (
+                        AccordionIcon,
                         ImageNode::new(
                             asset_server
-                                .load("embedded://planetes_editor/assets/directory_icon.png")
+                                .load("embedded://planetes_editor/assets/filled_triangle.png")
                         ),
                         Node {
-                            height: Val::Px(10.0),
+                            height: Val::Px(8.0),
+                            width: Val::Px(8.0),
                             ..default()
-                        }
+                        },
+                        UiTransform::from_rotation(Rot2::degrees(90.0))
                     ),
                     (
                         Text::new(label),
-                        TextFont {
-                            font_size: 12.0,
-                            ..default()
-                        },
                         TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                        TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7)),
                         RenderLayers::layer(1),
                     )
                 ]
             ),
             (
                 Node {
-                    padding: px(2.0).all(),
-                    margin: px(8.0).left(),
-                    border: px(1.0).left(),
+                    padding: px(2.0).left(),
+                    margin: px(16.0).left(),
                     display: Display::None,
                     flex_direction: FlexDirection::Column,
                     row_gap: px(8.0),
                     ..default()
                 },
-                BorderColor::from(Color::WHITE.with_alpha(0.25)),
                 AccordionContainer,
                 RenderLayers::layer(1),
                 Children::spawn(content)
@@ -139,3 +150,6 @@ impl AccordionState {
 
 #[derive(Component)]
 pub struct AccordionContainer;
+
+#[derive(Component)]
+pub struct AccordionIcon;
