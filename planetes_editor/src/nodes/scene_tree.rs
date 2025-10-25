@@ -1,8 +1,15 @@
-use crate::{nodes::accordion, scene::EditorScene};
+use crate::{
+    nodes::{
+        accordion,
+        entity_viewer::{EntityEditor, Viewing},
+    },
+    scene::EditorScene,
+};
 use bevy::{camera::visibility::RenderLayers, prelude::*};
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Update, (update_tree, update_branches));
+    app.add_systems(Update, (update_tree, update_branches))
+        .add_observer(select_entity);
 }
 
 #[derive(Component)]
@@ -136,6 +143,21 @@ pub fn branch(target_entity: Entity) -> impl Bundle {
             RenderLayers::layer(1),
         )],
     )
+}
+
+pub fn select_entity(
+    mut event: On<Pointer<Click>>,
+    mut commands: Commands,
+    representations: Query<&Represents>,
+    editors: Query<Entity, With<EntityEditor>>,
+) {
+    if let Ok(&Represents(scene_entity)) = representations.get(event.entity) {
+        info!("Found representing ancestor");
+        if let Ok(editor) = editors.single() {
+            commands.entity(editor).insert(Viewing(scene_entity));
+        }
+        event.propagate(false);
+    }
 }
 
 #[derive(Component)]

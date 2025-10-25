@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
     camera::visibility::RenderLayers,
-    ecs::relationship::AncestorIter,
     prelude::*,
 };
 
@@ -68,13 +67,14 @@ pub fn actuate_accordion(
             .entity(event.entity)
             .try_insert(Propagate(state.0.toggled()));
         event.propagate(false);
-        for ancestor in AncestorIter::new(&parents, event.entity) {
-            if let Ok(&Represents(scene_entity)) = representations.get(ancestor) {
-                info!("Found representing ancestor");
-                if let Ok(editor) = editors.single() {
-                    commands.entity(editor).insert(Viewing(scene_entity));
-                }
-                break;
+        if let Some(&Represents(scene_entity)) = parents
+            .iter_ancestors(event.entity)
+            .filter_map(|ancestor| representations.get(ancestor).ok())
+            .next()
+        {
+            info!("Found representing ancestor");
+            if let Ok(editor) = editors.single() {
+                commands.entity(editor).insert(Viewing(scene_entity));
             }
         }
     }
