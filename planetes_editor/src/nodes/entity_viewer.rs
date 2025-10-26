@@ -1,8 +1,18 @@
-use bevy::{camera::visibility::RenderLayers, prelude::*};
+use std::{any::TypeId, iter::once};
 
-use crate::ReflectPlanetesComponent;
+use bevy::{
+    camera::visibility::RenderLayers,
+    ecs::{component::ComponentId, relationship::RelatedSpawnerCommands},
+    prelude::*,
+    reflect::{StructInfo, TypeInfo},
+};
+
+use crate::{ReflectPlanetesComponent, nodes::accordion};
 pub fn plugin(app: &mut App) {
-    app.add_systems(Update, update_entity_viewer);
+    app.add_systems(
+        Update,
+        (update_entity_viewer, update_component_editor).chain(),
+    );
 }
 
 pub fn view() -> impl Bundle {
@@ -51,6 +61,7 @@ pub fn update_entity_viewer(
     names: Query<&Name>,
     registry: Res<AppTypeRegistry>,
     world: &World,
+    assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
 
@@ -68,7 +79,11 @@ pub fn update_entity_viewer(
         component.type_id().and_then(|type_id| {
             if allowed_types.contains(&type_id) && component.name() != "bevy_ecs::name::Name".into()
             {
-                Some((format!("{}", component.name().shortname()), type_id))
+                Some((
+                    component.id(),
+                    format!("{}", component.name().shortname()),
+                    type_id,
+                ))
             } else {
                 None
             }
@@ -97,11 +112,130 @@ pub fn update_entity_viewer(
                     ..default()
                 },))
                 .with_children(|parent| {
-                    for (name, _) in components {
-                        parent.spawn(Text::new(name));
+                    for (id, name, type_id) in components {
+                        parent.spawn(accordion::view(
+                            name,
+                            SpawnIter(once(component_editor(id, type_id))),
+                            assets.clone(),
+                        ));
                     }
                 });
         });
+}
+
+#[derive(Component)]
+pub struct ComponentEditor((ComponentId, TypeId));
+
+pub fn component_editor(id: ComponentId, type_id: TypeId) -> impl Bundle {
+    (
+        ComponentEditor((id, type_id)),
+        Node {
+            padding: px(2.0).left(),
+            flex_grow: 0.0,
+            flex_shrink: 1.0,
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            row_gap: px(4.0),
+            width: percent(100.0),
+            ..default()
+        },
+        children![(
+            Text::new(format!("{id:?}")),
+            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+        )],
+    )
+}
+
+pub fn update_component_editor(
+    mut commands: Commands,
+    target: Single<Entity, With<ViewedBy>>,
+    editors: Query<(Entity, &ComponentEditor), Changed<ComponentEditor>>,
+    registry: Res<AppTypeRegistry>,
+    world: &World,
+) {
+    let registry = registry.read();
+    for (editor, &ComponentEditor((id, type_id))) in editors {
+        let Some(registration) = registry.get(type_id) else {
+            continue;
+        };
+        let Some(component_data) = registration.data::<ReflectComponent>() else {
+            continue;
+        };
+        let Some(type_info) = registry.get_type_info(type_id) else {
+            continue;
+        };
+        let Ok(entity) = world.get_entity(*target) else {
+            continue;
+        };
+        let Some(reflected) = component_data.reflect(entity) else {
+            continue;
+        };
+
+        commands
+            .entity(editor)
+            .despawn_children()
+            .with_children(|parent| {
+                parent.spawn((
+                    Text::new(format!("{id:?}")),
+                    TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+                ));
+                component(parent, type_info, reflected);
+            });
+    }
+}
+
+fn component(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    type_info: &TypeInfo,
+    reflect: &dyn Reflect,
+) {
+    match type_info {
+        TypeInfo::Struct(info) => parent.spawn(reflected_struct(info, reflect)),
+        _ => parent.spawn(empty_component()),
+    };
+}
+
+fn empty_component() -> impl Bundle {
+    (
+        Text::new("Empty"),
+        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
+    )
+}
+
+fn reflected_struct(info: &StructInfo, reflect: &dyn Reflect) -> impl Bundle {
+    let struct_data = reflect.reflect_ref().as_struct().unwrap();
+    (
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            row_gap: px(2.0),
+            ..default()
+        },
+        Children::spawn(SpawnIter(
+            info.iter()
+                .map(|field| {
+                    (
+                        Node {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            row_gap: px(2.0),
+                            ..default()
+                        },
+                        children![
+                            (Text::new(format!("{}: ", field.name()))),
+                            (Text::new(
+                                struct_data
+                                    .field(field.name())
+                                    .map(|v| format!("{v:?}"))
+                                    .unwrap_or("Unknown".to_string())
+                            ))
+                        ],
+                    )
+                })
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )),
+    )
 }
 
 #[derive(Component)]

@@ -94,7 +94,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
             ..default()
         },
         RenderLayers::layer(1),
-        Propagate(AccordionState::Open),
+        Propagate(AccordionState::Closed),
         children![
             (
                 Button,
