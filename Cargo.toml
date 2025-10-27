@@ -59,6 +59,7 @@ too_many_arguments = "allow"
 type_complexity = "allow"
 # Make sure macros use their standard braces, such as `[]` for `bevy_ecs::children!`.
 nonstandard_macro_braces = "warn"
+unwrap_used = "warn"
 
 [workspace.metadata.bin]
 cargo-edit = { version = "0.13.7", bins = ["cargo-rm", "cargo-upgrade"] }

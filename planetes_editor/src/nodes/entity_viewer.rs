@@ -4,10 +4,10 @@ use bevy::{
     camera::visibility::RenderLayers,
     ecs::{component::ComponentId, relationship::RelatedSpawnerCommands},
     prelude::*,
-    reflect::{StructInfo, TypeInfo},
+    reflect::{StructInfo, TupleStructInfo, TypeInfo},
 };
 
-use crate::{ReflectPlanetesComponent, nodes::accordion};
+use crate::{ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion};
 pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
@@ -179,63 +179,161 @@ pub fn update_component_editor(
                     Text::new(format!("{id:?}")),
                     TextLayout::new_with_linebreak(LineBreak::WordBoundary),
                 ));
-                component(parent, type_info, reflected);
+                spawn_component_editor(parent, type_info, reflected);
             });
     }
 }
 
-fn component(
+fn spawn_component_editor(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     type_info: &TypeInfo,
     reflect: &dyn Reflect,
 ) {
     match type_info {
-        TypeInfo::Struct(info) => parent.spawn(reflected_struct(info, reflect)),
-        _ => parent.spawn(empty_component()),
+        TypeInfo::Struct(info) => spawn_struct_editor(parent, info, reflect),
+        _ => spawn_empty_component(parent),
     };
 }
 
-fn empty_component() -> impl Bundle {
-    (
+fn spawn_empty_component(parent: &mut RelatedSpawnerCommands<'_, ChildOf>) {
+    parent.spawn((
         Text::new("Empty"),
         TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-    )
+    ));
 }
 
-fn reflected_struct(info: &StructInfo, reflect: &dyn Reflect) -> impl Bundle {
+fn spawn_struct_editor(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    info: &StructInfo,
+    reflect: &dyn Reflect,
+) {
     let struct_data = reflect.reflect_ref().as_struct().unwrap();
-    (
-        Node {
+    parent
+        .spawn(Node {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
             row_gap: px(2.0),
             ..default()
-        },
-        Children::spawn(SpawnIter(
-            info.iter()
-                .map(|field| {
-                    (
-                        Node {
-                            display: Display::Flex,
-                            flex_direction: FlexDirection::Row,
-                            row_gap: px(2.0),
-                            ..default()
-                        },
-                        children![
-                            (Text::new(format!("{}: ", field.name()))),
-                            (Text::new(
-                                struct_data
-                                    .field(field.name())
-                                    .map(|v| format!("{v:?}"))
-                                    .unwrap_or("Unknown".to_string())
-                            ))
-                        ],
-                    )
+        })
+        .with_children(|parent| {
+            info.iter().for_each(|field| {
+                let name = format!("{}: ", field.name().capitalize_words());
+                let value = struct_data.field(field.name());
+                parent
+                    .spawn(Node {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        row_gap: px(2.0),
+                        ..default()
+                    })
+                    .with_children(|parent| {
+                        parent.spawn((
+                            Node {
+                                flex_grow: 1.0,
+                                ..default()
+                            },
+                            Text::new(name),
+                        ));
+                        match value {
+                            None => {
+                                parent.spawn(Text::new("Unknown Field"));
+                            }
+                            Some(value) => match value.get_represented_type_info() {
+                                Some(TypeInfo::TupleStruct(info)) => {
+                                    spawn_reflected_tuple_struct(parent, info, value);
+                                }
+                                Some(TypeInfo::Struct(info)) => {
+                                    spawn_reflected_struct(parent, info, value);
+                                }
+                                Some(TypeInfo::Tuple(_)) => {
+                                    parent.spawn(Text::new("Unknown Tuple"));
+                                }
+                                Some(TypeInfo::List(_)) => {
+                                    parent.spawn(Text::new("Unknown List"));
+                                }
+                                _ => {
+                                    parent.spawn(Text::new("Unknown Type"));
+                                }
+                            },
+                        };
+                    });
+            });
+        });
+}
+
+fn spawn_reflected_tuple_struct(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    info: &TupleStructInfo,
+    reflect: &dyn PartialReflect,
+) {
+    let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
+    parent
+        .spawn(Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            column_gap: px(4.0),
+            ..default()
+        })
+        .with_children(|parent| {
+            parent.spawn(Text::new(name));
+            parent
+                .spawn(Node {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(2.0),
+                    ..default()
                 })
-                .collect::<Vec<_>>()
-                .into_iter(),
-        )),
-    )
+                .with_children(|parent| {
+                    let tuple_struct = reflect.reflect_ref().as_tuple_struct().unwrap();
+                    tuple_struct.iter_fields().for_each(|field| {
+                        parent.spawn(Text::new(format!("{:?}", field)));
+                    })
+                });
+        });
+}
+
+fn spawn_reflected_struct(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    info: &StructInfo,
+    reflect: &dyn PartialReflect,
+) {
+    let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
+    parent
+        .spawn(Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            column_gap: px(16.0),
+            ..default()
+        })
+        .with_children(|parent| {
+            parent.spawn(Text::new(name));
+            parent
+                .spawn(Node {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(8.0),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    let reflect_struct = reflect.reflect_ref().as_struct().unwrap();
+                    info.iter()
+                        .zip(reflect_struct.iter_fields())
+                        .for_each(|(field, value)| {
+                            parent.spawn((
+                                Node {
+                                    display: Display::Flex,
+                                    flex_direction: FlexDirection::Row,
+                                    column_gap: px(4.0),
+                                    ..default()
+                                },
+                                children![
+                                    Text::new(field.name().capitalize_words().to_string()),
+                                    Text::new(format!("{:?}", value))
+                                ],
+                            ));
+                        })
+                });
+        });
 }
 
 #[derive(Component)]

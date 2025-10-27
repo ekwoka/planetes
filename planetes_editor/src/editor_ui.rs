@@ -169,7 +169,8 @@ pub fn build_ui(mut commands: Commands) {
                             display: Display::Flex,
                             flex_direction: FlexDirection::Column,
                             flex_grow: 0.0,
-                            width: percent(20.0),
+                            flex_shrink: 0.0,
+                            width: percent(40.0),
                             border: px(1.0).all(),
                             ..default()
                         },
