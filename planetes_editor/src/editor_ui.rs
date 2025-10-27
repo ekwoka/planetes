@@ -8,7 +8,7 @@ use bevy::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
+    EditorMode, ReflectEditorView, ReflectPlanetesBundle, ReflectPlanetesComponent,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::*,
 };
@@ -33,6 +33,7 @@ pub fn plugin(app: &mut App) {
     ))
     .init_state::<EditorMode>()
     .register_type_data::<Transform, ReflectPlanetesComponent>()
+    .register_type_data::<Transform, ReflectEditorView>()
     .register_type_data::<Children, ReflectPlanetesComponent>()
     .add_systems(
         OnEnter(EditorMode::Edit),

@@ -7,7 +7,7 @@ use bevy::{
     reflect::{StructInfo, TupleStructInfo, TypeInfo},
 };
 
-use crate::{ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion};
+use crate::{ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion};
 pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
@@ -170,6 +170,9 @@ pub fn update_component_editor(
         let Some(reflected) = component_data.reflect(entity) else {
             continue;
         };
+        let reflected_editor_view = registration
+            .data::<ReflectEditorView>()
+            .and_then(|editor_view| editor_view.get(reflected));
 
         commands
             .entity(editor)
@@ -179,7 +182,11 @@ pub fn update_component_editor(
                     Text::new(format!("{id:?}")),
                     TextLayout::new_with_linebreak(LineBreak::WordBoundary),
                 ));
-                spawn_component_editor(parent, type_info, reflected);
+                if let Some(editor_view) = reflected_editor_view {
+                    editor_view.add_to_parent(parent);
+                } else {
+                    spawn_component_editor(parent, type_info, reflected);
+                }
             });
     }
 }
