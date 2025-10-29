@@ -1660,6 +1660,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rstml",
+ "syn",
 ]
 
 [[package]]
