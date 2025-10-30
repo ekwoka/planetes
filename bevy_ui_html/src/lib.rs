@@ -18,7 +18,7 @@ struct TextNode {
 #[derive(Debug)]
 struct ElementNode {
     children: Vec<HtmlNode>,
-    attributes: HashMap<String, String>,
+    attributes: HashMap<String, TokenStream>,
 }
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl From<Node> for HtmlNode {
                     .collect();
 
                 let tag_name = element.open_tag.name.to_string();
-                let attributes: HashMap<String, String> = element
+                let attributes: HashMap<String, TokenStream> = element
                     .open_tag
                     .attributes
                     .into_iter()
@@ -55,8 +55,17 @@ impl From<Node> for HtmlNode {
                                 if let syn::Expr::Lit(expr_lit) = value_expr
                                     && let syn::Lit::Str(lit_str) = &expr_lit.lit
                                 {
-                                    return Some((key, lit_str.value()));
+                                    // String literal - return as TokenStream for later parsing
+                                    let value = lit_str.value();
+                                    return Some((key, quote! { #value }));
                                 }
+                                // For block expressions, extract the inner content
+                                if let syn::Expr::Block(expr_block) = value_expr {
+                                    let stmts = &expr_block.block.stmts;
+                                    return Some((key, quote! { #(#stmts)* }));
+                                }
+                                // Otherwise, return the expression as a TokenStream
+                                return Some((key, quote! { #value_expr }));
                             }
                             None
                         } else {
@@ -89,40 +98,53 @@ impl ToTokens for TextNode {
 }
 
 impl ElementNode {
-    fn parse_css_value(value: &str) -> Option<TokenStream> {
-        if let Some(px_value) = value.strip_suffix("px") {
-            let num =
-                syn::LitFloat::new(&format!("{}.0", px_value), proc_macro2::Span::call_site());
-            Some(quote! { ::bevy_ui::px(#num) })
-        } else if let Some(percent_value) = value.strip_suffix("%") {
-            let num = syn::LitFloat::new(
-                &format!("{}.0", percent_value),
-                proc_macro2::Span::call_site(),
-            );
-            Some(quote! { ::bevy_ui::percent(#num) })
-        } else if let Some(vw_value) = value.strip_suffix("vw") {
-            let num =
-                syn::LitFloat::new(&format!("{}.0", vw_value), proc_macro2::Span::call_site());
-            Some(quote! { ::bevy_ui::vw(#num) })
-        } else if let Some(vh_value) = value.strip_suffix("vh") {
-            let num =
-                syn::LitFloat::new(&format!("{}.0", vh_value), proc_macro2::Span::call_site());
-            Some(quote! { ::bevy_ui::vh(#num) })
-        } else if let Some(vmin_value) = value.strip_suffix("vmin") {
-            let num =
-                syn::LitFloat::new(&format!("{}.0", vmin_value), proc_macro2::Span::call_site());
-            Some(quote! { ::bevy_ui::vmin(#num) })
-        } else if let Some(vmax_value) = value.strip_suffix("vmax") {
-            let num =
-                syn::LitFloat::new(&format!("{}.0", vmax_value), proc_macro2::Span::call_site());
-            Some(quote! { ::bevy_ui::vmax(#num) })
+    fn parse_css_value(value: &TokenStream) -> Option<TokenStream> {
+        // Try to parse as a string literal (CSS-style values)
+        let value_str = value.to_string();
+
+        // Check if this is a quoted string (CSS-style value)
+        if value_str.starts_with('"') && value_str.ends_with('"') {
+            // Remove quotes
+            let value_str = value_str.trim_matches('"');
+
+            if let Some(px_value) = value_str.strip_suffix("px") {
+                let num =
+                    syn::LitFloat::new(&format!("{}.0", px_value), proc_macro2::Span::call_site());
+                Some(quote! { ::bevy_ui::px(#num) })
+            } else if let Some(percent_value) = value_str.strip_suffix("%") {
+                let num = syn::LitFloat::new(
+                    &format!("{}.0", percent_value),
+                    proc_macro2::Span::call_site(),
+                );
+                Some(quote! { ::bevy_ui::percent(#num) })
+            } else if let Some(vw_value) = value_str.strip_suffix("vw") {
+                let num =
+                    syn::LitFloat::new(&format!("{}.0", vw_value), proc_macro2::Span::call_site());
+                Some(quote! { ::bevy_ui::vw(#num) })
+            } else if let Some(vh_value) = value_str.strip_suffix("vh") {
+                let num =
+                    syn::LitFloat::new(&format!("{}.0", vh_value), proc_macro2::Span::call_site());
+                Some(quote! { ::bevy_ui::vh(#num) })
+            } else if let Some(vmin_value) = value_str.strip_suffix("vmin") {
+                let num =
+                    syn::LitFloat::new(&format!("{}.0", vmin_value), proc_macro2::Span::call_site());
+                Some(quote! { ::bevy_ui::vmin(#num) })
+            } else if let Some(vmax_value) = value_str.strip_suffix("vmax") {
+                let num =
+                    syn::LitFloat::new(&format!("{}.0", vmax_value), proc_macro2::Span::call_site());
+                Some(quote! { ::bevy_ui::vmax(#num) })
+            } else {
+                None
+            }
         } else {
-            None
+            // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))
+            // Use the value directly without prepending namespace
+            Some(value.clone())
         }
     }
 
     fn build_spacing_chain(
-        attributes: &HashMap<String, String>,
+        attributes: &HashMap<String, TokenStream>,
         property: &str,
     ) -> Option<TokenStream> {
         // Define directions in priority order: all -> top -> right -> bottom -> left
@@ -337,6 +359,36 @@ mod tests {
                 ::bevy_ui::Node {
                   padding: ::bevy_ui::px(10.0).all().with_bottom(::bevy_ui::percent(20.0)),
                   margin: ::bevy_ui::vw(5.0).top().with_right(::bevy_ui::vmax(20.0)).with_bottom(::bevy_ui::vmin(15.0)).with_left(::bevy_ui::vh(10.0)),
+                  ..default()
+                },
+                ::bevy_ecs::hierarchy::Children::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello"))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn single_div_with_rust_attributes() {
+        let input = quote! {
+            <div
+              padding={px(10.0)}
+              padding-bottom={percent(20.0)}
+              margin-top={vw(5.0)}
+              margin-left={vh(10.0)}
+              margin-bottom={vmin(15.0)}
+              margin-right={vmax(20.0)}
+              >
+              "Hello"
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node {
+                  padding: px(10.0).all().with_bottom(percent(20.0)),
+                  margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)),
                   ..default()
                 },
                 ::bevy_ecs::hierarchy::Children::spawn(
