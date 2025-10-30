@@ -52,10 +52,10 @@ impl From<Node> for HtmlNode {
                             let key = attr.key.to_string();
                             if let Some(value_expr) = attr.value() {
                                 // Try to extract string literal from the expression
-                                if let syn::Expr::Lit(expr_lit) = value_expr {
-                                    if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                                        return Some((key, lit_str.value()));
-                                    }
+                                if let syn::Expr::Lit(expr_lit) = value_expr
+                                    && let syn::Lit::Str(lit_str) = &expr_lit.lit
+                                {
+                                    return Some((key, lit_str.value()));
                                 }
                             }
                             None
@@ -68,7 +68,10 @@ impl From<Node> for HtmlNode {
                 if tag_name == "span" {
                     Self::Inline(InlineNode { children })
                 } else {
-                    Self::Element(ElementNode { children, attributes })
+                    Self::Element(ElementNode {
+                        children,
+                        attributes,
+                    })
                 }
             }
             _ => todo!("Unsupported node type"),
@@ -88,29 +91,40 @@ impl ToTokens for TextNode {
 impl ElementNode {
     fn parse_css_value(value: &str) -> Option<TokenStream> {
         if let Some(px_value) = value.strip_suffix("px") {
-            let num = syn::LitFloat::new(&format!("{}.0", px_value), proc_macro2::Span::call_site());
+            let num =
+                syn::LitFloat::new(&format!("{}.0", px_value), proc_macro2::Span::call_site());
             Some(quote! { ::bevy_ui::px(#num) })
         } else if let Some(percent_value) = value.strip_suffix("%") {
-            let num = syn::LitFloat::new(&format!("{}.0", percent_value), proc_macro2::Span::call_site());
+            let num = syn::LitFloat::new(
+                &format!("{}.0", percent_value),
+                proc_macro2::Span::call_site(),
+            );
             Some(quote! { ::bevy_ui::percent(#num) })
         } else if let Some(vw_value) = value.strip_suffix("vw") {
-            let num = syn::LitFloat::new(&format!("{}.0", vw_value), proc_macro2::Span::call_site());
+            let num =
+                syn::LitFloat::new(&format!("{}.0", vw_value), proc_macro2::Span::call_site());
             Some(quote! { ::bevy_ui::vw(#num) })
         } else if let Some(vh_value) = value.strip_suffix("vh") {
-            let num = syn::LitFloat::new(&format!("{}.0", vh_value), proc_macro2::Span::call_site());
+            let num =
+                syn::LitFloat::new(&format!("{}.0", vh_value), proc_macro2::Span::call_site());
             Some(quote! { ::bevy_ui::vh(#num) })
         } else if let Some(vmin_value) = value.strip_suffix("vmin") {
-            let num = syn::LitFloat::new(&format!("{}.0", vmin_value), proc_macro2::Span::call_site());
+            let num =
+                syn::LitFloat::new(&format!("{}.0", vmin_value), proc_macro2::Span::call_site());
             Some(quote! { ::bevy_ui::vmin(#num) })
         } else if let Some(vmax_value) = value.strip_suffix("vmax") {
-            let num = syn::LitFloat::new(&format!("{}.0", vmax_value), proc_macro2::Span::call_site());
+            let num =
+                syn::LitFloat::new(&format!("{}.0", vmax_value), proc_macro2::Span::call_site());
             Some(quote! { ::bevy_ui::vmax(#num) })
         } else {
             None
         }
     }
 
-    fn build_spacing_chain(attributes: &HashMap<String, String>, property: &str) -> Option<TokenStream> {
+    fn build_spacing_chain(
+        attributes: &HashMap<String, String>,
+        property: &str,
+    ) -> Option<TokenStream> {
         // Define directions in priority order: all -> top -> right -> bottom -> left
         let directions = [
             ("", "all"),
@@ -130,24 +144,21 @@ impl ElementNode {
             .collect();
 
         // Find the first available direction and start the chain
-        let (start_idx, mut chain) = values
-            .iter()
-            .enumerate()
-            .find_map(|(idx, val)| {
-                val.as_ref().map(|v| {
-                    let method = syn::Ident::new(directions[idx].1, proc_macro2::Span::call_site());
-                    (idx, quote! { #v.#method() })
-                })
-            })?;
+        let (start_idx, mut chain) = values.iter().enumerate().find_map(|(idx, val)| {
+            val.as_ref().map(|v| {
+                let method = syn::Ident::new(directions[idx].1, proc_macro2::Span::call_site());
+                (idx, quote! { #v.#method() })
+            })
+        })?;
 
         // Chain the remaining directions using with_X() methods
         for (idx, val) in values.iter().enumerate() {
-            if idx != start_idx {
-                if let Some(v) = val {
-                    let method_name = format!("with_{}", directions[idx].1);
-                    let method = syn::Ident::new(&method_name, proc_macro2::Span::call_site());
-                    chain = quote! { #chain.#method(#v) };
-                }
+            if idx != start_idx
+                && let Some(v) = val
+            {
+                let method_name = format!("with_{}", directions[idx].1);
+                let method = syn::Ident::new(&method_name, proc_macro2::Span::call_site());
+                chain = quote! { #chain.#method(#v) };
             }
         }
 
