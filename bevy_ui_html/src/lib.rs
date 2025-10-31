@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use rstml::{node::Node, parse2};
-use std::collections::HashMap;
 
 #[derive(Debug)]
 enum HtmlNode {
@@ -16,9 +15,15 @@ struct TextNode {
 }
 
 #[derive(Debug)]
+struct Attribute {
+    key: String,
+    value: syn::Expr,
+}
+
+#[derive(Debug)]
 struct ElementNode {
     children: Vec<HtmlNode>,
-    attributes: HashMap<String, TokenStream>,
+    attributes: Vec<Attribute>,
 }
 
 #[derive(Debug)]
@@ -43,7 +48,7 @@ impl From<Node> for HtmlNode {
                     .collect();
 
                 let tag_name = element.open_tag.name.to_string();
-                let attributes: HashMap<String, TokenStream> = element
+                let attributes: Vec<Attribute> = element
                     .open_tag
                     .attributes
                     .into_iter()
@@ -51,21 +56,10 @@ impl From<Node> for HtmlNode {
                         if let rstml::node::NodeAttribute::Attribute(attr) = attr {
                             let key = attr.key.to_string();
                             if let Some(value_expr) = attr.value() {
-                                // Try to extract string literal from the expression
-                                if let syn::Expr::Lit(expr_lit) = value_expr
-                                    && let syn::Lit::Str(lit_str) = &expr_lit.lit
-                                {
-                                    // String literal - return as TokenStream for later parsing
-                                    let value = lit_str.value();
-                                    return Some((key, quote! { #value }));
-                                }
-                                // For block expressions, extract the inner content
-                                if let syn::Expr::Block(expr_block) = value_expr {
-                                    let stmts = &expr_block.block.stmts;
-                                    return Some((key, quote! { #(#stmts)* }));
-                                }
-                                // Otherwise, return the expression as a TokenStream
-                                return Some((key, quote! { #value_expr }));
+                                return Some(Attribute {
+                                    key,
+                                    value: value_expr.clone(),
+                                });
                             }
                             None
                         } else {
@@ -102,15 +96,24 @@ impl ElementNode {
         s.replace('-', "_")
     }
 
-    fn get_attr<'a>(
-        attributes: &'a HashMap<String, TokenStream>,
-        kebab_name: &str,
-    ) -> Option<&'a TokenStream> {
-        attributes.get(kebab_name)
+    fn get_attr<'a>(attributes: &'a [Attribute], kebab_name: &str) -> Option<&'a syn::Expr> {
+        attributes
+            .iter()
+            .find(|attr| attr.key == kebab_name)
+            .map(|attr| &attr.value)
     }
-    fn parse_css_value(value: &TokenStream) -> Option<TokenStream> {
+
+    fn parse_css_value(value: &syn::Expr) -> Option<TokenStream> {
+        // Handle block expressions - extract the inner content
+        let value_tokens = if let syn::Expr::Block(expr_block) = value {
+            let stmts = &expr_block.block.stmts;
+            quote! { #(#stmts)* }
+        } else {
+            quote! { #value }
+        };
+
         // Try to parse as a string literal (CSS-style values)
-        let value_str = value.to_string();
+        let value_str = value_tokens.to_string();
 
         // Check if this is a quoted string (CSS-style value)
         if value_str.starts_with('"') && value_str.ends_with('"') {
@@ -153,13 +156,21 @@ impl ElementNode {
         } else {
             // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))
             // Use the value directly without prepending namespace
-            Some(value.clone())
+            Some(value_tokens)
         }
     }
 
-    fn parse_enum_value(value: &TokenStream) -> Option<TokenStream> {
+    fn parse_enum_value(value: &syn::Expr) -> Option<TokenStream> {
+        // Handle block expressions - extract the inner content
+        let value_tokens = if let syn::Expr::Block(expr_block) = value {
+            let stmts = &expr_block.block.stmts;
+            quote! { #(#stmts)* }
+        } else {
+            quote! { #value }
+        };
+
         // Check if this is a quoted string (CSS-style enum value)
-        let value_str = value.to_string();
+        let value_str = value_tokens.to_string();
         if value_str.starts_with('"') && value_str.ends_with('"') {
             // Remove quotes and use the string as-is (CSS-style)
             let value_str = value_str.trim_matches('"');
@@ -170,12 +181,20 @@ impl ElementNode {
             None
         } else {
             // Not a CSS-style value, assume it's a Rust expression
-            Some(value.clone())
+            Some(value_tokens)
         }
     }
 
-    fn parse_numeric_value(value: &TokenStream) -> Option<TokenStream> {
-        let value_str = value.to_string();
+    fn parse_numeric_value(value: &syn::Expr) -> Option<TokenStream> {
+        // Handle block expressions - extract the inner content
+        let value_tokens = if let syn::Expr::Block(expr_block) = value {
+            let stmts = &expr_block.block.stmts;
+            quote! { #(#stmts)* }
+        } else {
+            quote! { #value }
+        };
+
+        let value_str = value_tokens.to_string();
         // Check if this is a quoted string
         if value_str.starts_with('"') && value_str.ends_with('"') {
             let value_str = value_str.trim_matches('"');
@@ -187,14 +206,11 @@ impl ElementNode {
             None
         } else {
             // Not a CSS-style value, assume it's a Rust expression
-            Some(value.clone())
+            Some(value_tokens)
         }
     }
 
-    fn build_spacing_chain(
-        attributes: &HashMap<String, TokenStream>,
-        property: &str,
-    ) -> Option<TokenStream> {
+    fn build_spacing_chain(attributes: &[Attribute], property: &str) -> Option<TokenStream> {
         // Define directions in priority order: all -> top -> right -> bottom -> left
         let directions = [
             ("", "all"),
@@ -209,7 +225,7 @@ impl ElementNode {
             .iter()
             .map(|(suffix, _)| {
                 let key = format!("{}{}", property, suffix);
-                attributes.get(&key).and_then(Self::parse_css_value)
+                Self::get_attr(attributes, &key).and_then(Self::parse_css_value)
             })
             .collect();
 
@@ -311,8 +327,8 @@ impl ToTokens for ElementNode {
             }
 
             // Process flex-basis
-            if let Some(value) = Self::get_attr(&self.attributes, "flex-basis")
-                .and_then(Self::parse_css_value)
+            if let Some(value) =
+                Self::get_attr(&self.attributes, "flex-basis").and_then(Self::parse_css_value)
             {
                 fields.push(quote! {
                     flex_basis: #value
@@ -347,8 +363,8 @@ impl ToTokens for ElementNode {
 
             // Process numeric properties (f32)
             for prop in ["flex-grow", "flex-shrink", "scrollbar-width"] {
-                if let Some(value) = Self::get_attr(&self.attributes, prop)
-                    .and_then(Self::parse_numeric_value)
+                if let Some(value) =
+                    Self::get_attr(&self.attributes, prop).and_then(Self::parse_numeric_value)
                 {
                     let field_name = Self::kebab_to_snake(prop);
                     let field = syn::Ident::new(&field_name, proc_macro2::Span::call_site());
@@ -360,11 +376,12 @@ impl ToTokens for ElementNode {
 
             // Process aspect-ratio (Option<f32>)
             if let Some(value) = Self::get_attr(&self.attributes, "aspect-ratio")
-                && let Some(parsed) = Self::parse_numeric_value(value) {
-                    fields.push(quote! {
-                        aspect_ratio: Some(#parsed)
-                    });
-                }
+                && let Some(parsed) = Self::parse_numeric_value(value)
+            {
+                fields.push(quote! {
+                    aspect_ratio: Some(#parsed)
+                });
+            }
 
             // Process overflow (special struct)
             if let Some(value) =
