@@ -98,6 +98,16 @@ impl ToTokens for TextNode {
 }
 
 impl ElementNode {
+    fn kebab_to_snake(s: &str) -> String {
+        s.replace('-', "_")
+    }
+
+    fn get_attr<'a>(
+        attributes: &'a HashMap<String, TokenStream>,
+        kebab_name: &str,
+    ) -> Option<&'a TokenStream> {
+        attributes.get(kebab_name)
+    }
     fn parse_css_value(value: &TokenStream) -> Option<TokenStream> {
         // Try to parse as a string literal (CSS-style values)
         let value_str = value.to_string();
@@ -126,12 +136,16 @@ impl ElementNode {
                     syn::LitFloat::new(&format!("{}.0", vh_value), proc_macro2::Span::call_site());
                 Some(quote! { ::bevy_ui::vh(#num) })
             } else if let Some(vmin_value) = value_str.strip_suffix("vmin") {
-                let num =
-                    syn::LitFloat::new(&format!("{}.0", vmin_value), proc_macro2::Span::call_site());
+                let num = syn::LitFloat::new(
+                    &format!("{}.0", vmin_value),
+                    proc_macro2::Span::call_site(),
+                );
                 Some(quote! { ::bevy_ui::vmin(#num) })
             } else if let Some(vmax_value) = value_str.strip_suffix("vmax") {
-                let num =
-                    syn::LitFloat::new(&format!("{}.0", vmax_value), proc_macro2::Span::call_site());
+                let num = syn::LitFloat::new(
+                    &format!("{}.0", vmax_value),
+                    proc_macro2::Span::call_site(),
+                );
                 Some(quote! { ::bevy_ui::vmax(#num) })
             } else {
                 None
@@ -139,6 +153,40 @@ impl ElementNode {
         } else {
             // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))
             // Use the value directly without prepending namespace
+            Some(value.clone())
+        }
+    }
+
+    fn parse_enum_value(value: &TokenStream) -> Option<TokenStream> {
+        // Check if this is a quoted string (CSS-style enum value)
+        let value_str = value.to_string();
+        if value_str.starts_with('"') && value_str.ends_with('"') {
+            // Remove quotes and use the string as-is (CSS-style)
+            let value_str = value_str.trim_matches('"');
+            // Return as an identifier path
+            if let Ok(path) = syn::parse_str::<syn::Path>(value_str) {
+                return Some(quote! { #path });
+            }
+            None
+        } else {
+            // Not a CSS-style value, assume it's a Rust expression
+            Some(value.clone())
+        }
+    }
+
+    fn parse_numeric_value(value: &TokenStream) -> Option<TokenStream> {
+        let value_str = value.to_string();
+        // Check if this is a quoted string
+        if value_str.starts_with('"') && value_str.ends_with('"') {
+            let value_str = value_str.trim_matches('"');
+            // Try to parse as a number
+            if let Ok(num) = value_str.parse::<f32>() {
+                let lit = syn::LitFloat::new(&num.to_string(), proc_macro2::Span::call_site());
+                return Some(quote! { #lit });
+            }
+            None
+        } else {
+            // Not a CSS-style value, assume it's a Rust expression
             Some(value.clone())
         }
     }
@@ -161,7 +209,7 @@ impl ElementNode {
             .iter()
             .map(|(suffix, _)| {
                 let key = format!("{}{}", property, suffix);
-                attributes.get(&key).and_then(|v| Self::parse_css_value(v))
+                attributes.get(&key).and_then(Self::parse_css_value)
             })
             .collect();
 
@@ -207,6 +255,132 @@ impl ToTokens for ElementNode {
             if let Some(margin_tokens) = Self::build_spacing_chain(&self.attributes, "margin") {
                 fields.push(quote! {
                     margin: #margin_tokens
+                });
+            }
+
+            // Process border attributes
+            if let Some(border_tokens) = Self::build_spacing_chain(&self.attributes, "border") {
+                fields.push(quote! {
+                    border: #border_tokens
+                });
+            }
+
+            // Process simple Val properties (positioning)
+            for prop in ["left", "right", "top", "bottom"] {
+                if let Some(value) =
+                    Self::get_attr(&self.attributes, prop).and_then(Self::parse_css_value)
+                {
+                    let field = syn::Ident::new(prop, proc_macro2::Span::call_site());
+                    fields.push(quote! {
+                        #field: #value
+                    });
+                }
+            }
+
+            // Process sizing properties
+            for prop in [
+                "width",
+                "height",
+                "min-width",
+                "min-height",
+                "max-width",
+                "max-height",
+            ] {
+                if let Some(value) =
+                    Self::get_attr(&self.attributes, prop).and_then(Self::parse_css_value)
+                {
+                    let field_name = Self::kebab_to_snake(prop);
+                    let field = syn::Ident::new(&field_name, proc_macro2::Span::call_site());
+                    fields.push(quote! {
+                        #field: #value
+                    });
+                }
+            }
+
+            // Process gap properties
+            for prop in ["row-gap", "column-gap"] {
+                if let Some(value) =
+                    Self::get_attr(&self.attributes, prop).and_then(Self::parse_css_value)
+                {
+                    let field_name = Self::kebab_to_snake(prop);
+                    let field = syn::Ident::new(&field_name, proc_macro2::Span::call_site());
+                    fields.push(quote! {
+                        #field: #value
+                    });
+                }
+            }
+
+            // Process flex-basis
+            if let Some(value) = Self::get_attr(&self.attributes, "flex-basis")
+                .and_then(Self::parse_css_value)
+            {
+                fields.push(quote! {
+                    flex_basis: #value
+                });
+            }
+
+            // Process enum properties
+            for prop in [
+                "display",
+                "position-type",
+                "flex-direction",
+                "flex-wrap",
+                "align-items",
+                "justify-items",
+                "align-self",
+                "justify-self",
+                "align-content",
+                "justify-content",
+                "box-sizing",
+                "grid-auto-flow",
+            ] {
+                if let Some(value) =
+                    Self::get_attr(&self.attributes, prop).and_then(Self::parse_enum_value)
+                {
+                    let field_name = Self::kebab_to_snake(prop);
+                    let field = syn::Ident::new(&field_name, proc_macro2::Span::call_site());
+                    fields.push(quote! {
+                        #field: #value
+                    });
+                }
+            }
+
+            // Process numeric properties (f32)
+            for prop in ["flex-grow", "flex-shrink", "scrollbar-width"] {
+                if let Some(value) = Self::get_attr(&self.attributes, prop)
+                    .and_then(Self::parse_numeric_value)
+                {
+                    let field_name = Self::kebab_to_snake(prop);
+                    let field = syn::Ident::new(&field_name, proc_macro2::Span::call_site());
+                    fields.push(quote! {
+                        #field: #value
+                    });
+                }
+            }
+
+            // Process aspect-ratio (Option<f32>)
+            if let Some(value) = Self::get_attr(&self.attributes, "aspect-ratio")
+                && let Some(parsed) = Self::parse_numeric_value(value) {
+                    fields.push(quote! {
+                        aspect_ratio: Some(#parsed)
+                    });
+                }
+
+            // Process overflow (special struct)
+            if let Some(value) =
+                Self::get_attr(&self.attributes, "overflow").and_then(Self::parse_enum_value)
+            {
+                fields.push(quote! {
+                    overflow: #value
+                });
+            }
+
+            // Process overflow-clip-margin (special struct)
+            if let Some(value) = Self::get_attr(&self.attributes, "overflow-clip-margin")
+                .and_then(Self::parse_enum_value)
+            {
+                fields.push(quote! {
+                    overflow_clip_margin: #value
                 });
             }
 
@@ -393,6 +567,131 @@ mod tests {
                 },
                 ::bevy_ecs::hierarchy::Children::spawn(
                     ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello"))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_sizing_and_positioning() {
+        let input = quote! {
+            <div
+              width="100px"
+              height="50px"
+              min-width="10px"
+              max-width="200px"
+              left="5px"
+              top="10px"
+              >
+              "Test"
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node {
+                  left: ::bevy_ui::px(5.0),
+                  top: ::bevy_ui::px(10.0),
+                  width: ::bevy_ui::px(100.0),
+                  height: ::bevy_ui::px(50.0),
+                  min_width: ::bevy_ui::px(10.0),
+                  max_width: ::bevy_ui::px(200.0),
+                  ..default()
+                },
+                ::bevy_ecs::hierarchy::Children::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Test"))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_flexbox_attributes() {
+        let input = quote! {
+            <div
+              display={Display::Flex}
+              flex-direction={FlexDirection::Column}
+              flex-grow={1.0}
+              flex-shrink={0.5}
+              align-items={AlignItems::Center}
+              justify-content={JustifyContent::SpaceBetween}
+              >
+              "Flex"
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node {
+                  display: Display::Flex,
+                  flex_direction: FlexDirection::Column,
+                  align_items: AlignItems::Center,
+                  justify_content: JustifyContent::SpaceBetween,
+                  flex_grow: 1.0,
+                  flex_shrink: 0.5,
+                  ..default()
+                },
+                ::bevy_ecs::hierarchy::Children::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Flex"))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_border_and_gaps() {
+        let input = quote! {
+            <div
+              border="2px"
+              border-top="5px"
+              row-gap="10px"
+              column-gap="15px"
+              >
+              "Borders"
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node {
+                  border: ::bevy_ui::px(2.0).all().with_top(::bevy_ui::px(5.0)),
+                  row_gap: ::bevy_ui::px(10.0),
+                  column_gap: ::bevy_ui::px(15.0),
+                  ..default()
+                },
+                ::bevy_ecs::hierarchy::Children::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Borders"))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_aspect_ratio_and_position_type() {
+        let input = quote! {
+            <div
+              aspect-ratio="1.77"
+              position-type={PositionType::Absolute}
+              width="100%"
+              >
+              "Aspect"
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node {
+                  width: ::bevy_ui::percent(100.0),
+                  position_type: PositionType::Absolute,
+                  aspect_ratio: Some(1.77),
+                  ..default()
+                },
+                ::bevy_ecs::hierarchy::Children::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Aspect"))
                 )
             )
         };
