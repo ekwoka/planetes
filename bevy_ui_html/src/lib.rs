@@ -86,7 +86,7 @@ impl ToTokens for TextNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let value = &self.value;
         tokens.extend(quote! {
-            ::bevy_ui::TextNode::new(#value)
+            ::bevy_ui::widget::Text::new(#value)
         });
     }
 }
@@ -404,7 +404,7 @@ impl ToTokens for ElementNode {
             quote! {
                 ::bevy_ui::Node {
                     #(#fields,)*
-                    ..default()
+                    ..Default::default()
                 }
             }
         };
@@ -412,7 +412,7 @@ impl ToTokens for ElementNode {
         tokens.extend(quote! {
             (
                 #node_tokens,
-                ::bevy_ecs::hierarchy::Children::spawn(
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
                     #(::bevy_ecs::spawn::Spawn(#children)),*
                 )
             )
@@ -439,7 +439,7 @@ impl ToTokens for HtmlNode {
     }
 }
 
-pub fn html_inner(input: TokenStream) -> TokenStream {
+fn html_inner(input: TokenStream) -> TokenStream {
     let node_tree = parse2(input).unwrap();
     let mut output = TokenStream::new();
     eprintln!("Node tree: {:#?}", node_tree);
@@ -454,6 +454,11 @@ pub fn html_inner(input: TokenStream) -> TokenStream {
     output
 }
 
+#[proc_macro]
+pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    html_inner(input.into()).into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -466,8 +471,8 @@ mod tests {
         let output = quote! {
             (
                 ::bevy_ui::Node::default(),
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Hello"))
                 )
             )
         };
@@ -486,20 +491,20 @@ mod tests {
         let output = quote! {
             (
                 ::bevy_ui::Node::default(),
-                ::bevy_ecs::hierarchy::Children::spawn(
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
                     ::bevy_ecs::spawn::Spawn(
                         (
                             ::bevy_ui::Node::default(),
-                            ::bevy_ecs::hierarchy::Children::spawn(
-                                ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello"))
+                            <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                                ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Hello"))
                             )
                         )
                     ),
                     ::bevy_ecs::spawn::Spawn(
                         (
                             ::bevy_ui::Node::default(),
-                            ::bevy_ecs::hierarchy::Children::spawn(
-                                ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("World"))
+                            <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                                ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("World"))
                             )
                         )
                     )
@@ -521,9 +526,9 @@ mod tests {
         let output = quote! {
             (
                 ::bevy_ui::Node::default(),
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello")),
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("World"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Hello")),
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("World"))
                 )
             )
         };
@@ -550,10 +555,10 @@ mod tests {
                 ::bevy_ui::Node {
                   padding: ::bevy_ui::px(10.0).all().with_bottom(::bevy_ui::percent(20.0)),
                   margin: ::bevy_ui::vw(5.0).top().with_right(::bevy_ui::vmax(20.0)).with_bottom(::bevy_ui::vmin(15.0)).with_left(::bevy_ui::vh(10.0)),
-                  ..default()
+                  ..Default::default()
                 },
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Hello"))
                 )
             )
         };
@@ -580,10 +585,10 @@ mod tests {
                 ::bevy_ui::Node {
                   padding: px(10.0).all().with_bottom(percent(20.0)),
                   margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)),
-                  ..default()
+                  ..Default::default()
                 },
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Hello"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Hello"))
                 )
             )
         };
@@ -614,10 +619,10 @@ mod tests {
                   height: ::bevy_ui::px(50.0),
                   min_width: ::bevy_ui::px(10.0),
                   max_width: ::bevy_ui::px(200.0),
-                  ..default()
+                  ..Default::default()
                 },
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Test"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Test"))
                 )
             )
         };
@@ -648,10 +653,10 @@ mod tests {
                   justify_content: JustifyContent::SpaceBetween,
                   flex_grow: 1.0,
                   flex_shrink: 0.5,
-                  ..default()
+                  ..Default::default()
                 },
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Flex"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Flex"))
                 )
             )
         };
@@ -677,10 +682,10 @@ mod tests {
                   border: ::bevy_ui::px(2.0).all().with_top(::bevy_ui::px(5.0)),
                   row_gap: ::bevy_ui::px(10.0),
                   column_gap: ::bevy_ui::px(15.0),
-                  ..default()
+                  ..Default::default()
                 },
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Borders"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Borders"))
                 )
             )
         };
@@ -705,10 +710,10 @@ mod tests {
                   width: ::bevy_ui::percent(100.0),
                   position_type: PositionType::Absolute,
                   aspect_ratio: Some(1.77),
-                  ..default()
+                  ..Default::default()
                 },
-                ::bevy_ecs::hierarchy::Children::spawn(
-                    ::bevy_ecs::spawn::Spawn(::bevy_ui::TextNode::new("Aspect"))
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Aspect"))
                 )
             )
         };
