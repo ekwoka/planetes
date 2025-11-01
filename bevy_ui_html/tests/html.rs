@@ -6,7 +6,7 @@ use bevy_ui::{Node, px, widget::Text};
 use bevy_ui_html::html;
 
 #[test]
-fn test_html_macro() {
+fn test_basic_div() {
     let input = html! {
         <div padding="10px">
             "Hello World"
@@ -20,4 +20,15 @@ fn test_html_macro() {
         input.1,
         SpawnRelatedBundle::<ChildOf, Spawn<Text>> { .. }
     ))
+}
+
+#[test]
+fn test_basic_span() {
+    let input = html! {
+        <span>
+            "Hello World"
+        </span>
+    };
+
+    assert_eq!(input, Text("Hello World".to_string()));
 }

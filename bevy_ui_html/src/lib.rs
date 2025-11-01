@@ -442,7 +442,6 @@ impl ToTokens for HtmlNode {
 fn html_inner(input: TokenStream) -> TokenStream {
     let node_tree = parse2(input).unwrap();
     let mut output = TokenStream::new();
-    eprintln!("Node tree: {:#?}", node_tree);
 
     for node in node_tree.into_iter() {
         if let Node::Element(_) = node {
