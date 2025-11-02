@@ -2,39 +2,48 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use rstml::{node::Node, parse2};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum HtmlNode {
     Text(TextNode),
     Element(ElementNode),
     Inline(InlineNode),
     Block(BlockNode),
+    Iter(IterNode),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct TextNode {
     value: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Attribute {
     key: String,
     value: syn::Expr,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+struct ChildNode(HtmlNode);
+
+#[derive(Clone, Debug)]
 struct ElementNode {
-    children: Vec<HtmlNode>,
+    children: Vec<ChildNode>,
     attributes: Vec<Attribute>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct InlineNode {
     children: Vec<HtmlNode>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct BlockNode {
     block: rstml::node::NodeBlock,
+}
+
+#[derive(Clone, Debug)]
+struct IterNode {
+    block: Box<HtmlNode>,
 }
 
 impl From<Node> for HtmlNode {
@@ -44,6 +53,25 @@ impl From<Node> for HtmlNode {
                 value: text.value_string(),
             }),
             Node::Element(element) => {
+                let tag_name = element.open_tag.name.to_string();
+
+                // Handle special transparent iter tag
+                if tag_name == "iter" {
+                    // For iter tags, extract children and create an Iter node
+                    let block = element
+                        .children
+                        .into_iter()
+                        .filter_map(|child| match child {
+                            Node::Block(_) => Some(Self::from(child)),
+                            _ => None,
+                        })
+                        .next()
+                        .expect("iter tag must have at least one Block child");
+                    return Self::Iter(IterNode {
+                        block: Box::new(block),
+                    });
+                }
+
                 let children = element
                     .children
                     .into_iter()
@@ -52,41 +80,58 @@ impl From<Node> for HtmlNode {
                             Some(Self::from(child))
                         }
                         _ => None,
-                    })
-                    .collect();
-
-                let tag_name = element.open_tag.name.to_string();
-                let attributes: Vec<Attribute> = element
-                    .open_tag
-                    .attributes
-                    .into_iter()
-                    .filter_map(|attr| {
-                        if let rstml::node::NodeAttribute::Attribute(attr) = attr {
-                            let key = attr.key.to_string();
-                            if let Some(value_expr) = attr.value() {
-                                return Some(Attribute {
-                                    key,
-                                    value: value_expr.clone(),
-                                });
-                            }
-                            None
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+                    });
 
                 if tag_name == "span" {
-                    Self::Inline(InlineNode { children })
+                    Self::Inline(InlineNode {
+                        children: children.collect(),
+                    })
                 } else {
+                    let attributes: Vec<Attribute> = element
+                        .open_tag
+                        .attributes
+                        .into_iter()
+                        .filter_map(|attr| {
+                            if let rstml::node::NodeAttribute::Attribute(attr) = attr {
+                                let key = attr.key.to_string();
+                                if let Some(value_expr) = attr.value() {
+                                    return Some(Attribute {
+                                        key,
+                                        value: value_expr.clone(),
+                                    });
+                                }
+                                None
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                     Self::Element(ElementNode {
-                        children,
+                        children: children.map(|child| ChildNode(child)).collect(),
                         attributes,
                     })
                 }
             }
             Node::Block(block) => Self::Block(BlockNode { block }),
             _ => todo!("Unsupported node type"),
+        }
+    }
+}
+
+impl ToTokens for ChildNode {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let node = self.0.clone();
+        match node {
+            HtmlNode::Iter(node) => {
+                tokens.extend(quote! {
+                    ::bevy_ecs::spawn::SpawnIter(#node)
+                });
+            }
+            _ => {
+                tokens.extend(quote! {
+                    ::bevy_ecs::spawn::Spawn(#node)
+                });
+            }
         }
     }
 }
@@ -105,6 +150,15 @@ impl ToTokens for BlockNode {
         // Output the block directly - it can contain any Rust expression
         // including nested macro calls, component instantiation, etc.
         self.block.to_tokens(tokens);
+    }
+}
+
+impl ToTokens for IterNode {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let block = &self.block;
+        tokens.extend(quote! {
+            #block
+        });
     }
 }
 
@@ -430,7 +484,7 @@ impl ToTokens for ElementNode {
             (
                 #node_tokens,
                 <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
-                    #(::bevy_ecs::spawn::Spawn(#children)),*
+                    #(#children),*
                 )
             )
         });
@@ -453,6 +507,7 @@ impl ToTokens for HtmlNode {
             HtmlNode::Element(element) => element.to_tokens(tokens),
             HtmlNode::Inline(inline) => inline.to_tokens(tokens),
             HtmlNode::Block(block) => block.to_tokens(tokens),
+            HtmlNode::Iter(iter) => iter.to_tokens(tokens),
         }
     }
 }
@@ -825,6 +880,39 @@ mod tests {
                     ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Static text")),
                     ::bevy_ecs::spawn::Spawn({dynamic_content}),
                     ::bevy_ecs::spawn::Spawn({MyComponent::new()})
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn supports_iter_element() {
+        let input = quote! {
+            <div>
+               <iter>
+                   {
+                        items.map(|item| {
+                            html! {
+                                <div>{item.name}</div>
+                            }
+                        })
+                    }
+               </iter>
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node::default(),
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::SpawnIter({
+                        items.map(|item| {
+                            html! {
+                                <div>{item.name}</div>
+                            }
+                        })
+                    })
                 )
             )
         };

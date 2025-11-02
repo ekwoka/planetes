@@ -1,8 +1,7 @@
-use bevy_ecs::{
-    hierarchy::ChildOf,
-    spawn::{Spawn, SpawnRelatedBundle},
+use bevy::{
+    ecs::spawn::{Spawn, SpawnRelatedBundle},
+    prelude::*,
 };
-use bevy_ui::{Node, px, widget::Text};
 use bevy_ui_html::html;
 
 #[test]
@@ -31,4 +30,34 @@ fn test_basic_span() {
     };
 
     assert_eq!(input, Text("Hello World".to_string()));
+}
+
+#[test]
+fn test_simple_iter() {
+    let mut app = App::new();
+
+    let mut children = app.world_mut().query::<&Children>();
+    let mut text = app.world_mut().query::<&Text>();
+
+    let root = app
+        .world_mut()
+        .spawn(html! {
+            <div>
+                <iter>
+                    {
+                        (1..3).map(|i| Text::new(format!("Item {}", i)))
+                    }
+                </iter>
+            </div>
+        })
+        .id();
+
+    let children = children.get(app.world(), root).unwrap();
+    assert_eq!(children.len(), 2);
+
+    assert_eq!(
+        text.iter_many(app.world(), children)
+            .collect::<Vec<&Text>>(),
+        vec![&Text::new("Item 1"), &Text::new("Item 2")]
+    );
 }
