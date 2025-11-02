@@ -7,6 +7,7 @@ enum HtmlNode {
     Text(TextNode),
     Element(ElementNode),
     Inline(InlineNode),
+    Block(BlockNode),
 }
 
 #[derive(Debug)]
@@ -31,6 +32,11 @@ struct InlineNode {
     children: Vec<HtmlNode>,
 }
 
+#[derive(Debug)]
+struct BlockNode {
+    block: rstml::node::NodeBlock,
+}
+
 impl From<Node> for HtmlNode {
     fn from(node: Node) -> Self {
         match node {
@@ -42,7 +48,9 @@ impl From<Node> for HtmlNode {
                     .children
                     .into_iter()
                     .filter_map(|child| match child {
-                        Node::Text(_) | Node::Element(_) => Some(Self::from(child)),
+                        Node::Text(_) | Node::Element(_) | Node::Block(_) => {
+                            Some(Self::from(child))
+                        }
                         _ => None,
                     })
                     .collect();
@@ -77,6 +85,7 @@ impl From<Node> for HtmlNode {
                     })
                 }
             }
+            Node::Block(block) => Self::Block(BlockNode { block }),
             _ => todo!("Unsupported node type"),
         }
     }
@@ -88,6 +97,14 @@ impl ToTokens for TextNode {
         tokens.extend(quote! {
             ::bevy_ui::widget::Text::new(#value)
         });
+    }
+}
+
+impl ToTokens for BlockNode {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        // Output the block directly - it can contain any Rust expression
+        // including nested macro calls, component instantiation, etc.
+        self.block.to_tokens(tokens);
     }
 }
 
@@ -435,6 +452,7 @@ impl ToTokens for HtmlNode {
             HtmlNode::Text(text) => text.to_tokens(tokens),
             HtmlNode::Element(element) => element.to_tokens(tokens),
             HtmlNode::Inline(inline) => inline.to_tokens(tokens),
+            HtmlNode::Block(block) => block.to_tokens(tokens),
         }
     }
 }
@@ -713,6 +731,100 @@ mod tests {
                 },
                 <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
                     ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Aspect"))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn single_div_with_block_content() {
+        let input = quote! {
+            <div>{Text::new("Hello")}</div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node::default(),
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn({Text::new("Hello")})
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_complex_block_expression() {
+        let input = quote! {
+            <div>{if show { Text::new("Visible") } else { Text::new("Hidden") }}</div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node::default(),
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn({if show { Text::new("Visible") } else { Text::new("Hidden") }})
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_nested_macro_call() {
+        // This demonstrates that blocks can contain macro calls (like nested html! calls)
+        let inner = html_inner(quote! { <span>"Nested"</span> });
+        let input = quote! {
+            <div>{#inner}</div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node::default(),
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn({::bevy_ui::widget::Text::new("Nested")})
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_component_instantiation() {
+        // This demonstrates that blocks can contain arbitrary component instantiation
+        let input = quote! {
+            <div>{MyComponent::new()}</div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node::default(),
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn({MyComponent::new()})
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn div_with_mixed_text_and_blocks() {
+        let input = quote! {
+            <div>
+                "Static text"
+                {dynamic_content}
+                {MyComponent::new()}
+            </div>
+        };
+        let output = quote! {
+            (
+                ::bevy_ui::Node::default(),
+                <::bevy_ecs::hierarchy::Children as ::bevy_ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy_ecs::spawn::Spawn(::bevy_ui::widget::Text::new("Static text")),
+                    ::bevy_ecs::spawn::Spawn({dynamic_content}),
+                    ::bevy_ecs::spawn::Spawn({MyComponent::new()})
                 )
             )
         };
