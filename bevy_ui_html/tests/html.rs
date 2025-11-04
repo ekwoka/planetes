@@ -53,6 +53,7 @@ fn test_simple_iter() {
         .id();
 
     let children = children.get(app.world(), root).unwrap();
+
     assert_eq!(children.len(), 2);
 
     assert_eq!(
@@ -60,4 +61,44 @@ fn test_simple_iter() {
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Item 1"), &Text::new("Item 2")]
     );
+}
+
+#[test]
+fn test_editor_menu_button() {
+    #[derive(Component)]
+    struct MenuButton;
+
+    let mut app = App::new();
+
+    let mut text = app.world_mut().query::<&Text>();
+    let root = app
+        .world_mut()
+        .spawn(html! {
+            <MenuButton
+               padding="4px"
+               border-radius="2px">
+               "Menu"
+            </MenuButton>
+        })
+        .id();
+    let root_entity = app
+        .world_mut()
+        .query::<(&Node, &BorderRadius, &Children)>()
+        .get(app.world(), root);
+    assert!(root_entity.is_ok());
+    let root_entity = root_entity.unwrap();
+    assert_eq!(
+        root_entity.0,
+        &Node {
+            padding: px(4.0).all(),
+            ..default()
+        }
+    );
+    assert_eq!(root_entity.1, &BorderRadius::all(px(2.0)));
+    assert_eq!(root_entity.2.len(), 1);
+    assert_eq!(
+        text.iter_many(app.world(), root_entity.2)
+            .collect::<Vec<&Text>>(),
+        vec![&Text::new("Menu")]
+    )
 }

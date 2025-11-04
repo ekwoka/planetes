@@ -1658,8 +1658,6 @@ name = "bevy_ui_html"
 version = "0.0.1"
 dependencies = [
  "bevy",
- "bevy_ecs",
- "bevy_ui",
  "proc-macro2",
  "quote",
  "rstml",
