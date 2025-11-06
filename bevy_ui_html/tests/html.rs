@@ -83,7 +83,7 @@ fn test_editor_menu_button() {
         .id();
     let root_entity = app
         .world_mut()
-        .query::<(&Node, &BorderRadius, &Children)>()
+        .query_filtered::<(&Node, &BorderRadius, &Children), With<MenuButton>>()
         .get(app.world(), root);
     assert!(root_entity.is_ok());
     let root_entity = root_entity.unwrap();

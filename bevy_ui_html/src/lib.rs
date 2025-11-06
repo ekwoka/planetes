@@ -1,6 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use rstml::{node::Node, parse2};
+use rstml::{
+    node::{Node, NodeName},
+    parse2,
+};
 
 mod components;
 mod value;
@@ -33,6 +36,7 @@ struct ChildNode(HtmlNode);
 
 #[derive(Clone, Debug)]
 struct ElementNode {
+    tag_name: NodeName,
     children: Vec<ChildNode>,
     attributes: Vec<Attribute>,
 }
@@ -113,6 +117,7 @@ impl From<Node> for HtmlNode {
                         })
                         .collect();
                     Self::Element(ElementNode {
+                        tag_name: element.open_tag.name,
                         children: children.map(ChildNode).collect(),
                         attributes,
                     })
@@ -153,9 +158,15 @@ impl ToTokens for TextNode {
 
 impl ToTokens for BlockNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        // Output the block directly - it can contain any Rust expression
-        // including nested macro calls, component instantiation, etc.
-        self.block.to_tokens(tokens);
+        if let rstml::node::NodeBlock::ValidBlock(block) = &self.block
+            && block.stmts.len() == 1
+        {
+            block.stmts[0].to_tokens(tokens)
+        } else {
+            // Output the block directly - it can contain any Rust expression
+            // including nested macro calls, component instantiation, etc.
+            self.block.to_tokens(tokens);
+        }
     }
 }
 
@@ -331,9 +342,16 @@ impl ElementNode {
 
 impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let mut components = Vec::new();
+        if self.tag_name.to_string() != "div" {
+            let tag_name = &self.tag_name;
+            components.push(quote! {
+                #tag_name
+            })
+        }
         let children = &self.children;
-        let node_tokens = if self.attributes.is_empty() {
-            quote! { ::bevy::ui::Node::default() }
+        if self.attributes.is_empty() {
+            components.push(quote! { ::bevy::ui::Node::default() });
         } else {
             let mut fields = Vec::new();
 
@@ -478,15 +496,13 @@ impl ToTokens for ElementNode {
                 });
             }
 
-            quote! {
+            components.push(quote! {
                 ::bevy::ui::Node {
                     #(#fields,)*
                     ..Default::default()
                 }
-            }
+            });
         };
-
-        let mut components = Vec::new();
 
         BorderRadius::from(&self.attributes)
             .ok()
@@ -499,7 +515,6 @@ impl ToTokens for ElementNode {
 
         tokens.extend(quote! {
             (
-                #node_tokens,
                 #(#components,)*
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
                     #(#children),*
@@ -820,7 +835,7 @@ mod tests {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
-                    ::bevy::ecs::spawn::Spawn({Text::new("Hello")})
+                    ::bevy::ecs::spawn::Spawn(Text::new("Hello"))
                 )
             )
         };
@@ -837,7 +852,7 @@ mod tests {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
-                    ::bevy::ecs::spawn::Spawn({if show { Text::new("Visible") } else { Text::new("Hidden") }})
+                    ::bevy::ecs::spawn::Spawn(if show { Text::new("Visible") } else { Text::new("Hidden") })
                 )
             )
         };
@@ -856,25 +871,7 @@ mod tests {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
-                    ::bevy::ecs::spawn::Spawn({::bevy::ui::widget::Text::new("Nested")})
-                )
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_component_instantiation() {
-        // This demonstrates that blocks can contain arbitrary component instantiation
-        let input = quote! {
-            <div>{MyComponent::new()}</div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
-                    ::bevy::ecs::spawn::Spawn({MyComponent::new()})
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Nested"))
                 )
             )
         };
@@ -896,8 +893,8 @@ mod tests {
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Static text")),
-                    ::bevy::ecs::spawn::Spawn({dynamic_content}),
-                    ::bevy::ecs::spawn::Spawn({MyComponent::new()})
+                    ::bevy::ecs::spawn::Spawn(dynamic_content),
+                    ::bevy::ecs::spawn::Spawn(MyComponent::new())
                 )
             )
         };
@@ -924,13 +921,13 @@ mod tests {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
-                    ::bevy::ecs::spawn::SpawnIter({
+                    ::bevy::ecs::spawn::SpawnIter(
                         items.map(|item| {
                             html! {
                                 <div>{item.name}</div>
                             }
                         })
-                    })
+                    )
                 )
             )
         };
@@ -941,12 +938,11 @@ mod tests {
     #[test]
     fn supports_border_radius() {
         let input = quote! {
-            <MenuButton
+            <div
                padding="4px"
-               background="default"
                border-radius="2px">
                "Menu"
-            </MenuButton>
+            </div>
         };
         let expected = quote! {
             (
@@ -957,6 +953,75 @@ mod tests {
                 ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                )
+            )
+        };
+
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_unit_struct_elements() {
+        let input = quote! {
+            <MenuButton
+               padding="4px"
+               border-radius="2px">
+               "Menu"
+            </MenuButton>
+        };
+        let expected = quote! {
+            (
+                MenuButton,
+                ::bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all(),
+                    ..Default::default()
+                },
+                ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                )
+            )
+        };
+
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn only_removes_bracket_on_single_statement_block() {
+        let input = quote! {
+            <div>
+               <div>
+               {Text::new("Menu")}
+               </div>
+               <div>
+               {
+                   let thing = Text::new("Thing");
+                   thing
+               }
+               </div>
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node::default(),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy::ecs::spawn::Spawn((
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                            ::bevy::ecs::spawn::Spawn(Text::new("Menu"))
+                        )
+                    )),
+                    ::bevy::ecs::spawn::Spawn((
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                            ::bevy::ecs::spawn::Spawn({
+                                let thing = Text::new("Thing");
+                                thing
+                            })
+                        )
+                    ))
                 )
             )
         };

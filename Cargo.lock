@@ -4474,6 +4474,7 @@ version = "0.0.1"
 dependencies = [
  "avian3d",
  "bevy",
+ "bevy_ui_html",
  "serde",
 ]
 

@@ -187,16 +187,13 @@ pub fn build_ui(mut commands: Commands) {
 }
 
 fn menu_button(test: impl Into<String>) -> impl Bundle {
-    (
-        Node {
-            padding: px(4.0).all(),
-            ..default()
-        },
-        MenuButton,
-        BackgroundColor::DEFAULT,
-        BorderRadius::all(px(2.0)),
-        children![(Text::new(test))],
-    )
+    bevy_ui_html::html! {
+        <MenuButton
+          padding="4px"
+          border-radius="2px">
+          {Text::new(test)}
+        </MenuButton>
+    }
 }
 
 pub fn setup_camera_system(mut commands: Commands) {
