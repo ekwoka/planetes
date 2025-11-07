@@ -7,7 +7,7 @@ pub fn render(test: impl Into<String>) -> impl Bundle {
     bevy_ui_html::html! {
         <MenuButton
           padding="4px"
-          border-radius="20px">
+          border-radius="2px">
           {Text::new(test)}
         </MenuButton>
     }

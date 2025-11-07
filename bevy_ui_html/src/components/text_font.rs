@@ -46,11 +46,20 @@ impl ToTokens for TextFont {
                 _ => None,
             });
 
-        tokens.extend(quote! {
-            ::bevy::text::TextFont {
-                #(#fields,)*
-                ..Default::default()
-            }
-        })
+        if cfg!(feature = "propagate") {
+            tokens.extend(quote! {
+                    ::bevy::app::Propagate(::bevy::text::TextFont {
+                    #(#fields,)*
+                    ..Default::default()
+                })
+            })
+        } else {
+            tokens.extend(quote! {
+                ::bevy::text::TextFont {
+                    #(#fields,)*
+                    ..Default::default()
+                }
+            })
+        }
     }
 }

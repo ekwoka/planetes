@@ -1,5 +1,5 @@
 use bevy::{
-    app::{HierarchyPropagatePlugin, Propagate, PropagateStop},
+    app::{HierarchyPropagatePlugin, Propagate},
     asset::embedded_asset,
     camera::{Viewport, visibility::RenderLayers},
     math::Affine2,
@@ -29,7 +29,7 @@ pub fn plugin(app: &mut App) {
         scene_tree::plugin,
         accordion::plugin,
         entity_viewer::plugin,
-        // HierarchyPropagatePlugin::<TextFont>::new(Update),
+        HierarchyPropagatePlugin::<TextFont>::new(Update),
         HierarchyPropagatePlugin::<TextColor>::new(Update),
     ))
     .init_state::<EditorMode>()

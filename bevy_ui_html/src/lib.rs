@@ -1074,6 +1074,7 @@ mod tests {
         assert_eq!(result.to_string(), expected.to_string());
     }
 
+    #[cfg(not(feature = "propagate"))]
     #[test]
     fn supports_text_font() {
         let input = quote! {
@@ -1093,6 +1094,36 @@ mod tests {
                     font_size: 10.0,
                     ..Default::default()
                 },
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                )
+            )
+        };
+
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[cfg(feature = "propagate")]
+    #[test]
+    fn supports_text_font_with_propagate() {
+        let input = quote! {
+            <div
+                padding="4px"
+                font-size="10">
+                    "Menu"
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all(),
+                    ..Default::default()
+                },
+                ::bevy::app::Propagate(::bevy::text::TextFont {
+                    font_size: 10.0,
+                    ..Default::default()
+                }),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 )
