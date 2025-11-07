@@ -72,4 +72,32 @@ impl Value {
 
         // Check if this is a quoted string (CSS-style value)
     }
+
+    pub fn parse_as_float(&self) -> Option<TokenStream> {
+        let value = self.0.clone();
+        let value_tokens = if let syn::Expr::Block(expr_block) = value {
+            let stmts = &expr_block.block.stmts;
+            quote! { #(#stmts)* }
+        } else {
+            quote! { #value }
+        };
+
+        let value_str = value_tokens.to_string();
+        // Check if this is a quoted string
+        if value_str.starts_with('"') && value_str.ends_with('"') {
+            let value_str = value_str.trim_matches('"');
+            // Try to parse as a number
+            if let Ok(num) = value_str.parse::<f32>() {
+                let lit = syn::LitFloat::new(
+                    format!("{num:#?}").as_str(),
+                    proc_macro2::Span::call_site(),
+                );
+                return Some(quote! { #lit });
+            }
+            None
+        } else {
+            // Not a CSS-style value, assume it's a Rust expression
+            Some(value_tokens)
+        }
+    }
 }

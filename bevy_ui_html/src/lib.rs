@@ -288,7 +288,10 @@ impl ElementNode {
             let value_str = value_str.trim_matches('"');
             // Try to parse as a number
             if let Ok(num) = value_str.parse::<f32>() {
-                let lit = syn::LitFloat::new(&num.to_string(), proc_macro2::Span::call_site());
+                let lit = syn::LitFloat::new(
+                    format!("{num:#?}").as_str(),
+                    proc_macro2::Span::call_site(),
+                );
                 return Some(quote! { #lit });
             }
             None
@@ -513,6 +516,15 @@ impl ToTokens for ElementNode {
                 });
             });
 
+        TextFont::from(&self.attributes)
+            .ok()
+            .iter()
+            .for_each(|border| {
+                components.push(quote! {
+                    #border
+                });
+            });
+
         tokens.extend(quote! {
             (
                 #(#components,)*
@@ -526,7 +538,18 @@ impl ToTokens for ElementNode {
 
 impl ToTokens for InlineNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let children = &self.children;
+        let children = &self
+            .children
+            .iter()
+            .map(|child| match child {
+                HtmlNode::Block(block) => quote! {
+                    ::bevy::ui::widget::Text::new(#block)
+                },
+                _ => quote! {
+                    #child
+                },
+            })
+            .collect::<Vec<_>>();
         tokens.extend(quote! {
             #(#children),*
         });
@@ -1022,6 +1045,56 @@ mod tests {
                             })
                         )
                     ))
+                )
+            )
+        };
+
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn auto_wrap_inline_block_children() {
+        let input = quote! {
+            <div>
+                <span>{"Hello"}</span>
+                <span>{let thing = true; if thing { "World" } else { "Mom" }}</span>
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node::default(),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
+                )
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_text_font() {
+        let input = quote! {
+            <div
+                padding="4px"
+                font-size="10">
+                    "Menu"
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all(),
+                    ..Default::default()
+                },
+                ::bevy::text::TextFont {
+                    font_size: 10.0,
+                    ..Default::default()
+                },
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 )
             )
         };

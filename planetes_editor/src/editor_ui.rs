@@ -29,7 +29,7 @@ pub fn plugin(app: &mut App) {
         scene_tree::plugin,
         accordion::plugin,
         entity_viewer::plugin,
-        HierarchyPropagatePlugin::<TextFont>::new(Update),
+        // HierarchyPropagatePlugin::<TextFont>::new(Update),
         HierarchyPropagatePlugin::<TextColor>::new(Update),
     ))
     .init_state::<EditorMode>()
@@ -207,28 +207,45 @@ pub fn update_viewport(
 }
 
 fn bottom_bar() -> impl Bundle {
-    (
-        Node {
-            padding: UiRect::axes(px(8.0), px(2.0)),
-            flex_grow: 0.0,
-            width: percent(100.0),
-            ..default()
-        },
-        PropagateStop::<TextFont>::default(),
-        RenderLayers::layer(1),
-        children![(
-            Text::new(format!(
+    bevy_ui_html::html! {
+        <div
+            padding="8px"
+            padding-top="2px"
+            padding-bottom="2px"
+            flex-grow="0"
+            font-size="10"
+            width="100%">
+            <span>
+                {format!(
                 "{} v{}",
                 env!("CARGO_PKG_NAME").capitalize_words(),
                 env!("CARGO_PKG_VERSION")
-            )),
-            TextFont {
-                font_size: 10.0,
-                ..default()
-            },
-            RenderLayers::layer(1)
-        )],
-    )
+                )}
+            </span>
+        </div>
+    }
+    // (
+    //     Node {
+    //         padding: UiRect::axes(px(8.0), px(2.0)),
+    //         flex_grow: 0.0,
+    //         width: percent(100.0),
+    //         ..default()
+    //     },
+    //     PropagateStop::<TextFont>::default(),
+    //     RenderLayers::layer(1),
+    //     children![(
+    //         Text::new(format!(
+    //             "{} v{}",
+    //             env!("CARGO_PKG_NAME").capitalize_words(),
+    //             env!("CARGO_PKG_VERSION")
+    //         )),
+    //         TextFont {
+    //             font_size: 10.0,
+    //             ..default()
+    //         },
+    //         RenderLayers::layer(1)
+    //     )],
+    // )
 }
 
 #[derive(Component, Reflect, Serialize, Deserialize, Debug)]
