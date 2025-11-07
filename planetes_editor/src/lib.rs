@@ -1,4 +1,5 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
+mod atoms;
 pub mod editor_ui;
 mod infinite_grid;
 pub mod nodes;

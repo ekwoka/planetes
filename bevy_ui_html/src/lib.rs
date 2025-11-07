@@ -239,7 +239,7 @@ impl ElementNode {
                 );
                 Some(quote! { ::bevy::ui::vmax(#num) })
             } else {
-                None
+                Some(quote! { ::bevy::ui::Val::from(#value_tokens) })
             }
         } else {
             // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))

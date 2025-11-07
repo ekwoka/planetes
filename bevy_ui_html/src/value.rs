@@ -58,7 +58,8 @@ impl Value {
                         );
                         Some(quote! { ::bevy::ui::vmax(#num) })
                     } else {
-                        None
+                        let tokens = self.0.to_token_stream();
+                        Some(quote! { ::bevy::ui::Val::from(#tokens) })
                     }
                 } else {
                     // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))

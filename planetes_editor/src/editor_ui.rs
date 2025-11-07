@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     EditorMode, ReflectEditorView, ReflectPlanetesBundle, ReflectPlanetesComponent,
+    atoms::*,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::*,
 };
@@ -43,8 +44,8 @@ pub fn plugin(app: &mut App) {
         Update,
         (update_viewport).chain().run_if(in_state(EditorMode::Edit)),
     )
-    .add_observer(hover_menu_item)
-    .add_observer(unhover_menu_item);
+    .add_observer(button::hover_menu_item)
+    .add_observer(button::unhover_menu_item);
     #[cfg(feature = "avian")]
     {
         app.add_systems(OnEnter(EditorMode::Edit), pause_physics);
@@ -75,27 +76,6 @@ pub struct ViewPort;
 
 #[derive(Component)]
 pub struct MenuBar;
-
-#[derive(Component)]
-pub struct MenuButton;
-
-pub fn hover_menu_item(
-    trigger: On<Pointer<Over>>,
-    mut menu_items: Query<&mut BackgroundColor, With<MenuButton>>,
-) {
-    if let Ok(mut color) = menu_items.get_mut(trigger.entity) {
-        *color = BackgroundColor::from(Color::linear_rgba(0.2, 0.2, 1.0, 0.50));
-    }
-}
-
-pub fn unhover_menu_item(
-    trigger: On<Pointer<Out>>,
-    mut menu_items: Query<&mut BackgroundColor, With<MenuButton>>,
-) {
-    if let Ok(mut color) = menu_items.get_mut(trigger.entity) {
-        *color = BackgroundColor::DEFAULT;
-    }
-}
 
 pub fn build_ui(mut commands: Commands) {
     commands.spawn((
@@ -132,10 +112,10 @@ pub fn build_ui(mut commands: Commands) {
                 BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
                 RenderLayers::layer(1),
                 children![
-                    menu_button("File"),
-                    menu_button("Edit"),
-                    menu_button("View"),
-                    menu_button("Help")
+                    button::render("File"),
+                    button::render("Edit"),
+                    button::render("View"),
+                    button::render("Help")
                 ]
             ),
             (
@@ -184,16 +164,6 @@ pub fn build_ui(mut commands: Commands) {
             bottom_bar()
         ],
     ));
-}
-
-fn menu_button(test: impl Into<String>) -> impl Bundle {
-    bevy_ui_html::html! {
-        <MenuButton
-          padding="4px"
-          border-radius="2px">
-          {Text::new(test)}
-        </MenuButton>
-    }
 }
 
 pub fn setup_camera_system(mut commands: Commands) {
