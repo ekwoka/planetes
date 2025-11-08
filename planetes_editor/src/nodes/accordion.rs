@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
     camera::visibility::RenderLayers,
@@ -86,7 +84,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     asset_server: AssetServer,
 ) -> impl Bundle {
     (
-        Name::new(Cow::from(Into::<String>::into(label.clone()))),
+        Name::new(Into::<String>::into(label.clone())),
         Node {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,

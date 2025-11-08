@@ -3,6 +3,7 @@ use crate::{
         accordion,
         entity_viewer::{EntityEditor, Viewing},
     },
+    prelude::*,
     scene::EditorScene,
 };
 use bevy::{camera::visibility::RenderLayers, prelude::*};
@@ -19,21 +20,18 @@ pub struct SceneTreeView;
 pub struct SceneTreeBranch;
 
 pub fn view() -> impl Bundle {
-    (
-        SceneTreeView,
-        Node {
-            padding: px(8.0).all(),
-            flex_grow: 1.0,
-            flex_shrink: 1.0,
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            column_gap: px(8.0),
-            width: percent(100.0),
-            height: percent(100.0),
-            ..default()
-        },
-        RenderLayers::layer(1),
-    )
+    html! {
+        <SceneTreeView
+            padding="8px"
+            flex-grow="1"
+            flex-shrink="1"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            column-gap="8px"
+            width="100%"
+            height="100%">
+        </SceneTreeView>
+    }
 }
 
 pub fn update_tree(

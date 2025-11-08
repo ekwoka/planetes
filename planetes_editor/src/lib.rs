@@ -104,3 +104,7 @@ impl EditorView for Transform {
         ));
     }
 }
+
+pub mod prelude {
+    pub use bevy_ui_html::html;
+}

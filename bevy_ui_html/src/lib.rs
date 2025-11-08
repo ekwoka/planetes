@@ -528,9 +528,9 @@ impl ToTokens for ElementNode {
         tokens.extend(quote! {
             (
                 #(#components,)*
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     #(#children),*
-                )
+                ))
             )
         });
     }
@@ -599,9 +599,9 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -619,24 +619,24 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(
                         (
                             ::bevy::ui::Node::default(),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                                 ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                            )
+                            ))
                         )
                     ),
                     ::bevy::ecs::spawn::Spawn(
                         (
                             ::bevy::ui::Node::default(),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                                 ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
-                            )
+                            ))
                         )
                     )
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -654,10 +654,10 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -685,9 +685,9 @@ mod tests {
                   margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)),
                   ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -715,9 +715,9 @@ mod tests {
                   margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)),
                   ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -749,9 +749,9 @@ mod tests {
                   max_width: ::bevy::ui::px(200.0),
                   ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Test"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -783,9 +783,9 @@ mod tests {
                   flex_shrink: 0.5,
                   ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Flex"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -812,9 +812,9 @@ mod tests {
                   column_gap: ::bevy::ui::px(15.0),
                   ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Borders"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -840,9 +840,9 @@ mod tests {
                   aspect_ratio: Some(1.77),
                   ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Aspect"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -857,9 +857,9 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(Text::new("Hello"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -874,9 +874,9 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(if show { Text::new("Visible") } else { Text::new("Hidden") })
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -893,9 +893,9 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Nested"))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -914,11 +914,11 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Static text")),
                     ::bevy::ecs::spawn::Spawn(dynamic_content),
                     ::bevy::ecs::spawn::Spawn(MyComponent::new())
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -943,7 +943,7 @@ mod tests {
         let output = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::SpawnIter(
                         items.map(|item| {
                             html! {
@@ -951,7 +951,7 @@ mod tests {
                             }
                         })
                     )
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -974,9 +974,9 @@ mod tests {
                     ..Default::default()
                 },
                 ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                )
+                ))
             )
         };
 
@@ -1001,9 +1001,9 @@ mod tests {
                     ..Default::default()
                 },
                 ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                )
+                ))
             )
         };
 
@@ -1029,23 +1029,23 @@ mod tests {
         let expected = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn((
                         ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(Text::new("Menu"))
-                        )
+                        ))
                     )),
                     ::bevy::ecs::spawn::Spawn((
                         ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn({
                                 let thing = Text::new("Thing");
                                 thing
                             })
-                        )
+                        ))
                     ))
-                )
+                ))
             )
         };
 
@@ -1064,10 +1064,10 @@ mod tests {
         let expected = quote! {
             (
                 ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
-                )
+                ))
             )
         };
         let result = html_inner(input);
@@ -1094,9 +1094,9 @@ mod tests {
                     font_size: 10.0,
                     ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                )
+                ))
             )
         };
 
@@ -1124,9 +1124,9 @@ mod tests {
                     font_size: 10.0,
                     ..Default::default()
                 }),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn(
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                )
+                ))
             )
         };
 

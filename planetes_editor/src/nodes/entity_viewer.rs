@@ -1,13 +1,15 @@
 use std::{any::TypeId, iter::once};
 
 use bevy::{
-    camera::visibility::RenderLayers,
     ecs::{component::ComponentId, relationship::RelatedSpawnerCommands},
     prelude::*,
     reflect::{StructInfo, TupleStructInfo, TypeInfo},
 };
 
-use crate::{ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion};
+use crate::{
+    ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion,
+    prelude::*,
+};
 pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
@@ -16,43 +18,32 @@ pub fn plugin(app: &mut App) {
 }
 
 pub fn view() -> impl Bundle {
-    (
-        EntityViewer,
-        Node {
-            padding: px(8.0).all(),
-            flex_grow: 1.0,
-            flex_shrink: 1.0,
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            column_gap: px(8.0),
-            width: percent(100.0),
-            height: percent(100.0),
-            ..default()
-        },
-        RenderLayers::layer(1),
-        children![
-            (
-                Node {
-                    padding: px(2.0).all(),
-                    ..default()
-                },
-                children![Text::new("Entity Viewer")]
-            ),
-            (
-                EntityEditor,
-                Node {
-                    padding: px(2.0).all(),
-                    flex_grow: 1.0,
-                    flex_shrink: 1.0,
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    row_gap: px(8.0),
-                    ..default()
-                },
-                children![Text::new("No Entity Selected")]
-            )
-        ],
-    )
+    html! {
+        <EntityViewer
+            padding="8px"
+            flex-grow="1"
+            flex-shrink="1"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="8px"
+            width="100%"
+            height="100%"
+        >
+            <div padding="2px">
+               "Entity Viewer"
+            </div>
+            <EntityEditor
+                padding="2px"
+                flex-grow="1"
+                flex-shrink="1"
+                display={Display::Flex}
+                flex-direction={FlexDirection::Column}
+                row-gap="8px"
+            >
+              "No Entity Selected"
+            </EntityEditor>
+        </EntityViewer>
+    }
 }
 
 pub fn update_entity_viewer(
@@ -94,23 +85,27 @@ pub fn update_entity_viewer(
         .entity(editor)
         .despawn_children()
         .with_children(|parent| {
-            parent.spawn((
-                Node::default(),
-                Text::new(if let Ok(name) = names.get(target) {
-                    format!("Selected: {name}")
-                } else {
-                    format!("Selected: {target}")
-                }),
-            ));
+            parent.spawn(html! {
+                <span>
+                {
+                    if let Ok(name) = names.get(target) {
+                        format!("Selected: {name}")
+                    } else {
+                        format!("Selected: {target}")
+                    }
+                }
+                </span>
+            });
 
             parent
-                .spawn((Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    flex_grow: 1.0,
-                    row_gap: px(4.0),
-                    ..default()
-                },))
+                .spawn(html! {
+                    <div
+                       display={Display::Flex}
+                       flex-direction={FlexDirection::Column}
+                       flex-grow="1"
+                       row-gap="4px"
+                    />
+                })
                 .with_children(|parent| {
                     for (id, name, type_id) in components {
                         parent.spawn(accordion::view(
@@ -216,22 +211,24 @@ fn spawn_struct_editor(
 ) {
     let struct_data = reflect.reflect_ref().as_struct().unwrap();
     parent
-        .spawn(Node {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            row_gap: px(2.0),
-            ..default()
+        .spawn(html! {
+            <div
+               display={Display::Flex}
+               flex-direction={FlexDirection::Column}
+               row-gap="4px"
+            />
         })
         .with_children(|parent| {
             info.iter().for_each(|field| {
                 let name = format!("{}: ", field.name().capitalize_words());
                 let value = struct_data.field(field.name());
                 parent
-                    .spawn(Node {
-                        display: Display::Flex,
-                        flex_direction: FlexDirection::Row,
-                        row_gap: px(2.0),
-                        ..default()
+                    .spawn(html! {
+                        <div
+                           display={Display::Flex}
+                           flex-direction={FlexDirection::Row}
+                           column-gap="4px"
+                        />
                     })
                     .with_children(|parent| {
                         parent.spawn((
@@ -275,20 +272,22 @@ fn spawn_reflected_tuple_struct(
 ) {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
     parent
-        .spawn(Node {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Row,
-            column_gap: px(4.0),
-            ..default()
+        .spawn(html! {
+            <div
+               display={Display::Flex}
+               flex-direction={FlexDirection::Row}
+               column-gap="4px"
+            />
         })
         .with_children(|parent| {
             parent.spawn(Text::new(name));
             parent
-                .spawn(Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    column_gap: px(2.0),
-                    ..default()
+                .spawn(html! {
+                    <div
+                       display={Display::Flex}
+                       flex-direction={FlexDirection::Row}
+                       column-gap="2px"
+                    />
                 })
                 .with_children(|parent| {
                     let tuple_struct = reflect.reflect_ref().as_tuple_struct().unwrap();
@@ -306,38 +305,37 @@ fn spawn_reflected_struct(
 ) {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
     parent
-        .spawn(Node {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Row,
-            column_gap: px(16.0),
-            ..default()
+        .spawn(html! {
+            <div
+               display={Display::Flex}
+               flex-direction={FlexDirection::Row}
+               column-gap="16px"
+            />
         })
         .with_children(|parent| {
             parent.spawn(Text::new(name));
             parent
-                .spawn(Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    column_gap: px(8.0),
-                    ..default()
+                .spawn(html! {
+                    <div
+                       display={Display::Flex}
+                       flex-direction={FlexDirection::Row}
+                       column-gap="8px"
+                    />
                 })
                 .with_children(|parent| {
                     let reflect_struct = reflect.reflect_ref().as_struct().unwrap();
                     info.iter()
                         .zip(reflect_struct.iter_fields())
                         .for_each(|(field, value)| {
-                            parent.spawn((
-                                Node {
-                                    display: Display::Flex,
-                                    flex_direction: FlexDirection::Row,
-                                    column_gap: px(4.0),
-                                    ..default()
-                                },
-                                children![
-                                    Text::new(field.name().capitalize_words().to_string()),
-                                    Text::new(format!("{:?}", value))
-                                ],
-                            ));
+                            parent.spawn(html! {
+                                <div
+                                   display={Display::Flex}
+                                   flex-direction={FlexDirection::Row}
+                                   column-gap="4px">
+                                   <span>{field.name().capitalize_words().to_string()}</span>
+                                   <span>{format!("{value:?}")}</span>
+                                </div>
+                            });
                         })
                 });
         });

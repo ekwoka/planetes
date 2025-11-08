@@ -1,5 +1,5 @@
 use bevy::{
-    app::{HierarchyPropagatePlugin, Propagate},
+    app::HierarchyPropagatePlugin,
     asset::embedded_asset,
     camera::{Viewport, visibility::RenderLayers},
     math::Affine2,
@@ -12,6 +12,7 @@ use crate::{
     atoms::*,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::*,
+    prelude::*,
 };
 
 #[cfg(feature = "avian")]
@@ -78,92 +79,65 @@ pub struct ViewPort;
 pub struct MenuBar;
 
 pub fn build_ui(mut commands: Commands) {
-    commands.spawn((
-        Node {
-            padding: px(1.0).all(),
-            flex_grow: 0.0,
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            width: percent(100.0),
-            height: percent(100.0),
-            // Prevent children from expanding the height of this node.
-            min_height: px(0.0),
-            ..default()
-        },
-        Propagate(TextFont {
-            font_size: 12.0,
-            ..default()
-        }),
-        Propagate(TextColor::from(Color::linear_rgb(0.7, 0.7, 0.7))),
-        RenderLayers::layer(1),
-        children![
-            (
-                Node {
-                    padding: px(4.0).all(),
-                    flex_grow: 0.0,
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    column_gap: px(8.0),
-                    width: percent(100.0),
-                    border: px(1.0).bottom(),
-                    ..default()
-                },
-                MenuBar,
-                BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
-                RenderLayers::layer(1),
-                children![
-                    button::render("File"),
-                    button::render("Edit"),
-                    button::render("View"),
-                    button::render("Help")
-                ]
-            ),
-            (
-                Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    flex_grow: 1.0,
-                    flex_shrink: 1.0,
-                    width: percent(100.0),
-                    height: percent(50.0),
-                    ..default()
-                },
-                children![
-                    (
-                        Node {
-                            flex_grow: 1.0,
-                            flex_shrink: 1.0,
-                            width: percent(50.0),
-                            height: percent(100.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border: px(1.0).all(),
-                            ..default()
-                        },
-                        BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
-                        RenderLayers::layer(1),
-                        children![Text::new("Viewport")]
-                    ),
-                    (
-                        Node {
-                            padding: px(1.0).all(),
-                            display: Display::Flex,
-                            flex_direction: FlexDirection::Column,
-                            flex_grow: 0.0,
-                            flex_shrink: 0.0,
-                            width: percent(40.0),
-                            border: px(1.0).all(),
-                            ..default()
-                        },
-                        BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
-                        RenderLayers::layer(1),
-                        children![scene_tree::view(), entity_viewer::view()]
-                    ),
-                ]
-            ),
-            bottom_bar()
-        ],
-    ));
+    commands.spawn(html! {
+        <div
+            padding="1px"
+            flex-grow="0"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            width="100%"
+            height="100%"
+            font-size="12"
+            text-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                <MenuBar
+                    padding="4px"
+                    flex-grow="0"
+                    display={Display::Flex}
+                    flex-direction={FlexDirection::Row}
+                    column-gap="8px"
+                    width="100%"
+                    border-bottom="1px"
+                    border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                    <iter>
+                        {["File", "Edit", "View", "Help"].into_iter().map(|item| {
+                            button::render(item)
+                        })}
+                    </iter>
+                </MenuBar>
+                <div
+                    display={Display::Flex}
+                    flex-direction={FlexDirection::Row}
+                    flex-grow="1"
+                    flex-shrink="1"
+                    width="100%"
+                    height="50%">
+                    <div
+                        flex-grow="1"
+                        flex-shrink="1"
+                        width="50%"
+                        height="100%"
+                        justify-content={JustifyContent::Center}
+                        align-items={AlignItems::Center}
+                        border="1px"
+                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                        "Viewport"
+                    </div>
+                    <div
+                        padding="1px"
+                        display={Display::Flex}
+                        flex-direction={FlexDirection::Column}
+                        flex-grow="0"
+                        flex-shrink="0"
+                        width="40%"
+                        border="1px"
+                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                        {scene_tree::view()}
+                        {entity_viewer::view()}
+                    </div>
+                </div>
+                {bottom_bar()}
+            </div>
+    });
 }
 
 pub fn setup_camera_system(mut commands: Commands) {
@@ -207,7 +181,7 @@ pub fn update_viewport(
 }
 
 fn bottom_bar() -> impl Bundle {
-    bevy_ui_html::html! {
+    html! {
         <div
             padding="8px"
             padding-top="2px"
@@ -224,28 +198,6 @@ fn bottom_bar() -> impl Bundle {
             </span>
         </div>
     }
-    // (
-    //     Node {
-    //         padding: UiRect::axes(px(8.0), px(2.0)),
-    //         flex_grow: 0.0,
-    //         width: percent(100.0),
-    //         ..default()
-    //     },
-    //     PropagateStop::<TextFont>::default(),
-    //     RenderLayers::layer(1),
-    //     children![(
-    //         Text::new(format!(
-    //             "{} v{}",
-    //             env!("CARGO_PKG_NAME").capitalize_words(),
-    //             env!("CARGO_PKG_VERSION")
-    //         )),
-    //         TextFont {
-    //             font_size: 10.0,
-    //             ..default()
-    //         },
-    //         RenderLayers::layer(1)
-    //     )],
-    // )
 }
 
 #[derive(Component, Reflect, Serialize, Deserialize, Debug)]
