@@ -507,37 +507,10 @@ impl ToTokens for ElementNode {
             });
         };
 
-        BorderRadius::from(&self.attributes)
-            .ok()
-            .iter()
-            .for_each(|border_radius| {
-                components.push(quote! {
-                    #border_radius
-                });
-            });
-
-        BorderColor::from(&self.attributes)
-            .ok()
-            .iter()
-            .for_each(|border_color| {
-                components.push(quote! {
-                    #border_color
-                });
-            });
-
-        BackgroundColor::from(&self.attributes)
-            .ok()
-            .iter()
-            .for_each(|background_color| components.push(background_color.to_token_stream()));
-
-        TextFont::from(&self.attributes)
-            .ok()
-            .iter()
-            .for_each(|border| {
-                components.push(quote! {
-                    #border
-                });
-            });
+        components.push_some(BorderRadius::from(&self.attributes).ok());
+        components.push_some(BorderColor::from(&self.attributes).ok());
+        components.push_some(BackgroundColor::from(&self.attributes).ok());
+        components.push_some(TextFont::from(&self.attributes).ok());
 
         tokens.extend(quote! {
             (
@@ -578,6 +551,18 @@ impl ToTokens for HtmlNode {
             HtmlNode::Inline(inline) => inline.to_tokens(tokens),
             HtmlNode::Block(block) => block.to_tokens(tokens),
             HtmlNode::Iter(iter) => iter.to_tokens(tokens),
+        }
+    }
+}
+
+trait PushSomeTokens {
+    fn push_some(&mut self, item: Option<impl ToTokens>);
+}
+
+impl PushSomeTokens for Vec<TokenStream> {
+    fn push_some(&mut self, item: Option<impl ToTokens>) {
+        if let Some(item) = item {
+            self.push(item.to_token_stream());
         }
     }
 }
