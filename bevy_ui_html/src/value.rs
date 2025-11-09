@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Expr, ExprLit, Lit};
+use syn::{Expr, ExprBlock, ExprLit, Lit};
 
 #[derive(Clone, Debug)]
 pub struct Value(Expr);
@@ -98,6 +98,21 @@ impl Value {
         } else {
             // Not a CSS-style value, assume it's a Rust expression
             Some(value_tokens)
+        }
+    }
+
+    pub fn clean_block(&self) -> Option<TokenStream> {
+        let value = &self.0;
+
+        if let syn::Expr::Block(ExprBlock { block, .. }) = value {
+            if block.stmts.len() == 1 {
+                let stmt = &block.stmts[0];
+                Some(stmt.to_token_stream())
+            } else {
+                Some(block.into_token_stream())
+            }
+        } else {
+            None
         }
     }
 }

@@ -345,7 +345,7 @@ impl ElementNode {
 
 impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut components = Vec::new();
+        let mut components = Vec::<TokenStream>::new();
         if self.tag_name.to_string() != "div" {
             let tag_name = &self.tag_name;
             components.push(quote! {
@@ -524,6 +524,11 @@ impl ToTokens for ElementNode {
                     #border_color
                 });
             });
+
+        BackgroundColor::from(&self.attributes)
+            .ok()
+            .iter()
+            .for_each(|background_color| components.push(background_color.to_token_stream()));
 
         TextFont::from(&self.attributes)
             .ok()
@@ -1009,6 +1014,32 @@ mod tests {
                     ..Default::default()
                 },
                 ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                ))
+            )
+        };
+
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_background_color() {
+        let input = quote! {
+            <div
+               padding="4px"
+               background-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+               "Menu"
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all(),
+                    ..Default::default()
+                },
+                ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7)),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 ))

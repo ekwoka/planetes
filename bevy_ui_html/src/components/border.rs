@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Expr, ExprBlock};
 
 use crate::{Attribute, Value};
 
@@ -76,19 +75,12 @@ impl From<&Vec<Attribute>> for BorderColor {
 
 impl ToTokens for BorderColor {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let color = &self.attributes[0].value;
+        let color = Value::new(&self.attributes[0].value);
 
-        if let Expr::Block(ExprBlock { block, .. }) = color {
-            if block.stmts.len() == 1 {
-                let stmt = &block.stmts[0];
-                tokens.extend(quote! {
-                    ::bevy::ui::BorderColor::all(#stmt)
-                })
-            } else {
-                tokens.extend(quote! {
-                    ::bevy::ui::BorderColor::all(#block)
-                })
-            }
+        if let Some(color) = color.clean_block() {
+            tokens.extend(quote! {
+                ::bevy::ui::BorderColor::all(#color)
+            })
         }
     }
 }
