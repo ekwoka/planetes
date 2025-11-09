@@ -510,9 +510,18 @@ impl ToTokens for ElementNode {
         BorderRadius::from(&self.attributes)
             .ok()
             .iter()
-            .for_each(|border| {
+            .for_each(|border_radius| {
                 components.push(quote! {
-                    #border
+                    #border_radius
+                });
+            });
+
+        BorderColor::from(&self.attributes)
+            .ok()
+            .iter()
+            .for_each(|border_color| {
+                components.push(quote! {
+                    #border_color
                 });
             });
 
@@ -974,6 +983,32 @@ mod tests {
                     ..Default::default()
                 },
                 ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                ))
+            )
+        };
+
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_border_color() {
+        let input = quote! {
+            <div
+               padding="4px"
+               border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+               "Menu"
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all(),
+                    ..Default::default()
+                },
+                ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 ))
