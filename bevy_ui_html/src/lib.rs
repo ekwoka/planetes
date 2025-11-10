@@ -207,7 +207,7 @@ impl ToTokens for WithNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let block = &self.block;
         tokens.extend(quote! {
-            |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+            move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
                 #block
             }
         });
@@ -1240,7 +1240,7 @@ mod tests {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                    ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
                         if true {
                             parent.spawn(html! { <div>"Hello World"</div>});
                         } else {

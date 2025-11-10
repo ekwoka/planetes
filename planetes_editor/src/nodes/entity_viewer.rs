@@ -209,136 +209,133 @@ fn spawn_struct_editor(
     info: &StructInfo,
     reflect: &dyn Reflect,
 ) {
-    let struct_data = reflect.reflect_ref().as_struct().unwrap();
-    parent
-        .spawn(html! {
-            <div
-               display={Display::Flex}
-               flex-direction={FlexDirection::Column}
-               row-gap="4px"
-            />
-        })
-        .with_children(|parent| {
-            info.iter().for_each(|field| {
-                let name = format!("{}: ", field.name().capitalize_words());
-                let value = struct_data.field(field.name());
-                parent
-                    .spawn(html! {
-                        <div
-                           display={Display::Flex}
-                           flex-direction={FlexDirection::Row}
-                           column-gap="4px"
-                        />
-                    })
-                    .with_children(|parent| {
-                        parent.spawn((
-                            Node {
-                                flex_grow: 1.0,
-                                ..default()
-                            },
-                            Text::new(name),
-                        ));
-                        match value {
-                            None => {
-                                parent.spawn(Text::new("Unknown Field"));
-                            }
-                            Some(value) => match value.get_represented_type_info() {
-                                Some(TypeInfo::TupleStruct(info)) => {
-                                    spawn_reflected_tuple_struct(parent, info, value);
-                                }
-                                Some(TypeInfo::Struct(info)) => {
-                                    spawn_reflected_struct(parent, info, value);
-                                }
-                                Some(TypeInfo::Tuple(_)) => {
-                                    parent.spawn(Text::new("Unknown Tuple"));
-                                }
-                                Some(TypeInfo::List(_)) => {
-                                    parent.spawn(Text::new("Unknown List"));
-                                }
-                                _ => {
-                                    parent.spawn(Text::new("Unknown Type"));
-                                }
-                            },
-                        };
-                    });
-            });
-        });
+    let struct_data = reflect.to_dynamic().reflect_owned().into_struct().unwrap();
+    let fields = info.iter().cloned().collect::<Vec<_>>();
+    parent.spawn(html! {
+        <div
+           display={Display::Flex}
+           flex-direction={FlexDirection::Column}
+           row-gap="4px">
+           <iter>
+           {
+               fields.into_iter().map(move |field| {
+                   let name = format!("{}: ", field.name().capitalize_words());
+                   let value = struct_data
+                       .field(field.name())
+                       .map(|partial| partial.to_dynamic());
+                   html! {
+                       <div
+                          display={Display::Flex}
+                          flex-direction={FlexDirection::Row}
+                          column-gap="4px">
+                          <div flex-grow="1">
+                            <span>{name}</span>
+                          </div>
+                          <with>
+                          {
+                              match value {
+                                  None => {
+                                      parent.spawn(Text::new("Unknown Field"));
+                                  }
+                                  Some(value) => match value.get_represented_type_info() {
+                                      Some(TypeInfo::TupleStruct(info)) => {
+                                          parent.spawn(spawn_reflected_tuple_struct(info, value));
+                                      }
+                                      Some(TypeInfo::Struct(info)) => {
+                                          parent.spawn(spawn_reflected_struct(info, value));
+                                      }
+                                      Some(TypeInfo::Tuple(_)) => {
+                                          parent.spawn(Text::new("Unknown Tuple"));
+                                      }
+                                      Some(TypeInfo::List(_)) => {
+                                          parent.spawn(Text::new("Unknown List"));
+                                      }
+                                      _ => {
+                                          parent.spawn(Text::new("Unknown Type"));
+                                      }
+                                  },
+                              };
+                          }
+                          </with>
+                       </div>
+                   }
+               })
+           }
+           </iter>
+        </div>
+    });
 }
 
 fn spawn_reflected_tuple_struct(
-    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     info: &TupleStructInfo,
-    reflect: &dyn PartialReflect,
-) {
+    reflect: Box<dyn PartialReflect>,
+) -> impl Bundle {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
-    parent
-        .spawn(html! {
-            <div
-               display={Display::Flex}
-               flex-direction={FlexDirection::Row}
-               column-gap="4px"
-            />
-        })
-        .with_children(|parent| {
-            parent.spawn(Text::new(name));
-            parent
-                .spawn(html! {
-                    <div
-                       display={Display::Flex}
-                       flex-direction={FlexDirection::Row}
-                       column-gap="2px"
-                    />
-                })
-                .with_children(|parent| {
-                    let tuple_struct = reflect.reflect_ref().as_tuple_struct().unwrap();
-                    tuple_struct.iter_fields().for_each(|field| {
-                        parent.spawn(Text::new(format!("{:?}", field)));
-                    })
-                });
-        });
+    let tuple_struct = reflect
+        .reflect_ref()
+        .as_tuple_struct()
+        .unwrap()
+        .iter_fields()
+        .map(|field| format!("{:?}", field))
+        .collect::<Vec<String>>();
+    html! {
+        <div
+           display={Display::Flex}
+           flex-direction={FlexDirection::Row}
+           column-gap="4px">
+           <span>{name}</span>
+           <div
+              display={Display::Flex}
+              flex-direction={FlexDirection::Row}
+              column-gap="2px">
+              <iter>
+              {
+                  tuple_struct.into_iter().map(|field| {
+                      Text::new(field)
+                  })
+              }
+              </iter>
+            </div>
+        </div>
+    }
 }
 
-fn spawn_reflected_struct(
-    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    info: &StructInfo,
-    reflect: &dyn PartialReflect,
-) {
+fn spawn_reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
-    parent
-        .spawn(html! {
-            <div
-               display={Display::Flex}
-               flex-direction={FlexDirection::Row}
-               column-gap="16px"
-            />
+    let reflect_struct = reflect.reflect_owned().into_struct().unwrap();
+    let children = info
+        .iter()
+        .zip(reflect_struct.iter_fields())
+        .map(|(field, value)| {
+            html! {
+                <div
+                   display={Display::Flex}
+                   flex-direction={FlexDirection::Row}
+                   column-gap="4px">
+                   <span>{field.name().capitalize_words().to_string()}</span>
+                   <span>{format!("{value:?}")}</span>
+                </div>
+            }
         })
-        .with_children(|parent| {
-            parent.spawn(Text::new(name));
-            parent
-                .spawn(html! {
-                    <div
-                       display={Display::Flex}
-                       flex-direction={FlexDirection::Row}
-                       column-gap="8px"
-                    />
-                })
-                .with_children(|parent| {
-                    let reflect_struct = reflect.reflect_ref().as_struct().unwrap();
-                    info.iter()
-                        .zip(reflect_struct.iter_fields())
-                        .for_each(|(field, value)| {
-                            parent.spawn(html! {
-                                <div
-                                   display={Display::Flex}
-                                   flex-direction={FlexDirection::Row}
-                                   column-gap="4px">
-                                   <span>{field.name().capitalize_words().to_string()}</span>
-                                   <span>{format!("{value:?}")}</span>
-                                </div>
-                            });
-                        })
-                });
-        });
+        .collect::<Vec<_>>();
+    html! {
+        <div
+           display={Display::Flex}
+           flex-direction={FlexDirection::Row}
+           column-gap="16px">
+           <span>{name}</span>
+            <div
+                display={Display::Flex}
+                flex-direction={FlexDirection::Row}
+                column-gap="8px">
+                <iter>
+                {
+                    children.into_iter()
+                }
+                </iter>
+            </div>
+        </div>
+    }
 }
 
 #[derive(Component)]
