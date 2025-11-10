@@ -65,9 +65,9 @@ unwrap_used = "warn"
 [workspace.metadata.bin]
 cargo-edit = { version = "0.13.7", bins = ["cargo-rm", "cargo-upgrade"] }
 cargo-make = { version = "0.37.24" }
-cargo-nextest = { version = "0.9.109" }
+cargo-nextest = { version = "0.9.111" }
 cargo-watch = { version = "8.5.3", locked = true }
-dioxus-cli = { version = "0.7.0", bins = ["dx"] }
+dioxus-cli = { version = "0.7.1", bins = ["dx"] }
 
 [package]
 name = "planetes_sandbox"
