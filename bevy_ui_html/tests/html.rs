@@ -102,3 +102,39 @@ fn test_editor_menu_button() {
         vec![&Text::new("Menu")]
     )
 }
+
+#[test]
+fn test_simple_with() {
+    let mut app = App::new();
+
+    let mut children = app.world_mut().query::<&Children>();
+    let mut text = app.world_mut().query::<&Text>();
+
+    let root = app
+        .world_mut()
+        .spawn(html! {
+            <div>
+                <with>
+                    {
+                        let thing = true;
+                        if thing {
+                            parent.spawn(html! { <span>"Hello World"</span> });
+                        } else {
+                            parent.spawn(html! { <span>"Hello Mom"</span> });
+                        }
+                    }
+                </with>
+            </div>
+        })
+        .id();
+
+    let children = children.get(app.world(), root).unwrap();
+
+    assert_eq!(children.len(), 1);
+
+    assert_eq!(
+        text.iter_many(app.world(), children)
+            .collect::<Vec<&Text>>(),
+        vec![&Text::new("Hello World")]
+    );
+}

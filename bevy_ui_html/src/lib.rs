@@ -18,6 +18,7 @@ enum HtmlNode {
     Inline(InlineNode),
     Block(BlockNode),
     Iter(IterNode),
+    With(WithNode),
 }
 
 #[derive(Clone, Debug)]
@@ -56,6 +57,11 @@ struct IterNode {
     block: Box<HtmlNode>,
 }
 
+#[derive(Clone, Debug)]
+struct WithNode {
+    block: Box<HtmlNode>,
+}
+
 impl From<Node> for HtmlNode {
     fn from(node: Node) -> Self {
         match node {
@@ -76,8 +82,23 @@ impl From<Node> for HtmlNode {
                             _ => None,
                         })
                         .next()
-                        .expect("iter tag must have at least one Block child");
+                        .expect("iter tag must have exactly one Block child");
                     return Self::Iter(IterNode {
+                        block: Box::new(block),
+                    });
+                }
+
+                if tag_name == "with" {
+                    let block = element
+                        .children
+                        .into_iter()
+                        .filter_map(|child| match child {
+                            Node::Block(_) => Some(Self::from(child)),
+                            _ => None,
+                        })
+                        .next()
+                        .expect("iter tag must have exactly one Block child");
+                    return Self::With(WithNode {
                         block: Box::new(block),
                     });
                 }
@@ -138,6 +159,9 @@ impl ToTokens for ChildNode {
                     ::bevy::ecs::spawn::SpawnIter(#node)
                 });
             }
+            HtmlNode::With(node) => tokens.extend(quote! {
+                ::bevy::ecs::spawn::SpawnWith(#node)
+            }),
             _ => {
                 tokens.extend(quote! {
                     ::bevy::ecs::spawn::Spawn(#node)
@@ -175,6 +199,17 @@ impl ToTokens for IterNode {
         let block = &self.block;
         tokens.extend(quote! {
             #block
+        });
+    }
+}
+
+impl ToTokens for WithNode {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let block = &self.block;
+        tokens.extend(quote! {
+            |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                #block
+            }
         });
     }
 }
@@ -551,6 +586,7 @@ impl ToTokens for HtmlNode {
             HtmlNode::Inline(inline) => inline.to_tokens(tokens),
             HtmlNode::Block(block) => block.to_tokens(tokens),
             HtmlNode::Iter(iter) => iter.to_tokens(tokens),
+            HtmlNode::With(with) => with.to_tokens(tokens),
         }
     }
 }
@@ -1132,7 +1168,7 @@ mod tests {
             <div
                 padding="4px"
                 font-size="10">
-                    "Menu"
+                "Menu"
             </div>
         };
         let expected = quote! {
@@ -1181,6 +1217,39 @@ mod tests {
             )
         };
 
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_spawning_with_children() {
+        let input = quote! {
+            <div>
+                <with>
+                    {
+                        if true {
+                            parent.spawn(html! { <div>"Hello World"</div>});
+                        } else {
+                            parent.spawn(html! { <div>"Hello Mom"</div>});
+                        }
+                    }
+                </with>
+            </div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node::default(),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                        if true {
+                            parent.spawn(html! { <div>"Hello World"</div>});
+                        } else {
+                            parent.spawn(html! { <div>"Hello Mom"</div>});
+                        }
+                    })
+                ))
+            )
+        };
         let result = html_inner(input);
         assert_eq!(result.to_string(), expected.to_string());
     }
