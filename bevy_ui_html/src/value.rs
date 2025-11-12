@@ -112,7 +112,7 @@ impl Value {
                 Some(block.into_token_stream())
             }
         } else {
-            None
+            Some(value.into_token_stream())
         }
     }
 }

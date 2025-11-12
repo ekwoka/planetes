@@ -381,6 +381,7 @@ impl ElementNode {
 impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut components = Vec::<TokenStream>::new();
+        components.push_some(Name::from(&self.attributes).ok());
         if self.tag_name.to_string() != "div" {
             let tag_name = &self.tag_name;
             components.push(quote! {
@@ -1273,6 +1274,24 @@ mod tests {
                 (Checkable, Checked),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                ))
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_name() {
+        let input = quote! {
+            <div name="hello">"World"</div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ecs::name::Name::new("hello"),
+                ::bevy::ui::Node { ..Default::default() },
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
                 ))
             )
         };

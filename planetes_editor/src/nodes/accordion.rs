@@ -84,7 +84,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     asset_server: AssetServer,
 ) -> impl Bundle {
     (
-        Name::new(Into::<String>::into(label.clone())),
+        ::bevy::ecs::name::Name::new(Into::<String>::into(label.clone())),
         Node {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
