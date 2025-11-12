@@ -551,13 +551,16 @@ impl ToTokens for ElementNode {
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_block()),
         );
-
-        tokens.extend(quote! {
-            (
-                #(#components,)*
+        if !children.is_empty() {
+            components.push(quote! {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     #(#children),*
                 ))
+            })
+        }
+        tokens.extend(quote! {
+            (
+                #(#components),*
             )
         });
     }
@@ -646,6 +649,20 @@ mod tests {
         };
         let result = html_inner(input);
         assert_eq!(result.to_string(), output.to_string());
+    }
+
+    #[test]
+    fn single_div_with_no_children() {
+        let input = quote! {
+            <div/>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node::default()
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
     }
 
     #[test]

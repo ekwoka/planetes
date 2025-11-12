@@ -1,12 +1,14 @@
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
-    camera::visibility::RenderLayers,
     prelude::*,
 };
 
-use crate::nodes::{
-    entity_viewer::{EntityEditor, Viewing},
-    scene_tree::Represents,
+use crate::{
+    nodes::{
+        entity_viewer::{EntityEditor, Viewing},
+        scene_tree::Represents,
+    },
+    prelude::*,
 };
 
 pub fn plugin(app: &mut App) {
@@ -83,64 +85,43 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     content: SpawnIter<I>,
     asset_server: AssetServer,
 ) -> impl Bundle {
-    (
-        ::bevy::ecs::name::Name::new(Into::<String>::into(label.clone())),
-        Node {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            row_gap: px(8.0),
-            ..default()
-        },
-        RenderLayers::layer(1),
-        Propagate(AccordionState::Closed),
-        children![
-            (
-                Button,
-                Node {
-                    padding: px(2.0).all(),
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: px(8.0),
-                    ..default()
-                },
-                RenderLayers::layer(1),
-                children![
-                    (
-                        AccordionIcon,
-                        ImageNode::new(
-                            asset_server
-                                .load("embedded://planetes_editor/assets/filled_triangle.png")
-                        ),
-                        Node {
-                            height: Val::Px(8.0),
-                            width: Val::Px(8.0),
-                            ..default()
-                        },
-                        UiTransform::from_rotation(Rot2::degrees(90.0))
-                    ),
-                    (
-                        Text::new(label),
-                        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                        RenderLayers::layer(1),
-                    )
-                ]
-            ),
-            (
-                Node {
-                    padding: px(2.0).left(),
-                    margin: px(16.0).left(),
-                    display: Display::None,
-                    flex_direction: FlexDirection::Column,
-                    row_gap: px(8.0),
-                    ..default()
-                },
-                AccordionContainer,
-                RenderLayers::layer(1),
-                Children::spawn(content)
-            )
-        ],
-    )
+    html! {
+        <div
+            name={Into::<String>::into(label.clone())}
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="8px"
+            components={Propagate(AccordionState::Closed)}>
+            <Button
+                padding="2px"
+                display={Display::Flex}
+                flex-direction={FlexDirection::Row}
+                align-items={AlignItems::Center}
+                column-gap="8px">
+                <AccordionIcon
+                    height="8px"
+                    width="8px"
+                    components={
+                        (
+                            ImageNode::new(
+                                asset_server
+                                    .load("embedded://planetes_editor/assets/filled_triangle.png")
+                            ),
+                            UiTransform::from_rotation(Rot2::degrees(90.0))
+                        )
+                    }>
+                </AccordionIcon>
+                <span>{label}</span>
+            </Button>
+            <AccordionContainer
+                padding-left="2px"
+                margin-left="16px"
+                display={Display::None}
+                flex-direction={FlexDirection::Column}
+                row-gap="8px"
+                components={Children::spawn(content)}/>
+        </div>
+    }
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
