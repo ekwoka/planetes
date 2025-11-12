@@ -546,6 +546,10 @@ impl ToTokens for ElementNode {
         components.push_some(BorderColor::from(&self.attributes).ok());
         components.push_some(BackgroundColor::from(&self.attributes).ok());
         components.push_some(TextFont::from(&self.attributes).ok());
+        components.push_some(
+            Self::get_attr(&self.attributes, "components")
+                .and_then(|value| Value::new(value).clean_block()),
+        );
 
         tokens.extend(quote! {
             (
@@ -1247,6 +1251,28 @@ mod tests {
                             parent.spawn(html! { <div>"Hello Mom"</div>});
                         }
                     })
+                ))
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn support_arbitrary_component_additions() {
+        let input = quote! {
+            <div
+            components={(
+                Checkable,
+                Checked
+            )}>"Hello"</div>
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node { ..Default::default() },
+                (Checkable, Checked),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
                 ))
             )
         };
