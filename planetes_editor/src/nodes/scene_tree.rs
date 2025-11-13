@@ -6,7 +6,7 @@ use crate::{
     prelude::*,
     scene::EditorScene,
 };
-use bevy::{camera::visibility::RenderLayers, prelude::*};
+use bevy::prelude::*;
 
 pub fn plugin(app: &mut App) {
     app.add_systems(Update, (update_tree, update_branches))
@@ -79,35 +79,20 @@ pub fn update_branches(
             let text = format!("{name}:");
             branch_view.despawn_children().with_children(|parent| {
                 if child_entities.is_empty() {
-                    parent.spawn((
-                        Name::new(name),
-                        Node {
-                            padding: px(2.0).all(),
-                            display: Display::Flex,
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::Center,
-                            column_gap: px(8.0),
-                            ..default()
-                        },
-                        RenderLayers::layer(1),
-                        children![
-                            (
-                                ImageNode::new(
-                                    asset_server
-                                        .load("embedded://planetes_editor/assets/file_icon.png")
-                                ),
-                                Node {
-                                    height: Val::Px(10.0),
-                                    ..default()
-                                }
-                            ),
-                            (
-                                Text::new(text),
-                                TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                                RenderLayers::layer(1),
-                            )
-                        ],
-                    ));
+                    parent.spawn(html! {
+                        <div
+                            name={name}
+                            padding="2px"
+                            display={Display::Flex}
+                            flex-direction={FlexDirection::Row}
+                            align-items={AlignItems::Center}
+                            column-gap="8px">
+                            <img src={asset_server
+                                .load("embedded://planetes_editor/assets/file_icon.png")}
+                                height="10px"/>
+                            <span>{text}</span>
+                        </div>
+                    });
                 } else {
                     parent.spawn(accordion::view(
                         text,
@@ -121,26 +106,19 @@ pub fn update_branches(
 }
 
 pub fn branch(target_entity: Entity) -> impl Bundle {
-    (
-        SceneTreeBranch,
-        Node {
-            padding: px(2.0).left(),
-            flex_grow: 0.0,
-            flex_shrink: 1.0,
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            row_gap: px(8.0),
-            width: percent(100.0),
-            ..default()
-        },
-        RenderLayers::layer(1),
-        Represents(target_entity),
-        children![(
-            Text::new(format!("Child {target_entity}")),
-            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-            RenderLayers::layer(1),
-        )],
-    )
+    html! {
+        <SceneTreeBranch
+            padding-left="2px"
+                flex-grow="0"
+                flex-shrink="1"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="8px"
+            width="100%"
+            components={Represents(target_entity)}>
+            <span>{format!("Child {target_entity}")}</span>
+        </SceneTreeBranch>
+    }
 }
 
 pub fn select_entity(

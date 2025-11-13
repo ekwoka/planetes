@@ -98,19 +98,17 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
                 flex-direction={FlexDirection::Row}
                 align-items={AlignItems::Center}
                 column-gap="8px">
-                <AccordionIcon
+                <img
+                    src={asset_server
+                        .load("embedded://planetes_editor/assets/filled_triangle.png")}
                     height="8px"
                     width="8px"
                     components={
                         (
-                            ImageNode::new(
-                                asset_server
-                                    .load("embedded://planetes_editor/assets/filled_triangle.png")
-                            ),
+                            AccordionIcon,
                             UiTransform::from_rotation(Rot2::degrees(90.0))
                         )
-                    }>
-                </AccordionIcon>
+                    }/>
                 <span>{label}</span>
             </Button>
             <AccordionContainer

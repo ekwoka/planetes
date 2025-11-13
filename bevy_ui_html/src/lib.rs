@@ -382,7 +382,7 @@ impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut components = Vec::<TokenStream>::new();
         components.push_some(Name::from(&self.attributes).ok());
-        if self.tag_name.to_string() != "div" {
+        if self.tag_name.to_string() != "div" && self.tag_name.to_string() != "img" {
             let tag_name = &self.tag_name;
             components.push(quote! {
                 #tag_name
@@ -542,7 +542,7 @@ impl ToTokens for ElementNode {
                 }
             });
         };
-
+        components.push_some(Image::from(&self.attributes).ok());
         components.push_some(BorderRadius::from(&self.attributes).ok());
         components.push_some(BorderColor::from(&self.attributes).ok());
         components.push_some(BackgroundColor::from(&self.attributes).ok());
@@ -1310,6 +1310,25 @@ mod tests {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
                 ))
+            )
+        };
+        let result = html_inner(input);
+        assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn supports_img_tags() {
+        let input = quote! {
+            <img src={asset_server
+                .load("embedded://planetes_editor/assets/filled_triangle.png")} />
+        };
+        let expected = quote! {
+            (
+                ::bevy::ui::Node { ..Default::default() },
+                ::bevy::ui::widget::ImageNode::new(
+                    asset_server
+                        .load("embedded://planetes_editor/assets/filled_triangle.png")
+                )
             )
         };
         let result = html_inner(input);

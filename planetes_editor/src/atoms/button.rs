@@ -8,7 +8,7 @@ pub fn render(test: impl Into<String>) -> impl Bundle {
         <MenuButton
           padding="4px"
           border-radius="2px">
-          {Text::new(test)}
+              <span>{test}</span>
         </MenuButton>
     }
 }
