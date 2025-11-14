@@ -3,12 +3,12 @@ use bevy::prelude::*;
 #[derive(Component)]
 pub struct MenuButton;
 
-pub fn render(test: impl Into<String>) -> impl Bundle {
+pub fn render(text: impl Into<String>) -> impl Bundle {
     bevy_ui_html::html! {
         <MenuButton
           padding="4px"
           border-radius="2px">
-              <span>{test}</span>
+              <span>{text}</span>
         </MenuButton>
     }
 }

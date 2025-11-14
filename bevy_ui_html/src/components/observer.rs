@@ -36,7 +36,7 @@ impl ToTokens for Observer {
             .iter()
             .filter_map(|attr| Value::new(&attr.value).clean_block());
         tokens.extend(quote! {
-            ::bevy::ecs::spawn::SpawnWith(|parent: &mut RelatedSpawner<ChildOf>| {
+            ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
                 let entity = parent.target_entity();
                 #(parent.spawn(::bevy::ecs::observer::Observer::new(#observers).with_entity(entity));)*
             })

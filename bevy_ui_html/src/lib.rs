@@ -1013,7 +1013,7 @@ mod tests {
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
-                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut RelatedSpawner<ChildOf>| {
+                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
                             let entity = parent.target_entity();
                             parent.spawn(
                                 ::bevy::ecs::observer::Observer::new(
@@ -1026,7 +1026,6 @@ mod tests {
                                 .with_entity(entity)
                             );
                         })
-
                     ))
                 )
             };
@@ -1069,35 +1068,6 @@ mod tests {
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
-
-            #[test]
-            fn supports_text_layout() {
-                let input = quote! {
-                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node::default(),
-                        ::bevy::text::TextLayout {
-                            justify: Justify::Left,
-                            ..Default::default()
-                        },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(
-                                (
-                                    ::bevy::ui::widget::Text::new("Hello"),
-                                    ::bevy::text::TextLayout {
-                                        linebreak: LineBreak::NoWrap,
-                                        ..Default::default()
-                                    }
-                                )
-                            )
-                        ))
-                    )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
         }
 
         #[cfg(feature = "propagate")]
@@ -1131,35 +1101,35 @@ mod tests {
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
+        }
 
-            #[test]
-            fn supports_text_layout() {
-                let input = quote! {
-                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node::default(),
-                        ::bevy::app::Propagate(::bevy::text::TextLayout {
-                            justify: Justify::Left,
-                            ..Default::default()
-                        }),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(
-                                (
-                                    ::bevy::ui::widget::Text::new("Hello"),
-                                    ::bevy::app::Propagate(::bevy::text::TextLayout {
-                                        linebreak: LineBreak::NoWrap,
-                                        ..Default::default()
-                                    })
-                                )
+        #[test]
+        fn supports_text_layout() {
+            let input = quote! {
+                <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    ::bevy::text::TextLayout {
+                        justify: Justify::Left,
+                        ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            (
+                                ::bevy::ui::widget::Text::new("Hello"),
+                                ::bevy::text::TextLayout {
+                                    linebreak: LineBreak::NoWrap,
+                                    ..Default::default()
+                                }
                             )
-                        ))
-                    )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
         }
     }
 }

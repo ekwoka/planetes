@@ -103,20 +103,11 @@ impl ToTokens for TextLayout {
             }
         });
 
-        if cfg!(feature = "propagate") {
-            tokens.extend(quote! {
-                    ::bevy::app::Propagate(::bevy::text::TextLayout {
-                    #(#fields,)*
-                    ..Default::default()
-                })
-            })
-        } else {
-            tokens.extend(quote! {
-                ::bevy::text::TextLayout {
-                    #(#fields,)*
-                    ..Default::default()
-                }
-            })
-        }
+        tokens.extend(quote! {
+            ::bevy::text::TextLayout {
+                #(#fields,)*
+                ..Default::default()
+            }
+        });
     }
 }

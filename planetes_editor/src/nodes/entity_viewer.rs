@@ -66,20 +66,30 @@ pub fn update_entity_viewer(
         return;
     };
 
-    let components = components.filter_map(|component| {
-        component.type_id().and_then(|type_id| {
-            if allowed_types.contains(&type_id) && component.name() != "bevy_ecs::name::Name".into()
-            {
-                Some((
-                    component.id(),
-                    format!("{}", component.name().shortname()),
-                    type_id,
-                ))
-            } else {
-                None
-            }
+    let components = components
+        .filter_map(|component| {
+            component.type_id().and_then(|type_id| {
+                if allowed_types.contains(&type_id)
+                    && component.name() != "bevy_ecs::name::Name".into()
+                {
+                    Some((
+                        component.id(),
+                        format!("{}", component.name().shortname()),
+                        type_id,
+                    ))
+                } else {
+                    None
+                }
+            })
         })
-    });
+        .map(|(id, name, type_id)| {
+            accordion::view(
+                name,
+                SpawnIter(once(component_editor(id, type_id))),
+                assets.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
 
     commands
         .entity(editor)
@@ -97,24 +107,17 @@ pub fn update_entity_viewer(
                 </span>
             });
 
-            parent
-                .spawn(html! {
-                    <div
-                       display={Display::Flex}
-                       flex-direction={FlexDirection::Column}
-                       flex-grow="1"
-                       row-gap="4px"
-                    />
-                })
-                .with_children(|parent| {
-                    for (id, name, type_id) in components {
-                        parent.spawn(accordion::view(
-                            name,
-                            SpawnIter(once(component_editor(id, type_id))),
-                            assets.clone(),
-                        ));
-                    }
-                });
+            parent.spawn(html! {
+                <div
+                   display={Display::Flex}
+                   flex-direction={FlexDirection::Column}
+                   flex-grow="1"
+                   row-gap="4px">
+                   <iter>
+                    {components.into_iter()}
+                   </iter>
+                </div>
+            });
         });
 }
 
@@ -122,23 +125,21 @@ pub fn update_entity_viewer(
 pub struct ComponentEditor((ComponentId, TypeId));
 
 pub fn component_editor(id: ComponentId, type_id: TypeId) -> impl Bundle {
-    (
-        ComponentEditor((id, type_id)),
-        Node {
-            padding: px(2.0).left(),
-            flex_grow: 0.0,
-            flex_shrink: 1.0,
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            row_gap: px(4.0),
-            width: percent(100.0),
-            ..default()
-        },
-        children![(
-            Text::new(format!("{id:?}")),
-            TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-        )],
-    )
+    html! {
+        <div
+            padding-left="2px"
+            flex-grow="0"
+            flex-shrink="1"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="4px"
+            width="100%"
+            components={ComponentEditor((id, type_id))}>
+            <span linebreak={LineBreak::WordBoundary}>
+                {format!("{id:?}")}
+            </span>
+        </div>
+    }
 }
 
 pub fn update_component_editor(
@@ -198,10 +199,9 @@ fn spawn_component_editor(
 }
 
 fn spawn_empty_component(parent: &mut RelatedSpawnerCommands<'_, ChildOf>) {
-    parent.spawn((
-        Text::new("Empty"),
-        TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-    ));
+    parent.spawn(html! {
+        <span linebreak={LineBreak::WordBoundary}>"Empty"</span>
+    });
 }
 
 fn spawn_struct_editor(
