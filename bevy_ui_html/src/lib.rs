@@ -254,7 +254,12 @@ impl ToTokens for ElementNode {
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_block()),
         );
-        let children = &self.children;
+        let mut children = self
+            .children
+            .iter()
+            .map(|child| child.to_token_stream())
+            .collect::<Vec<_>>();
+        children.push_some(Observer::from(&self.attributes).ok());
         if !children.is_empty() {
             components.push(quote! {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -987,6 +992,47 @@ mod tests {
         };
         let result = html_inner(input);
         assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    mod children {
+        use super::*;
+
+        #[test]
+        fn adds_observers() {
+            let input = quote! {
+                <div onClick={|_event: On<Pointer<Click>>,
+                    mut commands: Commands,
+                    text: Single<Entity, With<Text>>| {
+                        commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                    }}>
+                    "Hello, World!"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
+                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut RelatedSpawner<ChildOf>| {
+                            let entity = parent.target_entity();
+                            parent.spawn(
+                                ::bevy::ecs::observer::Observer::new(
+                                    |_event: On<Pointer<Click> >,
+                                     mut commands: Commands,
+                                     text: Single<Entity, With<Text> >| {
+                                        commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                                    }
+                                )
+                                .with_entity(entity)
+                            );
+                        })
+
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
     }
 
     mod text_components {

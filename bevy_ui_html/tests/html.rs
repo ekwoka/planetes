@@ -1,5 +1,12 @@
+use std::time::Duration;
+
 use bevy::{
-    ecs::spawn::{Spawn, SpawnRelatedBundle},
+    camera::NormalizedRenderTarget,
+    ecs::{
+        relationship::RelatedSpawner,
+        spawn::{Spawn, SpawnRelatedBundle},
+    },
+    picking::pointer::Location,
     prelude::*,
 };
 use bevy_ui_html::html;
@@ -136,5 +143,117 @@ fn test_simple_with() {
         text.iter_many(app.world(), children)
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Hello World")]
+    );
+}
+
+#[test]
+fn allows_listeners() {
+    let mut app = App::new();
+
+    let mut text = app.world_mut().query::<&Text>();
+
+    let root = app
+        .world_mut()
+        .spawn(html! {
+            <div onClick={|_event: On<Pointer<Click>>,
+                mut commands: Commands,
+                text: Single<Entity, With<Text>>| {
+                    commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                }}>
+                "Hello, World!"
+            </div>
+        })
+        .id();
+
+    app.update();
+
+    app.world_mut().commands().trigger(Pointer {
+        entity: root,
+        pointer_id: bevy::picking::backend::prelude::PointerId::Mouse,
+        event: Click {
+            button: PointerButton::Primary,
+            hit: bevy::picking::backend::HitData {
+                camera: root,
+                depth: 0.0,
+                position: None,
+                normal: None,
+            },
+            duration: Duration::from_millis(100),
+        },
+        pointer_location: Location {
+            target: NormalizedRenderTarget::None {
+                width: 0,
+                height: 0,
+            },
+            position: Vec2::ZERO,
+        },
+    });
+
+    app.update();
+
+    assert_eq!(
+        text.iter(app.world()).collect::<Vec<&Text>>(),
+        vec![&Text::new("Hi, Mom!")]
+    );
+}
+
+#[test]
+fn allows_listeners_no_macro() {
+    let mut app = App::new();
+
+    let mut text = app.world_mut().query::<&Text>();
+
+    let root = app
+        .world_mut()
+        .spawn((
+            Node::default(),
+            Children::spawn((
+                SpawnWith(|parent: &mut RelatedSpawner<ChildOf>| {
+                    let entity = parent.target_entity();
+                    parent.spawn(
+                        Observer::new(
+                            |_event: On<Pointer<Click>>,
+                             mut commands: Commands,
+                             text: Single<Entity, With<Text>>| {
+                                commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                            },
+                        )
+                        .with_entity(entity),
+                    );
+                }),
+                Spawn(Text::new("Hello, World!")),
+            )),
+        ))
+        .id();
+
+    app.update();
+
+    app.world_mut().commands().trigger(Pointer {
+        entity: root,
+        pointer_id: bevy::picking::backend::prelude::PointerId::Mouse,
+        event: Click {
+            button: PointerButton::Primary,
+            hit: bevy::picking::backend::HitData {
+                camera: root,
+                depth: 0.0,
+                position: None,
+                normal: None,
+            },
+            duration: Duration::from_millis(100),
+        },
+        pointer_location: Location {
+            target: NormalizedRenderTarget::None {
+                width: 0,
+                height: 0,
+            },
+            position: Vec2::ZERO,
+        },
+    });
+
+    app.update();
+
+    assert_eq!(
+        text.iter(app.world()).collect::<Vec<&Text>>(),
+        vec![&Text::new("Hi, Mom!")]
     );
 }

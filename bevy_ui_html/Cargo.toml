@@ -12,7 +12,7 @@ rstml = "0.12"
 syn = "2.0"
 
 [dev-dependencies]
-bevy = { version = "0.17", default-features = false, features = ["bevy_ui"] }
+bevy = { version = "0.17", default-features = false, features = ["bevy_picking", "bevy_ui"] }
 
 [lints]
 workspace = true
