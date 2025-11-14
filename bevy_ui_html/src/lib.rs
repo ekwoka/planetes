@@ -4,6 +4,7 @@ use rstml::{
     node::{Node, NodeName},
     parse2,
 };
+use syn::spanned::Spanned;
 
 mod components;
 mod value;
@@ -30,6 +31,7 @@ struct TextNode {
 struct Attribute {
     key: String,
     value: syn::Expr,
+    span: proc_macro2::Span,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +47,7 @@ struct ElementNode {
 #[derive(Clone, Debug)]
 struct InlineNode {
     children: Vec<HtmlNode>,
+    attributes: Vec<Attribute>,
 }
 
 #[derive(Clone, Debug)]
@@ -113,30 +116,37 @@ impl From<Node> for HtmlNode {
                         _ => None,
                     });
 
+                let attributes: Vec<Attribute> = element
+                    .open_tag
+                    .attributes
+                    .into_iter()
+                    .filter_map(|attr| {
+                        if let rstml::node::NodeAttribute::Attribute(attr) = attr {
+                            let key = attr.key.to_string();
+                            if let Some(value_expr) = attr.value() {
+                                return Some(Attribute {
+                                    key,
+                                    value: value_expr.clone(),
+                                    span: match attr.key {
+                                        NodeName::Path(path) => path.span(),
+                                        NodeName::Punctuated(path) => path.span(),
+                                        NodeName::Block(block) => block.span(),
+                                    }
+                                    .span(),
+                                });
+                            }
+                            None
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 if tag_name == "span" {
                     Self::Inline(InlineNode {
                         children: children.collect(),
+                        attributes,
                     })
                 } else {
-                    let attributes: Vec<Attribute> = element
-                        .open_tag
-                        .attributes
-                        .into_iter()
-                        .filter_map(|attr| {
-                            if let rstml::node::NodeAttribute::Attribute(attr) = attr {
-                                let key = attr.key.to_string();
-                                if let Some(value_expr) = attr.value() {
-                                    return Some(Attribute {
-                                        key,
-                                        value: value_expr.clone(),
-                                    });
-                                }
-                                None
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
                     Self::Element(ElementNode {
                         tag_name: element.open_tag.name,
                         children: children.map(ChildNode).collect(),
@@ -239,6 +249,7 @@ impl ToTokens for ElementNode {
         components.push_some(BorderColor::from(&self.attributes).ok());
         components.push_some(BackgroundColor::from(&self.attributes).ok());
         components.push_some(TextFont::from(&self.attributes).ok());
+        components.push_some(TextLayout::from(&self.attributes).ok());
         components.push_some(
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_block()),
@@ -261,21 +272,31 @@ impl ToTokens for ElementNode {
 
 impl ToTokens for InlineNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let children = &self
-            .children
-            .iter()
-            .map(|child| match child {
-                HtmlNode::Block(block) => quote! {
-                    ::bevy::ui::widget::Text::new(#block)
-                },
-                _ => quote! {
-                    #child
-                },
-            })
-            .collect::<Vec<_>>();
-        tokens.extend(quote! {
-            #(#children),*
-        });
+        let mut components = Vec::<TokenStream>::new();
+        components.extend(
+            self.children
+                .iter()
+                .map(|child| match child {
+                    HtmlNode::Block(block) => quote! {
+                        ::bevy::ui::widget::Text::new(#block)
+                    },
+                    _ => quote! {
+                        #child
+                    },
+                })
+                .collect::<Vec<_>>(),
+        );
+        components.push_some(TextFont::from(&self.attributes).ok());
+        components.push_some(TextLayout::from(&self.attributes).ok());
+        if components.len() == 1 {
+            tokens.extend(quote! {
+                #(#components),*
+            });
+        } else {
+            tokens.extend(quote! {
+                (#(#components),*)
+            });
+        }
     }
 }
 
@@ -876,66 +897,6 @@ mod tests {
         assert_eq!(result.to_string(), expected.to_string());
     }
 
-    #[cfg(not(feature = "propagate"))]
-    #[test]
-    fn supports_text_font() {
-        let input = quote! {
-            <div
-                padding="4px"
-                font-size="10">
-                "Menu"
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    ..Default::default()
-                },
-                ::bevy::text::TextFont {
-                    font_size: 10.0,
-                    ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[cfg(feature = "propagate")]
-    #[test]
-    fn supports_text_font_with_propagate() {
-        let input = quote! {
-            <div
-                padding="4px"
-                font-size="10">
-                    "Menu"
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    ..Default::default()
-                },
-                ::bevy::app::Propagate(::bevy::text::TextFont {
-                    font_size: 10.0,
-                    ..Default::default()
-                }),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
     #[test]
     fn supports_spawning_with_children() {
         let input = quote! {
@@ -1026,5 +987,133 @@ mod tests {
         };
         let result = html_inner(input);
         assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    mod text_components {
+        use super::*;
+
+        #[cfg(not(feature = "propagate"))]
+        mod no_propagate {
+            use super::*;
+            #[test]
+            fn supports_text_font() {
+                let input = quote! {
+                    <div
+                        padding="4px"
+                        font-size="10">
+                        "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::text::TextFont {
+                            font_size: 10.0,
+                            ..Default::default()
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn supports_text_layout() {
+                let input = quote! {
+                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        ::bevy::text::TextLayout {
+                            justify: Justify::Left,
+                            ..Default::default()
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                (
+                                    ::bevy::ui::widget::Text::new("Hello"),
+                                    ::bevy::text::TextLayout {
+                                        linebreak: LineBreak::NoWrap,
+                                        ..Default::default()
+                                    }
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
+
+        #[cfg(feature = "propagate")]
+        mod propagate {
+            use super::*;
+            #[test]
+            fn supports_text_font() {
+                let input = quote! {
+                    <div
+                        padding="4px"
+                        font-size="10">
+                            "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::app::Propagate(::bevy::text::TextFont {
+                            font_size: 10.0,
+                            ..Default::default()
+                        }),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn supports_text_layout() {
+                let input = quote! {
+                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        ::bevy::app::Propagate(::bevy::text::TextLayout {
+                            justify: Justify::Left,
+                            ..Default::default()
+                        }),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                (
+                                    ::bevy::ui::widget::Text::new("Hello"),
+                                    ::bevy::app::Propagate(::bevy::text::TextLayout {
+                                        linebreak: LineBreak::NoWrap,
+                                        ..Default::default()
+                                    })
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
     }
 }
