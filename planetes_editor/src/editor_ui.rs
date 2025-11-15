@@ -8,7 +8,7 @@ use bevy::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    EditorMode, ReflectEditorView, ReflectPlanetesBundle, ReflectPlanetesComponent,
+    EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
     atoms::*,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::*,

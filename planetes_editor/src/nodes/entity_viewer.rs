@@ -1,7 +1,7 @@
 use std::{any::TypeId, iter::once};
 
 use bevy::{
-    ecs::{component::ComponentId, relationship::RelatedSpawnerCommands},
+    ecs::component::ComponentId,
     prelude::*,
     reflect::{StructInfo, TupleStructInfo, TypeInfo},
 };
