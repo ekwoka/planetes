@@ -170,6 +170,8 @@ pub fn update_component_editor(
             .data::<ReflectEditorView>()
             .and_then(|editor_view| editor_view.get(reflected));
 
+        let reflected = reflected.to_dynamic();
+
         commands
             .entity(editor)
             .despawn_children()
@@ -181,43 +183,50 @@ pub fn update_component_editor(
                 if let Some(editor_view) = reflected_editor_view {
                     editor_view.add_to_parent(parent);
                 } else {
-                    spawn_component_editor(parent, type_info, reflected);
+                    parent.spawn(spawn_component_editor(type_info.clone(), reflected));
                 }
             });
     }
 }
 
-fn spawn_component_editor(
-    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    type_info: &TypeInfo,
-    reflect: &dyn Reflect,
-) {
-    match type_info {
-        TypeInfo::Struct(info) => spawn_struct_editor(parent, info, reflect),
-        _ => spawn_empty_component(parent),
-    };
+fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+    html! {
+        <div width="100%">
+            <with>
+            {
+                match type_info {
+                    TypeInfo::Struct(info) => {
+                        if info.field_len() != 0 {
+                            parent.spawn(struct_editor(info, reflect))
+                        } else {
+                            parent.spawn(empty_component())
+                        }
+                    },
+                    _ => parent.spawn(empty_component()),
+                };
+            }
+            </with>
+        </div>
+    }
 }
 
-fn spawn_empty_component(parent: &mut RelatedSpawnerCommands<'_, ChildOf>) {
-    parent.spawn(html! {
+fn empty_component() -> impl Bundle {
+    html! {
         <span linebreak={LineBreak::WordBoundary}>"Empty"</span>
-    });
+    }
 }
 
-fn spawn_struct_editor(
-    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    info: &StructInfo,
-    reflect: &dyn Reflect,
-) {
-    let struct_data = reflect.to_dynamic().reflect_owned().into_struct().unwrap();
+fn struct_editor(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+    let struct_data = reflect.reflect_owned().into_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
-    parent.spawn(html! {
+    html! {
         <div
-           display={Display::Flex}
-           flex-direction={FlexDirection::Column}
-           row-gap="4px">
-           <iter>
-           {
+            width="100%"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="4px">
+            <iter>
+            {
                fields.into_iter().map(move |field| {
                    let name = format!("{}: ", field.name().capitalize_words());
                    let value = struct_data
@@ -239,10 +248,10 @@ fn spawn_struct_editor(
                                   }
                                   Some(value) => match value.get_represented_type_info() {
                                       Some(TypeInfo::TupleStruct(info)) => {
-                                          parent.spawn(spawn_reflected_tuple_struct(info, value));
+                                          parent.spawn(reflected_tuple_struct(info, value));
                                       }
                                       Some(TypeInfo::Struct(info)) => {
-                                          parent.spawn(spawn_reflected_struct(info, value));
+                                          parent.spawn(reflected_struct(info, value));
                                       }
                                       Some(TypeInfo::Tuple(_)) => {
                                           parent.spawn(Text::new("Unknown Tuple"));
@@ -263,13 +272,10 @@ fn spawn_struct_editor(
            }
            </iter>
         </div>
-    });
+    }
 }
 
-fn spawn_reflected_tuple_struct(
-    info: &TupleStructInfo,
-    reflect: Box<dyn PartialReflect>,
-) -> impl Bundle {
+fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
     let tuple_struct = reflect
         .reflect_ref()
@@ -300,7 +306,7 @@ fn spawn_reflected_tuple_struct(
     }
 }
 
-fn spawn_reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
     let reflect_struct = reflect.reflect_owned().into_struct().unwrap();
     let children = info

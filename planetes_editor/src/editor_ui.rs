@@ -35,7 +35,7 @@ pub fn plugin(app: &mut App) {
     ))
     .init_state::<EditorMode>()
     .register_type_data::<Transform, ReflectPlanetesComponent>()
-    .register_type_data::<Transform, ReflectEditorView>()
+    //.register_type_data::<Transform, ReflectEditorView>()
     .register_type_data::<Children, ReflectPlanetesComponent>()
     .add_systems(
         OnEnter(EditorMode::Edit),
