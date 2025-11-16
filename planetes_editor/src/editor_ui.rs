@@ -5,10 +5,9 @@ use bevy::{
     math::Affine2,
     prelude::*,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
-    EditorMode, ReflectPlanetesBundle, ReflectPlanetesComponent,
+    EditorMode, ReflectPlanetesComponent,
     atoms::*,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::*,
@@ -198,18 +197,6 @@ fn bottom_bar() -> impl Bundle {
             </span>
         </div>
     }
-}
-
-#[derive(Component, Reflect, Serialize, Deserialize, Debug)]
-#[reflect(Component, PlanetesComponent, Serialize, Deserialize)]
-struct Thingy;
-
-#[derive(Bundle, Reflect)]
-#[reflect(PlanetesBundle)]
-struct ThingyBundle {
-    thingy: Thingy,
-    transform: Transform,
-    camera: Camera3d,
 }
 
 pub trait Capitalize {

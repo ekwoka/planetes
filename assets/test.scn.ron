@@ -33,7 +33,13 @@
           rotation: (0.0, 0.0, 0.0, 1.0),
           scale: (1.0, 1.0, 1.0),
         ),
-        "planetes_editor::editor_ui::Thingy": (),
+        "planetes_editor::sample_data::ThingyUnit": (),
+        "planetes_editor::sample_data::ThingyStruct": (
+          field1: "this is a value",
+          field2: 420,
+        ),
+        "planetes_editor::sample_data::ThingyTuple": (69, 420),
+        "planetes_editor::sample_data::ThingyEnum": Tuple((69, 420))
       },
     ),
     4294967163: (

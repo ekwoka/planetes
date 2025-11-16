@@ -3,6 +3,7 @@ mod atoms;
 pub mod editor_ui;
 mod infinite_grid;
 pub mod nodes;
+mod sample_data;
 pub mod scene;
 
 pub use editor_ui::{MainView, plugin};

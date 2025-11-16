@@ -3,7 +3,7 @@ use std::{any::TypeId, iter::once};
 use bevy::{
     ecs::component::ComponentId,
     prelude::*,
-    reflect::{StructInfo, TupleStructInfo, TypeInfo},
+    reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 
 use crate::{
@@ -199,10 +199,16 @@ fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>)
                         if info.field_len() != 0 {
                             parent.spawn(struct_editor(info, reflect))
                         } else {
-                            parent.spawn(empty_component())
+                            parent.spawn(unit_struct())
                         }
                     },
-                    _ => parent.spawn(empty_component()),
+                    TypeInfo::TupleStruct(info) => {
+                        parent.spawn(tuple_struct_editor(info, reflect))
+                    }
+                    TypeInfo::Enum(info) => {
+                        parent.spawn(enum_editor(info, reflect))
+                    }
+                    _ => parent.spawn(unknown_struct()),
                 };
             }
             </with>
@@ -210,9 +216,15 @@ fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>)
     }
 }
 
-fn empty_component() -> impl Bundle {
+fn unit_struct() -> impl Bundle {
     html! {
-        <span linebreak={LineBreak::WordBoundary}>"Empty"</span>
+        <span linebreak={LineBreak::WordBoundary}>"Unit Struct"</span>
+    }
+}
+
+fn unknown_struct() -> impl Bundle {
+    html! {
+        <span linebreak={LineBreak::WordBoundary}>"Unknown Struct"</span>
     }
 }
 
@@ -266,6 +278,103 @@ fn struct_editor(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bun
                               };
                           }
                           </with>
+                       </div>
+                   }
+               })
+           }
+           </iter>
+        </div>
+    }
+}
+
+fn tuple_struct_editor(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+    let struct_data = reflect.reflect_owned().into_tuple_struct().unwrap();
+    let fields = info.iter().cloned().collect::<Vec<_>>();
+    html! {
+        <div
+            width="100%"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="4px">
+            <iter>
+            {
+               fields.into_iter().map(move |field| {
+                   let name = format!("{}: ", field.index());
+                   let value = struct_data
+                       .field(field.index())
+                       .map(|partial| partial.to_dynamic());
+                   html! {
+                       <div
+                          display={Display::Flex}
+                          flex-direction={FlexDirection::Row}
+                          column-gap="4px">
+                          <div flex-grow="1">
+                            <span>{name}</span>
+                          </div>
+                          <with>
+                          {
+                              match value {
+                                  None => {
+                                      parent.spawn(Text::new("Unknown Field"));
+                                  }
+                                  Some(value) => match value.get_represented_type_info() {
+                                      Some(TypeInfo::TupleStruct(info)) => {
+                                          parent.spawn(reflected_tuple_struct(info, value));
+                                      }
+                                      Some(TypeInfo::Struct(info)) => {
+                                          parent.spawn(reflected_struct(info, value));
+                                      }
+                                      Some(TypeInfo::Tuple(_)) => {
+                                          parent.spawn(Text::new("Unknown Tuple"));
+                                      }
+                                      Some(TypeInfo::List(_)) => {
+                                          parent.spawn(Text::new("Unknown List"));
+                                      }
+                                      Some(TypeInfo::Opaque(info)) => {
+                                          parent.spawn(Text::new(format!("{}:", info.type_path())));
+                                           parent.spawn(Text::new(format!("{:?}", value)));
+                                      }
+                                      other => {
+                                          parent.spawn(Text::new("Unknown Type"));
+                                          parent.spawn(Text::new(format!("{:?}", other)));
+                                      }
+                                  },
+                              };
+                          }
+                          </with>
+                       </div>
+                   }
+               })
+           }
+           </iter>
+        </div>
+    }
+}
+
+fn enum_editor(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+    let enum_data = reflect.reflect_owned().into_enum().unwrap();
+    let variants = info.iter().cloned().collect::<Vec<_>>();
+    html! {
+        <div
+            width="100%"
+            display={Display::Flex}
+            flex-direction={FlexDirection::Column}
+            row-gap="4px">
+            <iter>
+            {
+               variants.into_iter().map(move |variant| {
+                   let name = format!("{}: ", variant.name());
+                   let is_this = enum_data
+                       .variant_name() == variant.name();
+                   html! {
+                       <div
+                          display={Display::Flex}
+                          flex-direction={FlexDirection::Row}
+                          column-gap="4px">
+                          <div flex-grow="1">
+                            <span>{name}</span>
+                          </div>
+                          <span>{format!("{is_this:?}")}</span>
                        </div>
                    }
                })
