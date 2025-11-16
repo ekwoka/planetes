@@ -25,7 +25,7 @@ pub fn view() -> impl Bundle {
             padding="8px"
             flex-grow="1"
             flex-shrink="1"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             column-gap="8px"
             width="100%"
@@ -83,7 +83,7 @@ pub fn update_branches(
                         <div
                             name={name}
                             padding="2px"
-                            display={Display::Flex}
+                            display="Flex"
                             flex-direction={FlexDirection::Row}
                             align-items={AlignItems::Center}
                             column-gap="8px">
@@ -111,7 +111,7 @@ pub fn branch(target_entity: Entity) -> impl Bundle {
             padding-left="2px"
                 flex-grow="0"
                 flex-shrink="1"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             row-gap="8px"
             width="100%"

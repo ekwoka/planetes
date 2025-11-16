@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Expr, ExprBlock, ExprLit, Lit};
+use syn::{Expr, ExprBlock, ExprLit, Ident, Lit, Path, parse_quote_spanned, spanned::Spanned};
 
 #[derive(Clone, Debug)]
 pub struct Value(Expr);
@@ -99,6 +99,32 @@ impl Value {
             // Not a CSS-style value, assume it's a Rust expression
             Some(value_tokens)
         }
+    }
+
+    pub fn as_display(&self) -> Option<TokenStream> {
+        let known = match self.0.clone() {
+            Expr::Block(_) => self.clean_block(),
+            Expr::Lit(lit) => match lit.lit {
+                Lit::Str(string) => {
+                    let value = string.value();
+                    let name = match value.as_str() {
+                        "none" | "hidden" | "Hidden" => "None",
+                        "flex" => "Flex",
+                        "grid" => "Grid",
+                        "block" => "Block",
+                        other => other,
+                    };
+                    let ident = Ident::new(name, self.0.span());
+                    let path: Path = parse_quote_spanned! {
+                    self.0.span() => ::bevy::ui::Display::#ident
+                    };
+                    Some(path.to_token_stream())
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        known.or_else(|| Some(self.0.to_token_stream()))
     }
 
     pub fn clean_block(&self) -> Option<TokenStream> {

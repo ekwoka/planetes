@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-use crate::Attribute;
+use crate::{Attribute, Value};
 #[derive(Clone, Debug)]
 pub struct NodeComponent {
     attributes: Vec<Attribute>,
@@ -317,9 +317,19 @@ impl ToTokens for NodeComponent {
                 });
             }
 
+            for prop in ["display"] {
+                if let Some(value) = Self::get_attr(&self.attributes, prop)
+                    .map(Value::new)
+                    .and_then(|val| val.as_display())
+                {
+                    fields.push(quote! {
+                        display: #value
+                    });
+                }
+            }
+
             // Process enum properties
             for prop in [
-                "display",
                 "position-type",
                 "flex-direction",
                 "flex-wrap",

@@ -265,13 +265,22 @@ impl ToTokens for ElementNode {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     #(#children),*
                 ))
-            })
+            });
         }
-        tokens.extend(quote! {
-            (
-                #(#components),*
-            )
-        });
+        match components.len() {
+            1 => {
+                tokens.extend(quote! {
+                    #(#components)*
+                });
+            }
+            _ => {
+                tokens.extend(quote! {
+                    (
+                        #(#components),*
+                    )
+                });
+            }
+        }
     }
 }
 
@@ -376,9 +385,7 @@ mod tests {
             <div/>
         };
         let expected = quote! {
-            (
-                ::bevy::ui::Node::default()
-            )
+            ::bevy::ui::Node::default()
         };
         let result = html_inner(input);
         assert_eq!(result.to_string(), expected.to_string());
@@ -992,6 +999,55 @@ mod tests {
         };
         let result = html_inner(input);
         assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    mod nodes {
+        use super::*;
+
+        #[test]
+        fn allows_display_strings() {
+            let input = quote! {
+                <div display={Display::Flex}>
+                    <div display="none"/>
+                    <div display="hidden"/>
+                    <div display="flex"/>
+                    <div display="grid"/>
+                    <div display="block"/>
+                </div>
+            };
+            let epxected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        display: Display::Flex,
+                        ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::None,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::None,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::Flex,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::Grid,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::Block,
+                            ..Default::default()
+                        })
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), epxected.to_string());
+        }
     }
 
     mod children {

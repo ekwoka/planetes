@@ -23,7 +23,7 @@ pub fn view() -> impl Bundle {
             padding="8px"
             flex-grow="1"
             flex-shrink="1"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             row-gap="8px"
             width="100%"
@@ -36,7 +36,7 @@ pub fn view() -> impl Bundle {
                 padding="2px"
                 flex-grow="1"
                 flex-shrink="1"
-                display={Display::Flex}
+                display="Flex"
                 flex-direction={FlexDirection::Column}
                 row-gap="8px"
             >
@@ -109,7 +109,7 @@ pub fn update_entity_viewer(
 
             parent.spawn(html! {
                 <div
-                   display={Display::Flex}
+                   display="Flex"
                    flex-direction={FlexDirection::Column}
                    flex-grow="1"
                    row-gap="4px">
@@ -130,7 +130,7 @@ pub fn component_editor(id: ComponentId, type_id: TypeId) -> impl Bundle {
             padding-left="2px"
             flex-grow="0"
             flex-shrink="1"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             row-gap="4px"
             width="100%"
@@ -234,7 +234,7 @@ fn struct_editor(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bun
     html! {
         <div
             width="100%"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             row-gap="4px">
             <iter>
@@ -246,7 +246,7 @@ fn struct_editor(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bun
                        .map(|partial| partial.to_dynamic());
                    html! {
                        <div
-                          display={Display::Flex}
+                          display="Flex"
                           flex-direction={FlexDirection::Row}
                           column-gap="4px">
                           <div flex-grow="1">
@@ -293,7 +293,7 @@ fn tuple_struct_editor(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) 
     html! {
         <div
             width="100%"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             row-gap="4px">
             <iter>
@@ -305,7 +305,7 @@ fn tuple_struct_editor(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) 
                        .map(|partial| partial.to_dynamic());
                    html! {
                        <div
-                          display={Display::Flex}
+                          display="Flex"
                           flex-direction={FlexDirection::Row}
                           column-gap="4px">
                           <div flex-grow="1">
@@ -357,7 +357,7 @@ fn enum_editor(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle 
     html! {
         <div
             width="100%"
-            display={Display::Flex}
+            display="Flex"
             flex-direction={FlexDirection::Column}
             row-gap="4px">
             <iter>
@@ -368,7 +368,7 @@ fn enum_editor(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle 
                        .variant_name() == variant.name();
                    html! {
                        <div
-                          display={Display::Flex}
+                          display="Flex"
                           flex-direction={FlexDirection::Row}
                           column-gap="4px">
                           <div flex-grow="1">
@@ -395,12 +395,12 @@ fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflec
         .collect::<Vec<String>>();
     html! {
         <div
-           display={Display::Flex}
+           display="Flex"
            flex-direction={FlexDirection::Row}
            column-gap="4px">
            <span>{name}</span>
            <div
-              display={Display::Flex}
+              display="Flex"
               flex-direction={FlexDirection::Row}
               column-gap="2px">
               <iter>
@@ -424,7 +424,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         .map(|(field, value)| {
             html! {
                 <div
-                   display={Display::Flex}
+                   display="Flex"
                    flex-direction={FlexDirection::Row}
                    column-gap="4px">
                    <span>{field.name().capitalize_words().to_string()}</span>
@@ -435,7 +435,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         .collect::<Vec<_>>();
     html! {
         <div
-           display={Display::Flex}
+           display="Flex"
            flex-direction={FlexDirection::Row}
            column-gap="16px">
            <span>{name}</span>
