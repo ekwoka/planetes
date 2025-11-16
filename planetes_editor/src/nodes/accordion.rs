@@ -88,14 +88,14 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     html! {
         <div
             name={Into::<String>::into(label.clone())}
-            display="Flex"
-            flex-direction={FlexDirection::Column}
+            display="flex"
+            flex-direction="col"
             row-gap="8px"
             components={Propagate(AccordionState::Closed)}>
             <Button
                 padding="2px"
-                display="Flex"
-                flex-direction={FlexDirection::Row}
+                display="flex"
+                flex-direction="row"
                 align-items={AlignItems::Center}
                 column-gap="8px">
                 <img
@@ -115,7 +115,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
                 padding-left="2px"
                 margin-left="16px"
                 display="none"
-                flex-direction={FlexDirection::Column}
+                flex-direction="col"
                 row-gap="8px"
                 components={Children::spawn(content)}/>
         </div>

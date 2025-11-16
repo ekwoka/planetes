@@ -317,21 +317,27 @@ impl ToTokens for NodeComponent {
                 });
             }
 
-            for prop in ["display"] {
-                if let Some(value) = Self::get_attr(&self.attributes, prop)
-                    .map(Value::new)
-                    .and_then(|val| val.as_display())
-                {
-                    fields.push(quote! {
-                        display: #value
-                    });
-                }
+            if let Some(value) = Self::get_attr(&self.attributes, "display")
+                .map(Value::new)
+                .and_then(|val| val.as_display())
+            {
+                fields.push(quote! {
+                    display: #value
+                });
+            }
+
+            if let Some(value) = Self::get_attr(&self.attributes, "flex-direction")
+                .map(Value::new)
+                .and_then(|val| val.as_flex_direction())
+            {
+                fields.push(quote! {
+                    flex_direction: #value
+                });
             }
 
             // Process enum properties
             for prop in [
                 "position-type",
-                "flex-direction",
                 "flex-wrap",
                 "align-items",
                 "justify-items",

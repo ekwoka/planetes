@@ -1015,7 +1015,7 @@ mod tests {
                     <div display="block"/>
                 </div>
             };
-            let epxected = quote! {
+            let expected = quote! {
                 (
                     ::bevy::ui::Node {
                         display: Display::Flex,
@@ -1046,7 +1046,34 @@ mod tests {
                 )
             };
             let result = html_inner(input);
-            assert_eq!(result.to_string(), epxected.to_string());
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_flex_direction_strings() {
+            let tests = vec![
+                ("row", "Row"),
+                ("column", "Column"),
+                ("col", "Column"),
+                ("row-reverse", "RowReverse"),
+                ("column-reverse", "ColumnReverse"),
+                ("col-reverse", "ColumnReverse"),
+                ("Invalid", "Invalid"),
+            ];
+            for (input, expected) in tests {
+                let input = quote! {
+                    <div flex-direction=#input/>
+                };
+                let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
+                let expected = quote! {
+                    ::bevy::ui::Node {
+                        flex_direction: ::bevy::ui::FlexDirection::#ident,
+                        ..Default::default()
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
         }
     }
 

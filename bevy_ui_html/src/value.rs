@@ -127,6 +127,32 @@ impl Value {
         known.or_else(|| Some(self.0.to_token_stream()))
     }
 
+    pub fn as_flex_direction(&self) -> Option<TokenStream> {
+        let known = match self.0.clone() {
+            Expr::Block(_) => self.clean_block(),
+            Expr::Lit(lit) => match lit.lit {
+                Lit::Str(string) => {
+                    let value = string.value();
+                    let name = match value.as_str() {
+                        "row" => "Row",
+                        "column" | "col" => "Column",
+                        "row-reverse" => "RowReverse",
+                        "column-reverse" | "col-reverse" => "ColumnReverse",
+                        other => other,
+                    };
+                    let ident = Ident::new(name, self.0.span());
+                    let path: Path = parse_quote_spanned! {
+                    self.0.span() => ::bevy::ui::FlexDirection::#ident
+                    };
+                    Some(path.to_token_stream())
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        known.or_else(|| Some(self.0.to_token_stream()))
+    }
+
     pub fn clean_block(&self) -> Option<TokenStream> {
         let value = &self.0;
 

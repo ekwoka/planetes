@@ -82,8 +82,8 @@ pub fn build_ui(mut commands: Commands) {
         <div
             padding="1px"
             flex-grow="0"
-            display="Flex"
-            flex-direction={FlexDirection::Column}
+            display="flex"
+            flex-direction="col"
             width="100%"
             height="100%"
             font-size="12"
@@ -91,8 +91,8 @@ pub fn build_ui(mut commands: Commands) {
                 <MenuBar
                     padding="4px"
                     flex-grow="0"
-                    display="Flex"
-                    flex-direction={FlexDirection::Row}
+                    display="flex"
+                    flex-direction="row"
                     column-gap="8px"
                     width="100%"
                     border-bottom="1px"
@@ -104,8 +104,8 @@ pub fn build_ui(mut commands: Commands) {
                     </iter>
                 </MenuBar>
                 <div
-                    display="Flex"
-                    flex-direction={FlexDirection::Row}
+                    display="flex"
+                    flex-direction="row"
                     flex-grow="1"
                     flex-shrink="1"
                     width="100%"
@@ -123,8 +123,8 @@ pub fn build_ui(mut commands: Commands) {
                     </div>
                     <div
                         padding="1px"
-                        display="Flex"
-                        flex-direction={FlexDirection::Column}
+                        display="flex"
+                        flex-direction="col"
                         flex-grow="0"
                         flex-shrink="0"
                         width="40%"
