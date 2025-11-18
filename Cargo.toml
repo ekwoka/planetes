@@ -1,5 +1,5 @@
 [workspace]
-members = ["avian_bullet_trajectory", "bevy_ui_html", "derelict", "planetes_editor"]
+members = ["avian_bullet_trajectory", "bevy_ui_html", "derelict", "planetes_editor", "planetes_input"]
 
 [workspace.package]
 authors = ["Eric Kwoka <43540491+ekwoka@users.noreply.github.com>"]

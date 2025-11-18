@@ -4479,6 +4479,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "planetes_input"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "planetes_sandbox"
 version = "0.0.1"
 dependencies = [
