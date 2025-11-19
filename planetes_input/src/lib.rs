@@ -15,8 +15,4 @@ pub fn plugin(app: &mut App) {
     }
 }
 
-mod prelude {
-    pub use super::*;
-    
-    
-}
+mod prelude {}
