@@ -23,6 +23,13 @@ impl Validable for String {
     }
 }
 
+#[derive(Component, Default)]
+pub enum Validation {
+    #[default]
+    Valid,
+    Invalid(String),
+}
+
 macro_rules! impl_validable_for_numeric {
     ($($t:ty),*) => {
         $(
