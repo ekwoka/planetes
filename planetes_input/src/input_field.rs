@@ -29,8 +29,14 @@ impl<T: Validable> InputField<T> {
 }
 
 pub fn input_field_plugin<T: Validable>(app: &mut App) {
-    app.add_systems(PreUpdate, (on_value_created::<T>, on_value_changed::<T>));
-    app.add_systems(PostUpdate, on_input_text_changed::<T>);
+    app.add_systems(
+        PreUpdate,
+        (on_value_created::<T>, on_value_changed::<T>).chain(),
+    );
+    app.add_systems(
+        PostUpdate,
+        (on_value_created::<T>, on_input_text_changed::<T>).chain(),
+    );
 }
 
 fn on_value_changed<T: Validable>(
@@ -58,7 +64,7 @@ fn on_input_text_changed<T: Validable>(
 ) {
     for (entity, mut input, text) in changed_inputs.iter_mut() {
         eprintln!(
-            "Input field value changed from: {} to: {}",
+            "Input text changed from: {} to: {}",
             input.value.to_string(),
             text.0.clone()
         );

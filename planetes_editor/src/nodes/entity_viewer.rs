@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
     reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
+use planetes_input::prelude::InputField;
 
 use crate::{
     ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion,
@@ -96,15 +97,19 @@ pub fn update_entity_viewer(
         .despawn_children()
         .with_children(|parent| {
             parent.spawn(html! {
-                <span>
-                {
-                    if let Ok(name) = names.get(target) {
-                        format!("Selected: {name}")
-                    } else {
-                        format!("Selected: {target}")
-                    }
-                }
-                </span>
+                <div
+                  display="flex"
+                  flex-direction="row"
+                >
+                    <span>"Selected: "</span>
+                    <div components={InputField::<String>::new({
+                        if let Ok(name) = names.get(target) {
+                            format!("{name}")
+                        } else {
+                            format!("{target}")
+                        }
+                    })}/>
+                </div>
             });
 
             parent.spawn(html! {

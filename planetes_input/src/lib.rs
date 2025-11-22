@@ -13,8 +13,12 @@ pub fn plugin(app: &mut App) {
     if !app.is_plugin_added::<TabNavigationPlugin>() {
         app.add_plugins(TabNavigationPlugin);
     }
+    app.add_plugins((
+        input_field::input_field_plugin::<String>,
+        input_field::editable_text_plugin,
+    ));
 }
 
 pub mod prelude {
-    pub use super::*;
+    pub use super::{input_field::*, validable::*, *};
 }

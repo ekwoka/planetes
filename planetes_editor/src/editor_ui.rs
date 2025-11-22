@@ -31,6 +31,7 @@ pub fn plugin(app: &mut App) {
         entity_viewer::plugin,
         HierarchyPropagatePlugin::<TextFont>::new(Update),
         HierarchyPropagatePlugin::<TextColor>::new(Update),
+        planetes_input::plugin,
     ))
     .init_state::<EditorMode>()
     .register_type_data::<Transform, ReflectPlanetesComponent>()

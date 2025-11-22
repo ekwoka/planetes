@@ -11,6 +11,7 @@ rust-version = "1.90"
 avian_bullet_trajectory = { path = "avian_bullet_trajectory" }
 bevy_ui_html = { path = "bevy_ui_html", features = ["propagate"] }
 planetes_editor = { path = "planetes_editor" }
+planetes_input = { path = "planetes_input" }
 
 bevy = { version = "0.17", features = [
     "serialize",

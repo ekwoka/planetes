@@ -4476,6 +4476,7 @@ dependencies = [
  "avian3d",
  "bevy",
  "bevy_ui_html",
+ "planetes_input",
  "serde",
 ]
 
