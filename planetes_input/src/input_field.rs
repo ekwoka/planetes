@@ -1,6 +1,9 @@
 use crate::validable::{Validable, Validation};
 use bevy::{
-    input::keyboard::{Key, KeyboardInput},
+    input::{
+        ButtonState,
+        keyboard::{Key, KeyboardInput},
+    },
     input_focus::{FocusedInput, tab_navigation::TabIndex},
     prelude::*,
 };
@@ -275,11 +278,22 @@ pub fn editable_text_plugin(app: &mut App) {
 
 pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut EditableText>) {
     eprintln!("Keyboard Input");
-    if let Ok(mut editable_text) = text.get_mut(event.focused_entity) {
+    if event.input.state == ButtonState::Pressed
+        && let Ok(mut editable_text) = text.get_mut(event.focused_entity)
+    {
         eprintln!("Editable text input: {}", editable_text.0);
-        if let Key::Character(c) = &event.input.logical_key {
-            eprintln!("Found Key: {}", c);
-            editable_text.0.push_str(c.as_str());
+
+        match &event.input.logical_key {
+            Key::Character(c) => {
+                editable_text.0.push_str(c.as_str());
+            }
+            Key::Backspace => {
+                editable_text.0.pop();
+            }
+            Key::Space => {
+                editable_text.0.push(' ');
+            }
+            _ => {}
         }
     }
 }
@@ -375,5 +389,117 @@ mod editable_text {
 
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("HIMOM".into()));
+    }
+
+    #[test]
+    fn doesnt_capture_input_release() {
+        use bevy::ecs::system::RunSystemOnce;
+        use bevy::input::ButtonState;
+        use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
+        use bevy::input_focus::IsFocused;
+
+        let mut app = App::new();
+
+        let mut texts = app.world_mut().query::<&Text>();
+        app.add_plugins((
+            bevy::input::InputPlugin,
+            InputDispatchPlugin,
+            editable_text_plugin,
+        ));
+
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+
+        let input = app.world_mut().spawn(EditableText::new("H")).id();
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("H".into()));
+
+        app.world_mut().insert_resource(InputFocus(Some(input)));
+
+        app.update();
+
+        app.world_mut()
+            .run_system_once(move |helper: IsFocusedHelper| assert!(helper.is_focused(input)))
+            .unwrap();
+
+        app.world_mut().write_message(KeyboardInput {
+            key_code: KeyCode::KeyA,
+            logical_key: Key::Character("A".into()),
+            state: ButtonState::Released,
+            text: Some("A".into()),
+            repeat: false,
+            window: Entity::PLACEHOLDER,
+        });
+
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("H".into()));
+    }
+
+    #[test]
+    fn handles_space_and_backspace() {
+        use bevy::ecs::system::RunSystemOnce;
+        use bevy::input::ButtonState;
+        use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
+        use bevy::input_focus::IsFocused;
+
+        let mut app = App::new();
+
+        let mut texts = app.world_mut().query::<&Text>();
+        app.add_plugins((
+            bevy::input::InputPlugin,
+            InputDispatchPlugin,
+            editable_text_plugin,
+        ));
+
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+
+        let input = app.world_mut().spawn(EditableText::new("Hi")).id();
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("Hi".into()));
+
+        app.world_mut().insert_resource(InputFocus(Some(input)));
+
+        app.update();
+
+        app.world_mut()
+            .run_system_once(move |helper: IsFocusedHelper| assert!(helper.is_focused(input)))
+            .unwrap();
+
+        app.world_mut().write_message(KeyboardInput {
+            key_code: KeyCode::Space,
+            logical_key: Key::Space,
+            state: ButtonState::Pressed,
+            text: Some(" ".into()),
+            repeat: false,
+            window: Entity::PLACEHOLDER,
+        });
+
+        type_event!(app, KeyM, M);
+        type_event!(app, KeyO, O);
+        type_event!(app, KeyM, M);
+
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("Hi MOM".into()));
+
+        app.world_mut().write_message(KeyboardInput {
+            key_code: KeyCode::Backspace,
+            logical_key: Key::Backspace,
+            state: ButtonState::Pressed,
+            text: None,
+            repeat: false,
+            window: Entity::PLACEHOLDER,
+        });
+
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("Hi MO".into()));
     }
 }
