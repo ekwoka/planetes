@@ -2,6 +2,7 @@ use std::{any::TypeId, iter::once};
 
 use bevy::{
     ecs::component::ComponentId,
+    input_focus::InputFocus,
     prelude::*,
     reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
@@ -14,7 +15,12 @@ use crate::{
 pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (update_entity_viewer, update_component_editor).chain(),
+        (
+            update_entity_viewer,
+            update_component_editor,
+            highlight_selected_input,
+        )
+            .chain(),
     );
 }
 
@@ -100,15 +106,28 @@ pub fn update_entity_viewer(
                 <div
                   display="flex"
                   flex-direction="row"
+                  align-items={AlignItems::Center}
                 >
                     <span>"Selected: "</span>
-                    <div components={InputField::<String>::new({
-                        if let Ok(name) = names.get(target) {
-                            format!("{name}")
-                        } else {
-                            format!("{target}")
-                        }
-                    })}/>
+                    <div
+                        border="0px"
+                        border-radius="4px"
+                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}
+                        padding-top="2px"
+                        padding-bottom="2px"
+                        padding-left="3px"
+                        padding-right="3px"
+                        >
+                        <div
+                            components={InputField::<String>::new({
+                                if let Ok(name) = names.get(target) {
+                                    format!("{name}")
+                                } else {
+                                    format!("{target}")
+                                }
+                            })}
+                        />
+                    </div>
                 </div>
             });
 
@@ -124,6 +143,29 @@ pub fn update_entity_viewer(
                 </div>
             });
         });
+}
+
+pub fn highlight_selected_input(
+    inputs: Query<(Entity, &ChildOf), With<InputField<String>>>,
+    mut nodes: Query<&mut Node>,
+    focused: Res<InputFocus>,
+) {
+    if !focused.is_changed() {
+        return;
+    }
+    for (input, child_of) in inputs.iter() {
+        if let Some(focused_entity) = focused.0
+            && focused_entity == input
+        {
+            if let Ok(mut node) = nodes.get_mut(child_of.0) {
+                node.border = px(1).all();
+                node.padding = UiRect::axes(px(2), px(1));
+            }
+        } else if let Ok(mut node) = nodes.get_mut(child_of.0) {
+            node.border = px(0).all();
+            node.padding = UiRect::axes(px(3), px(2));
+        }
+    }
 }
 
 #[derive(Component)]
