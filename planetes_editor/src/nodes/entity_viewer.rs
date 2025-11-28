@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
     reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
-use planetes_input::prelude::InputField;
+use planetes_input::prelude::*;
 
 use crate::{
     ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion,
@@ -109,25 +109,11 @@ pub fn update_entity_viewer(
                   align-items={AlignItems::Center}
                 >
                     <span>"Selected: "</span>
-                    <div
-                        border="0px"
-                        border-radius="4px"
-                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}
-                        padding-top="2px"
-                        padding-bottom="2px"
-                        padding-left="3px"
-                        padding-right="3px"
-                        >
-                        <div
-                            components={InputField::<String>::new({
-                                if let Ok(name) = names.get(target) {
-                                    format!("{name}")
-                                } else {
-                                    format!("{target}")
-                                }
-                            })}
-                        />
-                    </div>
+                    {input_field::<String>(if let Ok(name) = names.get(target) {
+                        format!("{name}")
+                    } else {
+                        format!("{target}")
+                    })}
                 </div>
             });
 
@@ -143,6 +129,24 @@ pub fn update_entity_viewer(
                 </div>
             });
         });
+}
+
+pub fn input_field<T: Validable>(value: T) -> impl Bundle {
+    html! {
+        <div
+            border="0px"
+            border-radius="4px"
+            border-color={Color::linear_rgb(0.7, 0.7, 0.7)}
+            padding-top="2px"
+            padding-bottom="2px"
+            padding-left="3px"
+            padding-right="3px"
+            >
+            <div
+                components={InputField::<T>::new(value)}
+            />
+        </div>
+    }
 }
 
 pub fn highlight_selected_input(
