@@ -2,7 +2,8 @@ use std::{any::TypeId, iter::once};
 
 use bevy::{
     ecs::component::ComponentId,
-    input_focus::InputFocus,
+    input::keyboard::{Key, KeyboardInput},
+    input_focus::{FocusedInput, InputFocus},
     prelude::*,
     reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
@@ -101,12 +102,29 @@ pub fn update_entity_viewer(
     commands
         .entity(editor)
         .despawn_children()
-        .with_children(|parent| {
+        .with_children(move |parent| {
             parent.spawn(html! {
                 <div
                   display="flex"
                   flex-direction="row"
                   align-items={AlignItems::Center}
+                  oninput={|event: On<FocusedInput<KeyboardInput>>, inputs: Query<&InputField<String>>, mut names: Query<&mut Name>, target: Single<Entity, With<ViewedBy>>, focused: Res<InputFocus>| {
+                    if event.input.logical_key != Key::Enter {
+                        return;
+                    }
+                    info!("Typed in name input: {:?}", focused);
+                    if let Some(focused) = focused.0.inspect(|_| {
+                        info!("Focused Input Exists");
+                    }) &&
+                    let Ok(field) = inputs.get(focused).inspect_err(|_| {
+                        info!("Failed to get field");
+                    }) && let Ok(mut name) = names.get_mut(*target).inspect_err(|_| {
+                        info!("Failed to get name");
+                    }) {
+                        info!("updated Name");
+                        *name = Name::new(field.value.clone());
+                    }
+                  }}
                 >
                     <span>"Selected: "</span>
                     {input_field::<String>(if let Ok(name) = names.get(target) {
