@@ -2,10 +2,13 @@ use std::{any::TypeId, iter::once};
 
 use bevy::{
     ecs::component::ComponentId,
-    input::keyboard::{Key, KeyboardInput},
+    input::{
+        ButtonState,
+        keyboard::{Key, KeyboardInput},
+    },
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
-    reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
+    reflect::{EnumInfo, StructInfo, TupleStructInfo, Type, TypeInfo},
 };
 use planetes_input::prelude::*;
 
@@ -152,24 +155,26 @@ pub fn update_entity_viewer(
 pub fn input_field<T: Validable>(value: T) -> impl Bundle {
     html! {
         <div
-            border="0px"
+            border="1px"
             border-radius="4px"
-            border-color={Color::linear_rgb(0.7, 0.7, 0.7)}
-            padding-top="2px"
-            padding-bottom="2px"
+            border-color={Color::linear_rgb(0.3, 0.3, 0.3)}
+            padding-top="1px"
+            padding-bottom="1px"
             padding-left="3px"
             padding-right="3px"
             >
             <div
                 components={InputField::<T>::new(value)}
+                min-height="14px"
+                min-width="36px"
             />
         </div>
     }
 }
 
 pub fn highlight_selected_input(
+    mut commands: Commands,
     inputs: Query<(Entity, &ChildOf), With<InputField<String>>>,
-    mut nodes: Query<&mut Node>,
     focused: Res<InputFocus>,
 ) {
     if !focused.is_changed() {
@@ -179,13 +184,13 @@ pub fn highlight_selected_input(
         if let Some(focused_entity) = focused.0
             && focused_entity == input
         {
-            if let Ok(mut node) = nodes.get_mut(child_of.0) {
-                node.border = px(1).all();
-                node.padding = UiRect::axes(px(2), px(1));
-            }
-        } else if let Ok(mut node) = nodes.get_mut(child_of.0) {
-            node.border = px(0).all();
-            node.padding = UiRect::axes(px(3), px(2));
+            commands
+                .entity(child_of.0)
+                .insert(BorderColor::from(Color::linear_rgb(0.7, 0.7, 0.7)));
+        } else {
+            commands
+                .entity(child_of.0)
+                .insert(BorderColor::from(Color::linear_rgb(0.3, 0.3, 0.3)));
         }
     }
 }
@@ -260,7 +265,15 @@ pub fn update_component_editor(
 
 fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     html! {
-        <div width="100%">
+        <div width="100%" onenter={move |event: On<FocusedInput<KeyboardInput>>, inputs: Query<&InputField<String>>, target: Query<&ComponentEditor>, ancestors: Query<&ChildOf>, focused: Res<InputFocus>| {
+          if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
+              return;
+          }
+          let Some(ComponentEditor((id, type_id))) = ancestors.iter_ancestors(event.focused_entity).find_map(|entity| target.get(entity).ok()) else {
+              return;
+          };
+          info!("Applying Data to component {id:?} for type: {type_id:?}");
+        }}>
             <with>
             {
                 match type_info {
@@ -317,6 +330,7 @@ fn struct_editor(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bun
                        <div
                           display="flex"
                           flex-direction="row"
+                          align-items={AlignItems::Center}
                           column-gap="4px">
                           <div flex-grow="1">
                             <span>{name}</span>
@@ -495,9 +509,10 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                 <div
                    display="flex"
                    flex-direction="row"
+                   align-items={AlignItems::Center}
                    column-gap="4px">
                    <span>{field.name().capitalize_words().to_string()}</span>
-                   <span>{format!("{value:?}")}</span>
+                   {input_field::<String>(format!("{value:?}"))}
                 </div>
             }
         })
@@ -506,6 +521,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         <div
            display="flex"
            flex-direction="row"
+           align-items={AlignItems::Center}
            column-gap="16px">
            <span>{name}</span>
             <div

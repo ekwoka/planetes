@@ -46,7 +46,7 @@ fn on_value_changed<T: Validable>(
     mut changed_inputs: Query<(&mut InputField<T>, &mut EditableText), Changed<InputField<T>>>,
 ) {
     for (mut input, mut text) in changed_inputs.iter_mut() {
-        eprintln!(
+        info!(
             "Input field value changed from: {} to: {}",
             input.old_value.to_string(),
             input.value.to_string()
@@ -66,7 +66,7 @@ fn on_input_text_changed<T: Validable>(
     mut commands: Commands,
 ) {
     for (entity, mut input, text) in changed_inputs.iter_mut() {
-        eprintln!(
+        info!(
             "Input text changed from: {} to: {}",
             input.value.to_string(),
             text.0.clone()
@@ -89,7 +89,7 @@ fn on_value_created<T: Validable>(
     mut created_inputs: Query<(&InputField<T>, &mut EditableText), Added<InputField<T>>>,
 ) {
     for (input, mut text) in created_inputs.iter_mut() {
-        eprintln!("Input field created: {}", input.value.to_string());
+        info!("Input field created: {}", input.value.to_string());
         text.0 = input.value.to_string();
     }
 }
@@ -277,11 +277,10 @@ pub fn editable_text_plugin(app: &mut App) {
 }
 
 pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut EditableText>) {
-    eprintln!("Keyboard Input");
     if event.input.state == ButtonState::Pressed
         && let Ok(mut editable_text) = text.get_mut(event.focused_entity)
     {
-        eprintln!("Editable text input: {}", editable_text.0);
+        info!("Editable text input: {}", editable_text.0);
 
         match &event.input.logical_key {
             Key::Character(c) => {
@@ -300,7 +299,7 @@ pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut Edi
 
 pub fn on_text_change(mut changed_texts: Query<(&EditableText, &mut Text), Changed<EditableText>>) {
     for (editable, mut text) in changed_texts.iter_mut() {
-        eprintln!("Editable text changed: {}", editable.0);
+        info!("Editable text changed: {}", editable.0);
         text.0 = editable.0.clone();
     }
 }
