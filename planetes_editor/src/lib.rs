@@ -7,6 +7,11 @@ mod sample_data;
 pub mod scene;
 
 pub use editor_ui::{MainView, plugin};
+pub use planetes_scene_state::{
+    self as canonical, ApplyEditMessage, CanonicalScene, EditHistory, EditOp, PlanetesBundle,
+    PlanetesComponent, RedoMessage, ReflectPlanetesBundle, ReflectPlanetesComponent,
+    SyncCanonicalMessage, UndoMessage,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States)]
 pub enum EditorMode {
@@ -14,16 +19,6 @@ pub enum EditorMode {
     Edit,
     View,
 }
-
-#[reflect_trait]
-pub trait PlanetesComponent {}
-
-impl<T: Reflect + Component> PlanetesComponent for T {}
-
-#[reflect_trait]
-pub trait PlanetesBundle {}
-
-impl<T: Reflect + Bundle> PlanetesBundle for T {}
 
 #[reflect_trait]
 pub trait EditorView {

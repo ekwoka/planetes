@@ -25,6 +25,7 @@ pub fn plugin(app: &mut App) {
 
     app.add_plugins((
         InfiniteGridPlugin,
+        crate::canonical::plugin,
         crate::scene::plugin,
         scene_tree::plugin,
         accordion::plugin,

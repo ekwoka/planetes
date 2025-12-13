@@ -4477,6 +4477,7 @@ dependencies = [
  "bevy",
  "bevy_ui_html",
  "planetes_input",
+ "planetes_scene_state",
  "serde",
 ]
 
@@ -4500,6 +4501,13 @@ dependencies = [
  "getrandom",
  "planetes_editor",
  "serde",
+]
+
+[[package]]
+name = "planetes_scene_state"
+version = "0.0.1"
+dependencies = [
+ "bevy",
 ]
 
 [[package]]

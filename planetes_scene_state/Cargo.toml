@@ -1,0 +1,12 @@
+[package]
+name = "planetes_scene_state"
+version = "0.0.1"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bevy.workspace = true
+
+[lints]
+workspace = true
