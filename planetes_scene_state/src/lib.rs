@@ -15,6 +15,7 @@
 use std::{any::TypeId, collections::HashMap};
 
 use bevy::{
+    ecs::system::SystemState,
     prelude::*,
     reflect::{PartialReflect, ReflectPath},
 };
@@ -76,16 +77,27 @@ pub struct CanonicalScene {
 }
 
 impl CanonicalScene {
-    /// Returns the canonical data for a specific component on an entity.
-    pub fn get_component(&self, entity: Entity, type_id: TypeId) -> Option<&dyn PartialReflect> {
+    /// Returns the canonical data for a specific component by id on an entity.
+    pub fn get_component_by_id(
+        &self,
+        entity: Entity,
+        type_id: TypeId,
+    ) -> Option<&dyn PartialReflect> {
         self.components
             .get(&entity)
             .and_then(|comps| comps.get(&type_id))
             .map(|boxed| boxed.as_ref())
     }
 
+    pub fn get_component<T: Component + 'static>(
+        &self,
+        entity: Entity,
+    ) -> Option<&dyn PartialReflect> {
+        self.get_component_by_id(entity, TypeId::of::<T>())
+    }
+
     /// Returns mutable access to the canonical data for a specific component.
-    pub fn get_component_mut(
+    pub fn get_component_mut_by_id(
         &mut self,
         entity: Entity,
         type_id: TypeId,
@@ -93,6 +105,13 @@ impl CanonicalScene {
         self.components
             .get_mut(&entity)
             .and_then(|comps| comps.get_mut(&type_id))
+    }
+
+    pub fn get_component_mut<T: Component + 'static>(
+        &mut self,
+        entity: Entity,
+    ) -> Option<&mut Box<dyn PartialReflect>> {
+        self.get_component_mut_by_id(entity, TypeId::of::<T>())
     }
 
     pub fn insert_entity(
@@ -263,68 +282,65 @@ pub struct SyncCanonicalMessage {
 ///
 /// This is an exclusive system because it needs both world access for entity
 /// inspection and mutable access to the CanonicalScene resource.
-fn sync_canonical_scene(world: &mut World) {
-    world.resource_scope(|world, mut messages: Mut<Messages<SyncCanonicalMessage>>| {
-        // Collect entity IDs first
-        let entities: Vec<Entity> = messages.drain().map(|m| m.entity).collect();
+fn sync_canonical_scene(
+    world: &mut World,
+    params: &mut SystemState<MessageReader<SyncCanonicalMessage>>,
+) {
+    let mut messages = params.get_mut(world);
+    // Collect entity IDs first
+    let entities: Vec<Entity> = messages.read().map(|m| m.entity).collect();
 
-        if entities.is_empty() {
-            return;
-        }
+    if entities.is_empty() {
+        return;
+    }
 
-        // Get allowed types from registry
-        let registry = world.resource::<AppTypeRegistry>().clone();
-        let registry_guard = registry.read();
-        let allowed_types: Vec<_> = registry_guard
-            .iter_with_data::<ReflectPlanetesComponent>()
-            .map(|(type_reg, _)| type_reg.type_id())
-            .collect();
+    // Get allowed types from registry
+    let registry = world.resource::<AppTypeRegistry>().clone();
+    let registry_guard = registry.read();
+    let allowed_types: Vec<_> = registry_guard
+        .iter_with_data::<ReflectPlanetesComponent>()
+        .map(|(type_reg, _)| type_reg.type_id())
+        .collect();
 
-        // Collect component data for each entity
+    // Collect component data for each entity
 
-        for entity in &entities {
-            let Ok(entity_ref) = world.get_entity(*entity) else {
+    for entity in &entities {
+        let Ok(entity_ref) = world.get_entity(*entity) else {
+            continue;
+        };
+
+        let Ok(components) = world.inspect_entity(*entity) else {
+            continue;
+        };
+
+        let mut updates: HashMap<TypeId, Box<dyn PartialReflect>> = HashMap::new();
+        for component_info in components {
+            let Some(type_id) = component_info.type_id() else {
                 continue;
             };
 
-            let Ok(components) = world.inspect_entity(*entity) else {
+            if !allowed_types.contains(&type_id) {
                 continue;
-            };
-
-            let mut updates: HashMap<TypeId, Box<dyn PartialReflect>> = HashMap::new();
-            for component_info in components {
-                let Some(type_id) = component_info.type_id() else {
-                    continue;
-                };
-
-                if !allowed_types.contains(&type_id) {
-                    continue;
-                }
-
-                let Some(registration) = registry_guard.get(type_id) else {
-                    continue;
-                };
-
-                let Some(reflect_component) = registration.data::<ReflectComponent>() else {
-                    continue;
-                };
-
-                let Some(reflected) = reflect_component.reflect(entity_ref) else {
-                    continue;
-                };
-
-                updates.insert(type_id, reflected.to_dynamic());
             }
-            world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
-                canonical.insert_entity(*entity, updates);
-            });
+
+            let Some(registration) = registry_guard.get(type_id) else {
+                continue;
+            };
+
+            let Some(reflect_component) = registration.data::<ReflectComponent>() else {
+                continue;
+            };
+
+            let Some(reflected) = reflect_component.reflect(entity_ref) else {
+                continue;
+            };
+
+            updates.insert(type_id, reflected.to_dynamic());
         }
-
-        // Drop registry guard before mutating canonical
-        drop(registry_guard);
-
-        // Apply updates to canonical scene
-    });
+        world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
+            canonical.insert_entity(*entity, updates);
+        });
+    }
 }
 
 /// System that applies edit messages to the canonical scene.
@@ -334,7 +350,8 @@ fn apply_edit_messages(
     mut history: ResMut<EditHistory>,
 ) {
     for msg in messages.read() {
-        let Some(component_data) = canonical.get_component_mut(msg.entity, msg.component_type)
+        let Some(component_data) =
+            canonical.get_component_mut_by_id(msg.entity, msg.component_type)
         else {
             warn!(
                 "Cannot apply edit: no canonical data for entity {:?} component {:?}",
@@ -408,7 +425,8 @@ fn handle_undo(
             continue;
         };
 
-        let Some(component_data) = canonical.get_component_mut(op.entity, op.component_type) else {
+        let Some(component_data) = canonical.get_component_mut_by_id(op.entity, op.component_type)
+        else {
             warn!(
                 "Cannot undo: no canonical data for entity {:?} component {:?}",
                 op.entity, op.component_type
@@ -453,7 +471,8 @@ fn handle_redo(
             continue;
         };
 
-        let Some(component_data) = canonical.get_component_mut(op.entity, op.component_type) else {
+        let Some(component_data) = canonical.get_component_mut_by_id(op.entity, op.component_type)
+        else {
             warn!(
                 "Cannot redo: no canonical data for entity {:?} component {:?}",
                 op.entity, op.component_type
@@ -530,7 +549,7 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let retrieved = canonical.get_component(entity, TypeId::of::<TestComponent>());
+            let retrieved = canonical.get_component::<TestComponent>(entity);
             assert!(retrieved.is_some());
 
             let retrieved = retrieved.unwrap();
@@ -548,11 +567,7 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            assert!(
-                canonical
-                    .get_component(entity, TypeId::of::<TestComponent>())
-                    .is_none()
-            );
+            assert!(canonical.get_component::<TestComponent>(entity).is_none());
         }
 
         #[test]
@@ -631,12 +646,8 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let comp1 = canonical
-                .get_component(entity1, TypeId::of::<TestComponent>())
-                .unwrap();
-            let comp2 = canonical
-                .get_component(entity2, TypeId::of::<TestComponent>())
-                .unwrap();
+            let comp1 = canonical.get_component::<TestComponent>(entity1).unwrap();
+            let comp2 = canonical.get_component::<TestComponent>(entity2).unwrap();
 
             let value1 = "value"
                 .reflect_element(comp1)
@@ -676,9 +687,7 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let retrieved = canonical
-                .get_component(entity, TypeId::of::<TestComponent>())
-                .unwrap();
+            let retrieved = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
                 .reflect_element(retrieved)
                 .unwrap()
@@ -705,7 +714,7 @@ mod tests {
             {
                 let mut canonical = app.world_mut().resource_mut::<CanonicalScene>();
                 let component_data = canonical
-                    .get_component_mut(entity, TypeId::of::<TestComponent>())
+                    .get_component_mut_by_id(entity, TypeId::of::<TestComponent>())
                     .unwrap();
                 let field = "value"
                     .reflect_element_mut(component_data.as_mut())
@@ -714,9 +723,7 @@ mod tests {
             }
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let retrieved = canonical
-                .get_component(entity, TypeId::of::<TestComponent>())
-                .unwrap();
+            let retrieved = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
                 .reflect_element(retrieved)
                 .unwrap()
@@ -822,9 +829,7 @@ mod tests {
 
             {
                 let canonical = app.world().resource::<CanonicalScene>();
-                let comp = canonical
-                    .get_component(entity, TypeId::of::<TestComponent>())
-                    .unwrap();
+                let comp = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
                     .reflect_element(comp)
                     .unwrap()
@@ -837,9 +842,7 @@ mod tests {
 
             {
                 let canonical = app.world().resource::<CanonicalScene>();
-                let comp = canonical
-                    .get_component(entity, TypeId::of::<TestComponent>())
-                    .unwrap();
+                let comp = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
                     .reflect_element(comp)
                     .unwrap()
@@ -851,9 +854,7 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let comp = canonical
-                .get_component(entity, TypeId::of::<TestComponent>())
-                .unwrap();
+            let comp = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
                 .reflect_element(comp)
                 .unwrap()
@@ -924,9 +925,7 @@ mod tests {
 
             {
                 let canonical = app.world().resource::<CanonicalScene>();
-                let component = canonical
-                    .get_component(entity, TypeId::of::<TestComponent>())
-                    .unwrap();
+                let component = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
                     .reflect_element(component)
                     .unwrap()
@@ -938,9 +937,7 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let component = canonical
-                .get_component(entity, TypeId::of::<TestComponent>())
-                .unwrap();
+            let component = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
                 .reflect_element(component)
                 .unwrap()
@@ -1009,9 +1006,7 @@ mod tests {
 
             {
                 let canonical = app.world().resource::<CanonicalScene>();
-                let component = canonical
-                    .get_component(entity, TypeId::of::<TestComponent>())
-                    .unwrap();
+                let component = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
                     .reflect_element(component)
                     .unwrap()
@@ -1023,9 +1018,7 @@ mod tests {
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
-            let component = canonical
-                .get_component(entity, TypeId::of::<TestComponent>())
-                .unwrap();
+            let component = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
                 .reflect_element(component)
                 .unwrap()

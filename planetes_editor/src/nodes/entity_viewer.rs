@@ -8,7 +8,7 @@ use bevy::{
     },
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
-    reflect::{EnumInfo, StructInfo, TupleStructInfo, Type, TypeInfo},
+    reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 use planetes_input::prelude::*;
 
