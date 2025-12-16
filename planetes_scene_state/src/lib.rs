@@ -348,73 +348,87 @@ fn sync_canonical_scene(
 }
 
 /// System that applies edit messages to the canonical scene.
-fn apply_edit_messages(
-    mut messages: MessageReader<ApplyEditMessage>,
-    mut canonical: ResMut<CanonicalScene>,
-    mut history: ResMut<EditHistory>,
-) {
-    for msg in messages.read() {
-        let Some(component_data) =
-            canonical.get_component_mut_by_id(msg.entity, msg.component_type)
-        else {
-            warn!(
-                "Cannot apply edit: no canonical data for entity {:?} component {:?}",
-                msg.entity, msg.component_type
-            );
-            continue;
-        };
+fn apply_edit_messages(world: &mut World) {
+    world.resource_scope(|world, mut canonical: Mut<CanonicalScene>| {
+        world.resource_scope(|world, mut history: Mut<EditHistory>| {
+            world.resource_scope(|world, mut messages: Mut<Messages<ApplyEditMessage>>| {
+                for msg in messages.drain() {
+                    let Some(component_data) =
+                        canonical.get_component_mut_by_id(msg.entity, msg.component_type)
+                    else {
+                        warn!(
+                            "Cannot apply edit: no canonical data for entity {:?} component {:?}",
+                            msg.entity, msg.component_type
+                        );
+                        continue;
+                    };
 
-        // Capture old value before modification
-        let old_value = if msg.field_path.is_empty() {
-            component_data.to_dynamic()
-        } else {
-            match msg
-                .field_path
-                .as_str()
-                .reflect_element(component_data.as_ref())
-            {
-                Ok(field) => field.to_dynamic(),
-                Err(e) => {
-                    warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
-                    continue;
+                    // Capture old value before modification
+                    let old_value = if msg.field_path.is_empty() {
+                        component_data.to_dynamic()
+                    } else {
+                        match msg
+                            .field_path
+                            .as_str()
+                            .reflect_element(component_data.as_ref())
+                        {
+                            Ok(field) => field.to_dynamic(),
+                            Err(e) => {
+                                warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
+                                continue;
+                            }
+                        }
+                    };
+
+                    // Apply new value
+                    let apply_result = if msg.field_path.is_empty() {
+                        component_data.apply(msg.new_value.as_ref());
+                        Ok(())
+                    } else {
+                        msg.field_path
+                            .as_str()
+                            .reflect_element_mut(component_data.as_mut())
+                            .map(|field| field.apply(msg.new_value.as_ref()))
+                    };
+
+                    if let Err(e) = apply_result {
+                        warn!(
+                            "Cannot apply edit to field path '{}': {:?}",
+                            msg.field_path, e
+                        );
+                        continue;
+                    } else if let Ok(mut component) =
+                        world.get_reflect_mut(msg.entity, msg.component_type)
+                    {
+                        if msg.field_path.is_empty() {
+                            component.apply(msg.new_value.as_ref());
+                        } else {
+                            let _ = msg
+                                .field_path
+                                .as_str()
+                                .reflect_element_mut(component.as_partial_reflect_mut())
+                                .map(|field| field.apply(msg.new_value.as_ref()));
+                        }
+                    }
+
+                    // Record in history
+                    let op = EditOp {
+                        entity: msg.entity,
+                        component_type: msg.component_type,
+                        field_path: msg.field_path.clone(),
+                        old_value,
+                        new_value: msg.new_value.to_dynamic(),
+                    };
+                    history.push(op);
+
+                    info!(
+                        "Applied edit to {:?}.{} on entity {:?}",
+                        msg.component_type, msg.field_path, msg.entity
+                    );
                 }
-            }
-        };
-
-        // Apply new value
-        let apply_result = if msg.field_path.is_empty() {
-            component_data.apply(msg.new_value.as_ref());
-            Ok(())
-        } else {
-            msg.field_path
-                .as_str()
-                .reflect_element_mut(component_data.as_mut())
-                .map(|field| field.apply(msg.new_value.as_ref()))
-        };
-
-        if let Err(e) = apply_result {
-            warn!(
-                "Cannot apply edit to field path '{}': {:?}",
-                msg.field_path, e
-            );
-            continue;
-        }
-
-        // Record in history
-        let op = EditOp {
-            entity: msg.entity,
-            component_type: msg.component_type,
-            field_path: msg.field_path.clone(),
-            old_value,
-            new_value: msg.new_value.to_dynamic(),
-        };
-        history.push(op);
-
-        info!(
-            "Applied edit to {:?}.{} on entity {:?}",
-            msg.component_type, msg.field_path, msg.entity
-        );
-    }
+            });
+        });
+    });
 }
 
 /// System that handles undo requests.
@@ -738,6 +752,38 @@ mod tests {
                 .unwrap()
                 .try_downcast_ref::<f32>();
             assert_eq!(value, Some(&99.0));
+        }
+
+        #[test]
+        fn edit_applies_to_live_entity() {
+            let mut app = setup_test_app();
+
+            let entity = app
+                .world_mut()
+                .spawn(TestComponent {
+                    value: 1.0,
+                    name: "original".to_string(),
+                })
+                .id();
+
+            app.world_mut()
+                .write_message(SyncCanonicalMessage { entity });
+            app.update();
+
+            app.world_mut().write_message(ApplyEditMessage {
+                entity,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(99.0f32),
+            });
+            app.update();
+
+            let retrieved = app
+                .world()
+                .entity(entity)
+                .get_components::<&TestComponent>()
+                .unwrap();
+            assert_eq!(retrieved.value, 99.0);
         }
 
         #[test]

@@ -265,7 +265,7 @@ pub fn update_component_editor(
 
 fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     html! {
-        <div width="100%" onenter={move |event: On<FocusedInput<KeyboardInput>>, inputs: Query<&InputField<String>>, target: Query<&ComponentEditor>, ancestors: Query<&ChildOf>, focused: Res<InputFocus>| {
+        <div width="100%" onenter={move |event: On<FocusedInput<KeyboardInput>>, _inputs: Query<&InputField<String>>, target: Query<&ComponentEditor>, ancestors: Query<&ChildOf>, _focused: Res<InputFocus>| {
           if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
               return;
           }
