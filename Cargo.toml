@@ -65,11 +65,11 @@ nonstandard_macro_braces = "warn"
 unwrap_used = "warn"
 
 [workspace.metadata.bin]
-cargo-edit = { version = "0.13.8", bins = ["cargo-rm", "cargo-upgrade"] }
-cargo-make = { version = "0.37.24" }
-cargo-nextest = { version = "0.9.114" }
+cargo-edit = { version = "0.13.8", bins = ["cargo-rm", "cargo-upgrade"], locked = true }
+cargo-make = { version = "0.37.24", locked = true }
+cargo-nextest = { version = "0.9.115", locked = true }
 cargo-watch = { version = "8.5.3", locked = true }
-dioxus-cli = { version = "0.7.2", bins = ["dx"] }
+dioxus-cli = { version = "0.7.2", bins = ["dx"], locked = true }
 
 [package]
 name = "planetes_sandbox"

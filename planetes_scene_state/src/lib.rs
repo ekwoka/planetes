@@ -288,7 +288,7 @@ fn sync_canonical_scene(
 ) {
     let mut messages = params.get_mut(world);
     // Collect entity IDs first
-    let entities: Vec<Entity> = messages.read().map(|m| m.entity).collect();
+    let mut entities: Vec<Entity> = messages.read().map(|m| m.entity).collect();
 
     if entities.is_empty() {
         return;
@@ -304,12 +304,16 @@ fn sync_canonical_scene(
 
     // Collect component data for each entity
 
-    for entity in &entities {
-        let Ok(entity_ref) = world.get_entity(*entity) else {
+    while let Some(entity) = entities.pop() {
+        let Ok(entity_ref) = world.get_entity(entity) else {
             continue;
         };
 
-        let Ok(components) = world.inspect_entity(*entity) else {
+        if let Some(children) = entity_ref.get_components::<&Children>() {
+            entities.extend(children.iter());
+        }
+
+        let Ok(components) = world.inspect_entity(entity) else {
             continue;
         };
 
@@ -338,7 +342,7 @@ fn sync_canonical_scene(
             updates.insert(type_id, reflected.to_dynamic());
         }
         world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
-            canonical.insert_entity(*entity, updates);
+            canonical.insert_entity(entity, updates);
         });
     }
 }
@@ -555,6 +559,47 @@ mod tests {
             let retrieved = retrieved.unwrap();
             let value_field = "value".reflect_element(retrieved).unwrap();
             assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&42.0));
+        }
+
+        #[test]
+        fn syncs_entity_and_children() {
+            let mut app = setup_test_app();
+
+            let parent = app
+                .world_mut()
+                .spawn(TestComponent {
+                    value: 42.0,
+                    name: "test".to_string(),
+                })
+                .id();
+
+            let child = app
+                .world_mut()
+                .spawn((
+                    TestComponent {
+                        value: 40.0,
+                        name: "child".to_string(),
+                    },
+                    ChildOf(parent),
+                ))
+                .id();
+
+            app.world_mut()
+                .write_message(SyncCanonicalMessage { entity: parent });
+            app.update();
+
+            let canonical = app.world().resource::<CanonicalScene>();
+            let retrieved_parent = canonical.get_component::<TestComponent>(parent);
+            assert!(retrieved_parent.is_some());
+
+            let retrieved_child = canonical.get_component::<TestComponent>(child);
+            assert!(retrieved_child.is_some());
+
+            let value_field = "value".reflect_element(retrieved_parent.unwrap()).unwrap();
+            assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&42.0));
+
+            let value_field = "value".reflect_element(retrieved_child.unwrap()).unwrap();
+            assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&40.0));
         }
 
         #[test]
