@@ -45,6 +45,7 @@ pub fn plugin(app: &mut App) {
                 apply_edit_messages,
                 handle_undo,
                 handle_redo,
+                update_scene_from_state.run_if(resource_changed::<CanonicalScene>),
             )
                 .chain(),
         );
@@ -73,7 +74,23 @@ pub fn plugin(app: &mut App) {
 pub struct CanonicalScene {
     /// Maps entities to their canonical component data.
     /// Inner map: TypeId -> Reflected component data
-    components: HashMap<Entity, HashMap<TypeId, Box<dyn PartialReflect>>>,
+    entities: HashMap<Entity, CanonicalEntityState>,
+}
+
+pub struct CanonicalEntityState {
+    entity: Entity,
+    components: HashMap<TypeId, Box<dyn PartialReflect>>,
+    changed: bool,
+}
+
+impl CanonicalEntityState {
+    pub fn new(entity: Entity) -> Self {
+        CanonicalEntityState {
+            entity,
+            components: HashMap::new(),
+            changed: false,
+        }
+    }
 }
 
 impl CanonicalScene {
@@ -83,9 +100,9 @@ impl CanonicalScene {
         entity: Entity,
         type_id: TypeId,
     ) -> Option<&dyn PartialReflect> {
-        self.components
+        self.entities
             .get(&entity)
-            .and_then(|comps| comps.get(&type_id))
+            .and_then(|state| state.components.get(&type_id))
             .map(|boxed| boxed.as_ref())
     }
 
@@ -102,9 +119,10 @@ impl CanonicalScene {
         entity: Entity,
         type_id: TypeId,
     ) -> Option<&mut Box<dyn PartialReflect>> {
-        self.components
-            .get_mut(&entity)
-            .and_then(|comps| comps.get_mut(&type_id))
+        self.entities.get_mut(&entity).and_then(|state| {
+            state.changed = true;
+            state.components.get_mut(&type_id)
+        })
     }
 
     pub fn get_component_mut<T: Component + 'static>(
@@ -117,9 +135,16 @@ impl CanonicalScene {
     pub fn insert_entity(
         &mut self,
         entity: Entity,
-        data: HashMap<TypeId, Box<dyn PartialReflect>>,
+        components: HashMap<TypeId, Box<dyn PartialReflect>>,
     ) {
-        self.components.insert(entity, data);
+        self.entities.insert(
+            entity,
+            CanonicalEntityState {
+                entity,
+                components,
+                changed: true,
+            },
+        );
     }
 
     /// Inserts or updates canonical data for a component on an entity.
@@ -127,17 +152,18 @@ impl CanonicalScene {
         &mut self,
         entity: Entity,
         type_id: TypeId,
-        data: Box<dyn PartialReflect>,
+        component: Box<dyn PartialReflect>,
     ) {
-        self.components
+        self.entities
             .entry(entity)
-            .or_default()
-            .insert(type_id, data);
+            .or_insert(CanonicalEntityState::new(entity))
+            .components
+            .insert(type_id, component);
     }
 
     /// Removes all canonical data for an entity.
     pub fn remove_entity(&mut self, entity: Entity) {
-        self.components.remove(&entity);
+        self.entities.remove(&entity);
     }
 
     /// Returns all component type IDs stored for an entity.
@@ -145,12 +171,12 @@ impl CanonicalScene {
         &self,
         entity: Entity,
     ) -> Option<&HashMap<TypeId, Box<dyn PartialReflect>>> {
-        self.components.get(&entity)
+        self.entities.get(&entity).map(|state| &state.components)
     }
 
     /// Checks if an entity has any canonical data stored.
     pub fn contains_entity(&self, entity: Entity) -> bool {
-        self.components.contains_key(&entity)
+        self.entities.contains_key(&entity)
     }
 }
 
@@ -348,87 +374,73 @@ fn sync_canonical_scene(
 }
 
 /// System that applies edit messages to the canonical scene.
-fn apply_edit_messages(world: &mut World) {
-    world.resource_scope(|world, mut canonical: Mut<CanonicalScene>| {
-        world.resource_scope(|world, mut history: Mut<EditHistory>| {
-            world.resource_scope(|world, mut messages: Mut<Messages<ApplyEditMessage>>| {
-                for msg in messages.drain() {
-                    let Some(component_data) =
-                        canonical.get_component_mut_by_id(msg.entity, msg.component_type)
-                    else {
-                        warn!(
-                            "Cannot apply edit: no canonical data for entity {:?} component {:?}",
-                            msg.entity, msg.component_type
-                        );
-                        continue;
-                    };
+fn apply_edit_messages(
+    mut messages: MessageReader<ApplyEditMessage>,
+    mut canonical_scene: ResMut<CanonicalScene>,
+    mut history: ResMut<EditHistory>,
+) {
+    for msg in messages.read() {
+        let Some(component_data) =
+            canonical_scene.get_component_mut_by_id(msg.entity, msg.component_type)
+        else {
+            warn!(
+                "Cannot apply edit: no canonical data for entity {:?} component {:?}",
+                msg.entity, msg.component_type
+            );
+            continue;
+        };
 
-                    // Capture old value before modification
-                    let old_value = if msg.field_path.is_empty() {
-                        component_data.to_dynamic()
-                    } else {
-                        match msg
-                            .field_path
-                            .as_str()
-                            .reflect_element(component_data.as_ref())
-                        {
-                            Ok(field) => field.to_dynamic(),
-                            Err(e) => {
-                                warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
-                                continue;
-                            }
-                        }
-                    };
-
-                    // Apply new value
-                    let apply_result = if msg.field_path.is_empty() {
-                        component_data.apply(msg.new_value.as_ref());
-                        Ok(())
-                    } else {
-                        msg.field_path
-                            .as_str()
-                            .reflect_element_mut(component_data.as_mut())
-                            .map(|field| field.apply(msg.new_value.as_ref()))
-                    };
-
-                    if let Err(e) = apply_result {
-                        warn!(
-                            "Cannot apply edit to field path '{}': {:?}",
-                            msg.field_path, e
-                        );
-                        continue;
-                    } else if let Ok(mut component) =
-                        world.get_reflect_mut(msg.entity, msg.component_type)
-                    {
-                        if msg.field_path.is_empty() {
-                            component.apply(msg.new_value.as_ref());
-                        } else {
-                            let _ = msg
-                                .field_path
-                                .as_str()
-                                .reflect_element_mut(component.as_partial_reflect_mut())
-                                .map(|field| field.apply(msg.new_value.as_ref()));
-                        }
-                    }
-
-                    // Record in history
-                    let op = EditOp {
-                        entity: msg.entity,
-                        component_type: msg.component_type,
-                        field_path: msg.field_path.clone(),
-                        old_value,
-                        new_value: msg.new_value.to_dynamic(),
-                    };
-                    history.push(op);
-
-                    info!(
-                        "Applied edit to {:?}.{} on entity {:?}",
-                        msg.component_type, msg.field_path, msg.entity
-                    );
+        // Capture old value before modification
+        let old_value = if msg.field_path.is_empty() {
+            component_data.to_dynamic()
+        } else {
+            match msg
+                .field_path
+                .as_str()
+                .reflect_element(component_data.as_ref())
+            {
+                Ok(field) => field.to_dynamic(),
+                Err(e) => {
+                    warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
+                    continue;
                 }
-            });
-        });
-    });
+            }
+        };
+
+        // Apply new value
+        let apply_result = if msg.field_path.is_empty() {
+            component_data.apply(msg.new_value.as_ref());
+            Ok(())
+        } else {
+            msg.field_path
+                .as_str()
+                .reflect_element_mut(component_data.as_mut())
+                .map(|field| field.apply(msg.new_value.as_ref()))
+        };
+
+        if let Err(e) = apply_result {
+            warn!(
+                "Cannot apply edit to field path '{}': {:?}",
+                msg.field_path, e
+            );
+            continue;
+        }
+
+        // Record in history
+        let op = EditOp {
+            entity: msg.entity,
+            component_type: msg.component_type,
+            field_path: msg.field_path.clone(),
+            old_value,
+            new_value: msg.new_value.to_dynamic(),
+        };
+        history.push(op);
+
+        info!(
+            "Applied edit to {:?}.{} on entity {:?}",
+            msg.component_type, msg.field_path, msg.entity
+        );
+    }
 }
 
 /// System that handles undo requests.
@@ -521,6 +533,27 @@ fn handle_redo(
         history.push_undo(op);
         info!("Redo applied");
     }
+}
+
+fn update_scene_from_state(world: &mut World) {
+    world.resource_scope(|world, mut canonical_scene: Mut<CanonicalScene>| {
+        for state in canonical_scene
+            .entities
+            .values_mut()
+            .filter(|state| state.changed)
+        {
+            for (type_id, data) in state.components.iter() {
+                if let Ok(mut component) = world.get_reflect_mut(state.entity, *type_id)
+                    && let Err(e) = component.try_apply(data.as_ref()) {
+                        warn!(
+                            "Cannot update component of type {:?} for entity {:?}: {:?}",
+                            type_id, state.entity, e
+                        );
+                    };
+            }
+            state.changed = false;
+        }
+    });
 }
 
 #[cfg(test)]
@@ -783,6 +816,55 @@ mod tests {
                 .entity(entity)
                 .get_components::<&TestComponent>()
                 .unwrap();
+            assert_eq!(retrieved.value, 99.0);
+        }
+
+        #[test]
+        fn edit_syncs_all_data_on_entity() {
+            let mut app = setup_test_app();
+
+            let entity = app
+                .world_mut()
+                .spawn(TestComponent {
+                    value: 1.0,
+                    name: "original".to_string(),
+                })
+                .id();
+
+            app.world_mut()
+                .write_message(SyncCanonicalMessage { entity });
+            app.update();
+
+            let mut entity_ref = app.world_mut().entity_mut(entity);
+            let mut retrieved = entity_ref.get_mut::<TestComponent>().unwrap();
+
+            retrieved.name = "edited".to_string();
+
+            app.update();
+
+            let retrieved = app
+                .world()
+                .entity(entity)
+                .get_components::<&TestComponent>()
+                .unwrap();
+
+            assert_eq!(retrieved.name, "edited".to_string());
+            assert_eq!(retrieved.value, 1.0);
+
+            app.world_mut().write_message(ApplyEditMessage {
+                entity,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(99.0f32),
+            });
+            app.update();
+
+            let retrieved = app
+                .world()
+                .entity(entity)
+                .get_components::<&TestComponent>()
+                .unwrap();
+            assert_eq!(retrieved.name, "original".to_string());
             assert_eq!(retrieved.value, 99.0);
         }
 
