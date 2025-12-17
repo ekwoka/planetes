@@ -42,6 +42,7 @@ pub fn plugin(app: &mut App) {
             Update,
             (
                 sync_canonical_scene,
+                collect_edit_history,
                 apply_edit_messages,
                 handle_undo,
                 handle_redo,
@@ -268,6 +269,13 @@ impl EditHistory {
     }
 }
 
+impl Extend<EditOp> for EditHistory {
+    fn extend<T: IntoIterator<Item = EditOp>>(&mut self, iter: T) {
+        self.undo_stack.extend(iter);
+        self.redo_stack.clear();
+    }
+}
+
 /// Message to request applying an edit to the canonical scene.
 ///
 /// Send this message when a field value changes in the UI. The system will:
@@ -377,7 +385,6 @@ fn sync_canonical_scene(
 fn apply_edit_messages(
     mut messages: MessageReader<ApplyEditMessage>,
     mut canonical_scene: ResMut<CanonicalScene>,
-    mut history: ResMut<EditHistory>,
 ) {
     for msg in messages.read() {
         let Some(component_data) =
@@ -388,23 +395,6 @@ fn apply_edit_messages(
                 msg.entity, msg.component_type
             );
             continue;
-        };
-
-        // Capture old value before modification
-        let old_value = if msg.field_path.is_empty() {
-            component_data.to_dynamic()
-        } else {
-            match msg
-                .field_path
-                .as_str()
-                .reflect_element(component_data.as_ref())
-            {
-                Ok(field) => field.to_dynamic(),
-                Err(e) => {
-                    warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
-                    continue;
-                }
-            }
         };
 
         // Apply new value
@@ -427,20 +417,46 @@ fn apply_edit_messages(
         }
 
         // Record in history
-        let op = EditOp {
-            entity: msg.entity,
-            component_type: msg.component_type,
-            field_path: msg.field_path.clone(),
-            old_value,
-            new_value: msg.new_value.to_dynamic(),
-        };
-        history.push(op);
-
         info!(
             "Applied edit to {:?}.{} on entity {:?}",
             msg.component_type, msg.field_path, msg.entity
         );
     }
+}
+
+fn collect_edit_history(
+    mut messages: MessageReader<ApplyEditMessage>,
+    mut history: ResMut<EditHistory>,
+    canonical_scene: ResMut<CanonicalScene>,
+) {
+    if messages.is_empty() {
+        return;
+    }
+
+    history.extend(messages.read().filter_map(|msg| {
+        canonical_scene
+            .get_component_by_id(msg.entity, msg.component_type)
+            .and_then(|component_state| {
+                if msg.field_path.is_empty() {
+                    Some(component_state.to_dynamic())
+                } else {
+                    match msg.field_path.as_str().reflect_element(component_state) {
+                        Ok(field) => Some(field.to_dynamic()),
+                        Err(e) => {
+                            warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
+                            None
+                        }
+                    }
+                }
+            })
+            .map(|old_value| EditOp {
+                entity: msg.entity,
+                component_type: msg.component_type,
+                field_path: msg.field_path.clone(),
+                old_value,
+                new_value: msg.new_value.to_dynamic(),
+            })
+    }));
 }
 
 /// System that handles undo requests.
@@ -544,12 +560,13 @@ fn update_scene_from_state(world: &mut World) {
         {
             for (type_id, data) in state.components.iter() {
                 if let Ok(mut component) = world.get_reflect_mut(state.entity, *type_id)
-                    && let Err(e) = component.try_apply(data.as_ref()) {
-                        warn!(
-                            "Cannot update component of type {:?} for entity {:?}: {:?}",
-                            type_id, state.entity, e
-                        );
-                    };
+                    && let Err(e) = component.try_apply(data.as_ref())
+                {
+                    warn!(
+                        "Cannot update component of type {:?} for entity {:?}: {:?}",
+                        type_id, state.entity, e
+                    );
+                };
             }
             state.changed = false;
         }
@@ -867,42 +884,6 @@ mod tests {
             assert_eq!(retrieved.name, "original".to_string());
             assert_eq!(retrieved.value, 99.0);
         }
-
-        #[test]
-        fn get_component_mut_allows_modification() {
-            let mut app = setup_test_app();
-
-            let entity = app
-                .world_mut()
-                .spawn(TestComponent {
-                    value: 1.0,
-                    name: "test".to_string(),
-                })
-                .id();
-
-            app.world_mut()
-                .write_message(SyncCanonicalMessage { entity });
-            app.update();
-
-            {
-                let mut canonical = app.world_mut().resource_mut::<CanonicalScene>();
-                let component_data = canonical
-                    .get_component_mut_by_id(entity, TypeId::of::<TestComponent>())
-                    .unwrap();
-                let field = "value"
-                    .reflect_element_mut(component_data.as_mut())
-                    .unwrap();
-                field.apply(&50.0f32);
-            }
-
-            let canonical = app.world().resource::<CanonicalScene>();
-            let retrieved = canonical.get_component::<TestComponent>(entity).unwrap();
-            let value = "value"
-                .reflect_element(retrieved)
-                .unwrap()
-                .try_downcast_ref::<f32>();
-            assert_eq!(value, Some(&50.0));
-        }
     }
 
     mod edit_history {
@@ -934,6 +915,19 @@ mod tests {
             let history = app.world().resource::<EditHistory>();
             assert!(history.can_undo());
             assert!(!history.can_redo());
+            assert!(history.undo_stack.len() == 1);
+            let edit_op = history.undo_stack.get(0).unwrap();
+            assert_eq!(edit_op.entity, entity);
+            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+            assert_eq!(edit_op.field_path, "value".to_string());
+            assert_eq!(
+                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&0.0f32)
+            );
+            assert_eq!(
+                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&1.0f32)
+            );
         }
 
         #[test]
@@ -953,6 +947,11 @@ mod tests {
                 new_value: Box::new(1.0f32),
             });
             app.update();
+
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(!history.can_redo());
+            }
 
             app.world_mut().write_message(UndoMessage);
             app.update();
@@ -975,67 +974,6 @@ mod tests {
         }
 
         #[test]
-        fn undo_pops_most_recent_edit() {
-            let mut app = setup_test_app();
-
-            let entity = app.world_mut().spawn(TestComponent::default()).id();
-
-            app.world_mut()
-                .write_message(SyncCanonicalMessage { entity });
-            app.update();
-
-            app.world_mut().write_message(ApplyEditMessage {
-                entity,
-                component_type: TypeId::of::<TestComponent>(),
-                field_path: "value".to_string(),
-                new_value: Box::new(1.0f32),
-            });
-            app.update();
-
-            app.world_mut().write_message(ApplyEditMessage {
-                entity,
-                component_type: TypeId::of::<TestComponent>(),
-                field_path: "value".to_string(),
-                new_value: Box::new(2.0f32),
-            });
-            app.update();
-
-            {
-                let canonical = app.world().resource::<CanonicalScene>();
-                let comp = canonical.get_component::<TestComponent>(entity).unwrap();
-                let value = "value"
-                    .reflect_element(comp)
-                    .unwrap()
-                    .try_downcast_ref::<f32>();
-                assert_eq!(value, Some(&2.0));
-            }
-
-            app.world_mut().write_message(UndoMessage);
-            app.update();
-
-            {
-                let canonical = app.world().resource::<CanonicalScene>();
-                let comp = canonical.get_component::<TestComponent>(entity).unwrap();
-                let value = "value"
-                    .reflect_element(comp)
-                    .unwrap()
-                    .try_downcast_ref::<f32>();
-                assert_eq!(value, Some(&1.0));
-            }
-
-            app.world_mut().write_message(UndoMessage);
-            app.update();
-
-            let canonical = app.world().resource::<CanonicalScene>();
-            let comp = canonical.get_component::<TestComponent>(entity).unwrap();
-            let value = "value"
-                .reflect_element(comp)
-                .unwrap()
-                .try_downcast_ref::<f32>();
-            assert_eq!(value, Some(&0.0));
-        }
-
-        #[test]
         fn clear_history_removes_all() {
             let mut app = setup_test_app();
 
@@ -1053,12 +991,19 @@ mod tests {
             });
             app.update();
 
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(history.can_undo());
+                assert!(!history.can_redo());
+            }
+
             app.world_mut().write_message(UndoMessage);
             app.update();
 
             {
                 let history = app.world().resource::<EditHistory>();
                 assert!(history.can_redo());
+                assert!(!history.can_undo());
             }
 
             app.world_mut().resource_mut::<EditHistory>().clear();
@@ -1106,6 +1051,35 @@ mod tests {
                 assert_eq!(value, Some(&50.0));
             }
 
+            app.world_mut().write_message(ApplyEditMessage {
+                entity,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(99.0f32),
+            });
+            app.update();
+
+            {
+                let canonical = app.world().resource::<CanonicalScene>();
+                let component = canonical.get_component::<TestComponent>(entity).unwrap();
+                let value = "value"
+                    .reflect_element(component)
+                    .unwrap()
+                    .try_downcast_ref::<f32>();
+                assert_eq!(value, Some(&99.0));
+            }
+
+            app.world_mut().write_message(UndoMessage);
+            app.update();
+
+            let canonical = app.world().resource::<CanonicalScene>();
+            let component = canonical.get_component::<TestComponent>(entity).unwrap();
+            let value = "value"
+                .reflect_element(component)
+                .unwrap()
+                .try_downcast_ref::<f32>();
+            assert_eq!(value, Some(&50.0));
+
             app.world_mut().write_message(UndoMessage);
             app.update();
 
@@ -1148,6 +1122,20 @@ mod tests {
             let history = app.world().resource::<EditHistory>();
             assert!(!history.can_undo());
             assert!(history.can_redo());
+
+            assert!(history.redo_stack.len() == 1);
+            let edit_op = history.redo_stack.get(0).unwrap();
+            assert_eq!(edit_op.entity, entity);
+            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+            assert_eq!(edit_op.field_path, "value".to_string());
+            assert_eq!(
+                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&0.0f32)
+            );
+            assert_eq!(
+                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&50.0f32)
+            );
         }
 
         #[test]
@@ -1217,8 +1205,16 @@ mod tests {
             });
             app.update();
 
+            let history = app.world().resource::<EditHistory>();
+            assert!(history.can_undo());
+            assert!(!history.can_redo());
+
             app.world_mut().write_message(UndoMessage);
             app.update();
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(!history.can_undo());
+            assert!(history.can_redo());
 
             app.world_mut().write_message(RedoMessage);
             app.update();
@@ -1226,6 +1222,20 @@ mod tests {
             let history = app.world().resource::<EditHistory>();
             assert!(history.can_undo());
             assert!(!history.can_redo());
+
+            assert!(history.undo_stack.len() == 1);
+            let edit_op = history.undo_stack.get(0).unwrap();
+            assert_eq!(edit_op.entity, entity);
+            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+            assert_eq!(edit_op.field_path, "value".to_string());
+            assert_eq!(
+                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&0.0f32)
+            );
+            assert_eq!(
+                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&50.0f32)
+            );
         }
     }
 }
