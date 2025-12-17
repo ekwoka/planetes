@@ -7,10 +7,11 @@ mod sample_data;
 pub mod scene;
 
 pub use editor_ui::{MainView, plugin};
+
 pub use planetes_scene_state::{
-    self as canonical, ApplyEditMessage, CanonicalScene, EditHistory, EditOp, PlanetesBundle,
-    PlanetesComponent, RedoMessage, ReflectPlanetesBundle, ReflectPlanetesComponent,
-    SyncCanonicalMessage, UndoMessage,
+    self as canonical, ApplyEdit, CanonicalScene, EditHistory, EditOp, PlanetesBundle,
+    PlanetesComponent, Redo, ReflectPlanetesBundle, ReflectPlanetesComponent, SyncCanonicalMessage,
+    Undo,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States)]

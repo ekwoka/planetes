@@ -34,9 +34,9 @@ impl<T: Reflect + Bundle> PlanetesBundle for T {}
 pub fn plugin(app: &mut App) {
     app.init_resource::<CanonicalScene>()
         .init_resource::<EditHistory>()
-        .add_message::<ApplyEditMessage>()
-        .add_message::<UndoMessage>()
-        .add_message::<RedoMessage>()
+        .add_message::<ApplyEdit>()
+        .add_message::<Undo>()
+        .add_message::<Redo>()
         .add_message::<SyncCanonicalMessage>()
         .add_systems(
             Update,
@@ -283,7 +283,7 @@ impl Extend<EditOp> for EditHistory {
 /// 2. Apply the new value to canonical state
 /// 3. Record the operation in edit history for undo/redo
 #[derive(Message)]
-pub struct ApplyEditMessage {
+pub struct ApplyEdit {
     /// The entity being edited.
     pub entity: Entity,
     /// The component type being modified.
@@ -296,11 +296,11 @@ pub struct ApplyEditMessage {
 
 /// Message to request an undo operation.
 #[derive(Message)]
-pub struct UndoMessage;
+pub struct Undo;
 
 /// Message to request a redo operation.
 #[derive(Message)]
-pub struct RedoMessage;
+pub struct Redo;
 
 /// Message to request syncing canonical state from live entities.
 ///
@@ -383,7 +383,7 @@ fn sync_canonical_scene(
 
 /// System that applies edit messages to the canonical scene.
 fn apply_edit_messages(
-    mut messages: MessageReader<ApplyEditMessage>,
+    mut messages: MessageReader<ApplyEdit>,
     mut canonical_scene: ResMut<CanonicalScene>,
 ) {
     for msg in messages.read() {
@@ -425,7 +425,7 @@ fn apply_edit_messages(
 }
 
 fn collect_edit_history(
-    mut messages: MessageReader<ApplyEditMessage>,
+    mut messages: MessageReader<ApplyEdit>,
     mut history: ResMut<EditHistory>,
     canonical_scene: ResMut<CanonicalScene>,
 ) {
@@ -461,7 +461,7 @@ fn collect_edit_history(
 
 /// System that handles undo requests.
 fn handle_undo(
-    mut messages: MessageReader<UndoMessage>,
+    mut messages: MessageReader<Undo>,
     mut canonical: ResMut<CanonicalScene>,
     mut history: ResMut<EditHistory>,
 ) {
@@ -507,7 +507,7 @@ fn handle_undo(
 
 /// System that handles redo requests.
 fn handle_redo(
-    mut messages: MessageReader<RedoMessage>,
+    mut messages: MessageReader<Redo>,
     mut canonical: ResMut<CanonicalScene>,
     mut history: ResMut<EditHistory>,
 ) {
@@ -787,7 +787,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -820,7 +820,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -868,7 +868,7 @@ mod tests {
             assert_eq!(retrieved.name, "edited".to_string());
             assert_eq!(retrieved.value, 1.0);
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -904,7 +904,7 @@ mod tests {
                 assert!(!history.can_undo());
             }
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -940,7 +940,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -953,7 +953,7 @@ mod tests {
                 assert!(!history.can_redo());
             }
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             {
@@ -961,7 +961,7 @@ mod tests {
                 assert!(history.can_redo());
             }
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -983,7 +983,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -997,7 +997,7 @@ mod tests {
                 assert!(!history.can_redo());
             }
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             {
@@ -1033,7 +1033,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1051,7 +1051,7 @@ mod tests {
                 assert_eq!(value, Some(&50.0));
             }
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1069,7 +1069,7 @@ mod tests {
                 assert_eq!(value, Some(&99.0));
             }
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
@@ -1080,7 +1080,7 @@ mod tests {
                 .try_downcast_ref::<f32>();
             assert_eq!(value, Some(&50.0));
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
@@ -1102,7 +1102,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1116,7 +1116,7 @@ mod tests {
                 assert!(!history.can_redo());
             }
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             let history = app.world().resource::<EditHistory>();
@@ -1154,7 +1154,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1162,7 +1162,7 @@ mod tests {
             });
             app.update();
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             {
@@ -1175,7 +1175,7 @@ mod tests {
                 assert_eq!(value, Some(&10.0));
             }
 
-            app.world_mut().write_message(RedoMessage);
+            app.world_mut().write_message(Redo);
             app.update();
 
             let canonical = app.world().resource::<CanonicalScene>();
@@ -1197,7 +1197,7 @@ mod tests {
                 .write_message(SyncCanonicalMessage { entity });
             app.update();
 
-            app.world_mut().write_message(ApplyEditMessage {
+            app.world_mut().write_message(ApplyEdit {
                 entity,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1209,14 +1209,14 @@ mod tests {
             assert!(history.can_undo());
             assert!(!history.can_redo());
 
-            app.world_mut().write_message(UndoMessage);
+            app.world_mut().write_message(Undo);
             app.update();
 
             let history = app.world().resource::<EditHistory>();
             assert!(!history.can_undo());
             assert!(history.can_redo());
 
-            app.world_mut().write_message(RedoMessage);
+            app.world_mut().write_message(Redo);
             app.update();
 
             let history = app.world().resource::<EditHistory>();
