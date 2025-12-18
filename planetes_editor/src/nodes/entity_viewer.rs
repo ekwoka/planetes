@@ -1,7 +1,6 @@
 use std::{any::TypeId, iter::once};
 
 use bevy::{
-    ecs::component::ComponentId,
     input::{
         ButtonState,
         keyboard::{Key, KeyboardInput},
@@ -11,6 +10,7 @@ use bevy::{
     reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 use planetes_input::prelude::*;
+use planetes_scene_state::CanonicalScene;
 
 use crate::{
     ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion,
@@ -61,42 +61,27 @@ pub fn update_entity_viewer(
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
     names: Query<&Name>,
-    registry: Res<AppTypeRegistry>,
-    world: &World,
+    canonical_scene: Res<CanonicalScene>,
     assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
 
-    let registry = registry.read();
-    let allowed_types = registry
-        .iter_with_data::<ReflectPlanetesComponent>()
-        .map(|(type_reg, _)| type_reg.type_id())
-        .collect::<Vec<_>>();
+    info!("Checking Entity {}", target);
 
-    let Some(components) = world.inspect_entity(target).ok() else {
+    info!("scene entities: {}", canonical_scene.entities.len());
+
+    let Some(components) = canonical_scene.get_entity_components(target) else {
         return;
     };
 
+    info!("Found Components: {}", components.len());
     let components = components
-        .filter_map(|component| {
-            component.type_id().and_then(|type_id| {
-                if allowed_types.contains(&type_id)
-                    && component.name() != "bevy_ecs::name::Name".into()
-                {
-                    Some((
-                        component.id(),
-                        format!("{}", component.name().shortname()),
-                        type_id,
-                    ))
-                } else {
-                    None
-                }
-            })
-        })
-        .map(|(id, name, type_id)| {
+        .values()
+        .filter(|component| component.name != "bevy_ecs::name::Name".into())
+        .map(|component| {
             accordion::view(
-                name,
-                SpawnIter(once(component_editor(id, type_id))),
+                component.name.shortname().to_string(),
+                SpawnIter(once(component_editor(component.type_id))),
                 assets.clone(),
             )
         })
@@ -196,9 +181,9 @@ pub fn highlight_selected_input(
 }
 
 #[derive(Component)]
-pub struct ComponentEditor((ComponentId, TypeId));
+pub struct ComponentEditor(TypeId);
 
-pub fn component_editor(id: ComponentId, type_id: TypeId) -> impl Bundle {
+pub fn component_editor(type_id: TypeId) -> impl Bundle {
     html! {
         <div
             padding-left="2px"
@@ -208,9 +193,9 @@ pub fn component_editor(id: ComponentId, type_id: TypeId) -> impl Bundle {
             flex-direction="col"
             row-gap="4px"
             width="100%"
-            components={ComponentEditor((id, type_id))}>
+            components={ComponentEditor(type_id)}>
             <span linebreak={LineBreak::WordBoundary}>
-                {format!("{id:?}")}
+              "Hello World"
             </span>
         </div>
     }
@@ -220,45 +205,26 @@ pub fn update_component_editor(
     mut commands: Commands,
     target: Single<Entity, With<ViewedBy>>,
     editors: Query<(Entity, &ComponentEditor), Changed<ComponentEditor>>,
+    canonical_scene: Res<CanonicalScene>,
     registry: Res<AppTypeRegistry>,
-    world: &World,
 ) {
     let registry = registry.read();
-    for (editor, &ComponentEditor((id, type_id))) in editors {
-        let Some(registration) = registry.get(type_id) else {
-            continue;
-        };
-        let Some(component_data) = registration.data::<ReflectComponent>() else {
-            continue;
-        };
+    for (editor, &ComponentEditor(type_id)) in editors {
         let Some(type_info) = registry.get_type_info(type_id) else {
             continue;
         };
-        let Ok(entity) = world.get_entity(*target) else {
-            continue;
-        };
-        let Some(reflected) = component_data.reflect(entity) else {
-            continue;
-        };
-        let reflected_editor_view = registration
-            .data::<ReflectEditorView>()
-            .and_then(|editor_view| editor_view.get(reflected));
 
-        let reflected = reflected.to_dynamic();
+        let Some(reflected) = canonical_scene.get_component_by_id(*target, type_id) else {
+            continue;
+        };
+
+        let reflected = reflected.data.to_dynamic();
 
         commands
             .entity(editor)
             .despawn_children()
             .with_children(|parent| {
-                parent.spawn((
-                    Text::new(format!("{id:?}")),
-                    TextLayout::new_with_linebreak(LineBreak::WordBoundary),
-                ));
-                if let Some(editor_view) = reflected_editor_view {
-                    editor_view.add_to_parent(parent);
-                } else {
-                    parent.spawn(spawn_component_editor(type_info.clone(), reflected));
-                }
+                parent.spawn(spawn_component_editor(type_info.clone(), reflected));
             });
     }
 }
@@ -269,10 +235,10 @@ fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>)
           if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
               return;
           }
-          let Some(ComponentEditor((id, type_id))) = ancestors.iter_ancestors(event.focused_entity).find_map(|entity| target.get(entity).ok()) else {
+          let Some(ComponentEditor(type_id)) = ancestors.iter_ancestors(event.focused_entity).find_map(|entity| target.get(entity).ok()) else {
               return;
           };
-          info!("Applying Data to component {id:?} for type: {type_id:?}");
+          info!("Applying Data to component for type: {type_id:?}");
         }}>
             <with>
             {

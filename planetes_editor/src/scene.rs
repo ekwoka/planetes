@@ -6,13 +6,15 @@ use bevy::{
     prelude::*,
     tasks::IoTaskPool,
 };
+use planetes_scene_state::SyncCanonicalMessage;
 
 pub fn plugin(app: &mut App) {
     info!("Plugin SCENE");
     app.add_plugins(HierarchyPropagatePlugin::<InScene>::new(Update))
         .register_type_data::<Name, ReflectPlanetesComponent>()
         .add_systems(OnEnter(EditorMode::Edit), load_scene)
-        .add_systems(OnEnter(EditorMode::Edit), save_scene);
+        .add_systems(OnEnter(EditorMode::Edit), save_scene)
+        .add_observer(sync_scene_elements);
 }
 
 #[derive(Component)]
@@ -72,4 +74,10 @@ pub fn load_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
         Propagate(InScene),
         DynamicSceneRoot(scene_handle),
     ));
+}
+
+fn sync_scene_elements(event: On<Add, InScene>, mut commands: Commands) {
+    commands.write_message(SyncCanonicalMessage {
+        entity: event.entity,
+    });
 }

@@ -15,7 +15,7 @@
 use std::{any::TypeId, collections::HashMap};
 
 use bevy::{
-    ecs::system::SystemState,
+    ecs::{component::ComponentId, system::SystemState},
     prelude::*,
     reflect::{PartialReflect, ReflectPath},
 };
@@ -75,13 +75,13 @@ pub fn plugin(app: &mut App) {
 pub struct CanonicalScene {
     /// Maps entities to their canonical component data.
     /// Inner map: TypeId -> Reflected component data
-    entities: HashMap<Entity, CanonicalEntityState>,
+    pub entities: HashMap<Entity, CanonicalEntityState>,
 }
 
 pub struct CanonicalEntityState {
-    entity: Entity,
-    components: HashMap<TypeId, Box<dyn PartialReflect>>,
-    changed: bool,
+    pub entity: Entity,
+    pub components: HashMap<TypeId, CanonicalComponentState>,
+    pub changed: bool,
 }
 
 impl CanonicalEntityState {
@@ -94,23 +94,29 @@ impl CanonicalEntityState {
     }
 }
 
+pub struct CanonicalComponentState {
+    pub id: ComponentId,
+    pub name: DebugName,
+    pub type_id: TypeId,
+    pub data: Box<dyn PartialReflect>,
+}
+
 impl CanonicalScene {
     /// Returns the canonical data for a specific component by id on an entity.
     pub fn get_component_by_id(
         &self,
         entity: Entity,
         type_id: TypeId,
-    ) -> Option<&dyn PartialReflect> {
+    ) -> Option<&CanonicalComponentState> {
         self.entities
             .get(&entity)
             .and_then(|state| state.components.get(&type_id))
-            .map(|boxed| boxed.as_ref())
     }
 
     pub fn get_component<T: Component + 'static>(
         &self,
         entity: Entity,
-    ) -> Option<&dyn PartialReflect> {
+    ) -> Option<&CanonicalComponentState> {
         self.get_component_by_id(entity, TypeId::of::<T>())
     }
 
@@ -119,7 +125,7 @@ impl CanonicalScene {
         &mut self,
         entity: Entity,
         type_id: TypeId,
-    ) -> Option<&mut Box<dyn PartialReflect>> {
+    ) -> Option<&mut CanonicalComponentState> {
         self.entities.get_mut(&entity).and_then(|state| {
             state.changed = true;
             state.components.get_mut(&type_id)
@@ -129,14 +135,14 @@ impl CanonicalScene {
     pub fn get_component_mut<T: Component + 'static>(
         &mut self,
         entity: Entity,
-    ) -> Option<&mut Box<dyn PartialReflect>> {
+    ) -> Option<&mut CanonicalComponentState> {
         self.get_component_mut_by_id(entity, TypeId::of::<T>())
     }
 
     pub fn insert_entity(
         &mut self,
         entity: Entity,
-        components: HashMap<TypeId, Box<dyn PartialReflect>>,
+        components: HashMap<TypeId, CanonicalComponentState>,
     ) {
         self.entities.insert(
             entity,
@@ -153,7 +159,7 @@ impl CanonicalScene {
         &mut self,
         entity: Entity,
         type_id: TypeId,
-        component: Box<dyn PartialReflect>,
+        component: CanonicalComponentState,
     ) {
         self.entities
             .entry(entity)
@@ -171,7 +177,7 @@ impl CanonicalScene {
     pub fn get_entity_components(
         &self,
         entity: Entity,
-    ) -> Option<&HashMap<TypeId, Box<dyn PartialReflect>>> {
+    ) -> Option<&HashMap<TypeId, CanonicalComponentState>> {
         self.entities.get(&entity).map(|state| &state.components)
     }
 
@@ -351,7 +357,7 @@ fn sync_canonical_scene(
             continue;
         };
 
-        let mut updates: HashMap<TypeId, Box<dyn PartialReflect>> = HashMap::new();
+        let mut component_states: HashMap<TypeId, CanonicalComponentState> = HashMap::new();
         for component_info in components {
             let Some(type_id) = component_info.type_id() else {
                 continue;
@@ -373,10 +379,18 @@ fn sync_canonical_scene(
                 continue;
             };
 
-            updates.insert(type_id, reflected.to_dynamic());
+            component_states.insert(
+                type_id,
+                CanonicalComponentState {
+                    id: component_info.id(),
+                    type_id,
+                    name: component_info.name(),
+                    data: reflected.to_dynamic(),
+                },
+            );
         }
         world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
-            canonical.insert_entity(entity, updates);
+            canonical.insert_entity(entity, component_states);
         });
     }
 }
@@ -399,12 +413,12 @@ fn apply_edit_messages(
 
         // Apply new value
         let apply_result = if msg.field_path.is_empty() {
-            component_data.apply(msg.new_value.as_ref());
+            component_data.data.apply(msg.new_value.as_ref());
             Ok(())
         } else {
             msg.field_path
                 .as_str()
-                .reflect_element_mut(component_data.as_mut())
+                .reflect_element_mut(component_data.data.as_mut())
                 .map(|field| field.apply(msg.new_value.as_ref()))
         };
 
@@ -438,9 +452,13 @@ fn collect_edit_history(
             .get_component_by_id(msg.entity, msg.component_type)
             .and_then(|component_state| {
                 if msg.field_path.is_empty() {
-                    Some(component_state.to_dynamic())
+                    Some(component_state.data.to_dynamic())
                 } else {
-                    match msg.field_path.as_str().reflect_element(component_state) {
+                    match msg
+                        .field_path
+                        .as_str()
+                        .reflect_element(component_state.data.as_ref())
+                    {
                         Ok(field) => Some(field.to_dynamic()),
                         Err(e) => {
                             warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
@@ -482,12 +500,12 @@ fn handle_undo(
 
         // Apply old value (reverse the edit)
         let apply_result = if op.field_path.is_empty() {
-            component_data.apply(op.old_value.as_ref());
+            component_data.data.apply(op.old_value.as_ref());
             Ok(())
         } else {
             op.field_path
                 .as_str()
-                .reflect_element_mut(component_data.as_mut())
+                .reflect_element_mut(component_data.data.as_mut())
                 .map(|field| field.apply(op.old_value.as_ref()))
         };
 
@@ -528,12 +546,12 @@ fn handle_redo(
 
         // Apply new value (re-apply the edit)
         let apply_result = if op.field_path.is_empty() {
-            component_data.apply(op.new_value.as_ref());
+            component_data.data.apply(op.new_value.as_ref());
             Ok(())
         } else {
             op.field_path
                 .as_str()
-                .reflect_element_mut(component_data.as_mut())
+                .reflect_element_mut(component_data.data.as_mut())
                 .map(|field| field.apply(op.new_value.as_ref()))
         };
 
@@ -560,7 +578,7 @@ fn update_scene_from_state(world: &mut World) {
         {
             for (type_id, data) in state.components.iter() {
                 if let Ok(mut component) = world.get_reflect_mut(state.entity, *type_id)
-                    && let Err(e) = component.try_apply(data.as_ref())
+                    && let Err(e) = component.try_apply(data.data.as_ref())
                 {
                     warn!(
                         "Cannot update component of type {:?} for entity {:?}: {:?}",
@@ -621,7 +639,7 @@ mod tests {
             assert!(retrieved.is_some());
 
             let retrieved = retrieved.unwrap();
-            let value_field = "value".reflect_element(retrieved).unwrap();
+            let value_field = "value".reflect_element(retrieved.data.as_ref()).unwrap();
             assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&42.0));
         }
 
@@ -659,10 +677,14 @@ mod tests {
             let retrieved_child = canonical.get_component::<TestComponent>(child);
             assert!(retrieved_child.is_some());
 
-            let value_field = "value".reflect_element(retrieved_parent.unwrap()).unwrap();
+            let value_field = "value"
+                .reflect_element(retrieved_parent.unwrap().data.as_ref())
+                .unwrap();
             assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&42.0));
 
-            let value_field = "value".reflect_element(retrieved_child.unwrap()).unwrap();
+            let value_field = "value"
+                .reflect_element(retrieved_child.unwrap().data.as_ref())
+                .unwrap();
             assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&40.0));
         }
 
@@ -759,11 +781,11 @@ mod tests {
             let comp2 = canonical.get_component::<TestComponent>(entity2).unwrap();
 
             let value1 = "value"
-                .reflect_element(comp1)
+                .reflect_element(comp1.data.as_ref())
                 .unwrap()
                 .try_downcast_ref::<f32>();
             let value2 = "value"
-                .reflect_element(comp2)
+                .reflect_element(comp2.data.as_ref())
                 .unwrap()
                 .try_downcast_ref::<f32>();
 
@@ -798,7 +820,7 @@ mod tests {
             let canonical = app.world().resource::<CanonicalScene>();
             let retrieved = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
-                .reflect_element(retrieved)
+                .reflect_element(retrieved.data.as_ref())
                 .unwrap()
                 .try_downcast_ref::<f32>();
             assert_eq!(value, Some(&99.0));
@@ -1045,7 +1067,7 @@ mod tests {
                 let canonical = app.world().resource::<CanonicalScene>();
                 let component = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
-                    .reflect_element(component)
+                    .reflect_element(component.data.as_ref())
                     .unwrap()
                     .try_downcast_ref::<f32>();
                 assert_eq!(value, Some(&50.0));
@@ -1063,7 +1085,7 @@ mod tests {
                 let canonical = app.world().resource::<CanonicalScene>();
                 let component = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
-                    .reflect_element(component)
+                    .reflect_element(component.data.as_ref())
                     .unwrap()
                     .try_downcast_ref::<f32>();
                 assert_eq!(value, Some(&99.0));
@@ -1075,7 +1097,7 @@ mod tests {
             let canonical = app.world().resource::<CanonicalScene>();
             let component = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
-                .reflect_element(component)
+                .reflect_element(component.data.as_ref())
                 .unwrap()
                 .try_downcast_ref::<f32>();
             assert_eq!(value, Some(&50.0));
@@ -1086,7 +1108,7 @@ mod tests {
             let canonical = app.world().resource::<CanonicalScene>();
             let component = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
-                .reflect_element(component)
+                .reflect_element(component.data.as_ref())
                 .unwrap()
                 .try_downcast_ref::<f32>();
             assert_eq!(value, Some(&10.0));
@@ -1169,7 +1191,7 @@ mod tests {
                 let canonical = app.world().resource::<CanonicalScene>();
                 let component = canonical.get_component::<TestComponent>(entity).unwrap();
                 let value = "value"
-                    .reflect_element(component)
+                    .reflect_element(component.data.as_ref())
                     .unwrap()
                     .try_downcast_ref::<f32>();
                 assert_eq!(value, Some(&10.0));
@@ -1181,7 +1203,7 @@ mod tests {
             let canonical = app.world().resource::<CanonicalScene>();
             let component = canonical.get_component::<TestComponent>(entity).unwrap();
             let value = "value"
-                .reflect_element(component)
+                .reflect_element(component.data.as_ref())
                 .unwrap()
                 .try_downcast_ref::<f32>();
             assert_eq!(value, Some(&50.0));
