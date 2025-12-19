@@ -107,16 +107,12 @@ impl NodeComponent {
                     syn::LitFloat::new(&format!("{vh_value}.0"), proc_macro2::Span::call_site());
                 Some(quote! { ::bevy::ui::vh(#num) })
             } else if let Some(vmin_value) = value_str.strip_suffix("vmin") {
-                let num = syn::LitFloat::new(
-                    &format!("{vmin_value}.0"),
-                    proc_macro2::Span::call_site(),
-                );
+                let num =
+                    syn::LitFloat::new(&format!("{vmin_value}.0"), proc_macro2::Span::call_site());
                 Some(quote! { ::bevy::ui::vmin(#num) })
             } else if let Some(vmax_value) = value_str.strip_suffix("vmax") {
-                let num = syn::LitFloat::new(
-                    &format!("{vmax_value}.0"),
-                    proc_macro2::Span::call_site(),
-                );
+                let num =
+                    syn::LitFloat::new(&format!("{vmax_value}.0"), proc_macro2::Span::call_site());
                 Some(quote! { ::bevy::ui::vmax(#num) })
             } else {
                 Some(quote! { ::bevy::ui::Val::from(#value_tokens) })

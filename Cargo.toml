@@ -4,7 +4,7 @@ members = ["avian_bullet_trajectory", "bevy_ui_html", "derelict", "planetes_edit
 [workspace.package]
 authors = ["Eric Kwoka <43540491+ekwoka@users.noreply.github.com>"]
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.92"
 
 [workspace.dependencies]
 # Local Packages
