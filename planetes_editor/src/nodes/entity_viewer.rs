@@ -1,4 +1,4 @@
-use std::{any::TypeId, iter::once};
+use std::iter::once;
 
 use bevy::{
     input::{
@@ -7,18 +7,21 @@ use bevy::{
     },
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
-    reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
 
-use crate::{editor_ui::Capitalize, nodes::accordion, prelude::*};
+use crate::{
+    atoms::{highlight_selected_input, input_field},
+    nodes::{accordion, component_editor},
+    prelude::*,
+};
 pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
         (
             update_entity_viewer,
-            update_component_editor,
+            component_editor::update_component_editor,
             highlight_selected_input,
         )
             .chain(),
@@ -70,11 +73,11 @@ pub fn update_entity_viewer(
     info!("Found Components: {}", components.len());
     let components = components
         .values()
-        .filter(|component| component.name != "bevy_ecs::name::Name".into())
+        .filter(|component| component.name() != &"bevy_ecs::name::Name".into())
         .map(|component| {
             accordion::view(
-                component.name.shortname().to_string(),
-                SpawnIter(once(component_editor(component.type_id))),
+                component.name().shortname().to_string(),
+                SpawnIter(once(component_editor::base(component.type_id()))),
                 assets.clone(),
             )
         })
@@ -143,373 +146,6 @@ fn update_name(
                 .entity(*target)
                 .insert(Name::new(field.value.clone()));
         }
-    }
-}
-
-pub fn input_field<T: Validable>(value: T) -> impl Bundle {
-    html! {
-        <div
-            border="1px"
-            border-radius="4px"
-            border-color={Color::linear_rgb(0.3, 0.3, 0.3)}
-            padding-top="1px"
-            padding-bottom="1px"
-            padding-left="3px"
-            padding-right="3px"
-            >
-            <div
-                components={InputField::<T>::new(value)}
-                min-height="14px"
-                min-width="36px"
-            />
-        </div>
-    }
-}
-
-pub fn highlight_selected_input(
-    mut commands: Commands,
-    inputs: Query<(Entity, &ChildOf), With<InputField<String>>>,
-    focused: Res<InputFocus>,
-) {
-    if !focused.is_changed() {
-        return;
-    }
-    for (input, child_of) in inputs.iter() {
-        if let Some(focused_entity) = focused.0
-            && focused_entity == input
-        {
-            commands
-                .entity(child_of.0)
-                .insert(BorderColor::from(Color::linear_rgb(0.7, 0.7, 0.7)));
-        } else {
-            commands
-                .entity(child_of.0)
-                .insert(BorderColor::from(Color::linear_rgb(0.3, 0.3, 0.3)));
-        }
-    }
-}
-
-#[derive(Component)]
-pub struct ComponentEditor(TypeId);
-
-pub fn component_editor(type_id: TypeId) -> impl Bundle {
-    html! {
-        <div
-            padding-left="2px"
-            flex-grow="0"
-            flex-shrink="1"
-            display="flex"
-            flex-direction="col"
-            row-gap="4px"
-            width="100%"
-            components={ComponentEditor(type_id)}>
-            <span linebreak={LineBreak::WordBoundary}>
-              "Hello World"
-            </span>
-        </div>
-    }
-}
-
-pub fn update_component_editor(
-    mut commands: Commands,
-    target: Single<Entity, With<ViewedBy>>,
-    editors: Query<(Entity, &ComponentEditor), Changed<ComponentEditor>>,
-    canonical_scene: Res<CanonicalScene>,
-    registry: Res<AppTypeRegistry>,
-) {
-    let registry = registry.read();
-    for (editor, &ComponentEditor(type_id)) in editors {
-        let Some(type_info) = registry.get_type_info(type_id) else {
-            continue;
-        };
-
-        let Some(reflected) = canonical_scene.get_component_by_id(*target, type_id) else {
-            continue;
-        };
-
-        let reflected = reflected.data.to_dynamic();
-
-        commands
-            .entity(editor)
-            .despawn_children()
-            .with_children(|parent| {
-                parent.spawn(spawn_component_editor(type_info.clone(), reflected));
-            });
-    }
-}
-
-fn spawn_component_editor(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    html! {
-        <div width="100%" onenter={move |event: On<FocusedInput<KeyboardInput>>, _inputs: Query<&InputField<String>>, target: Query<&ComponentEditor>, ancestors: Query<&ChildOf>, _focused: Res<InputFocus>| {
-          if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
-              return;
-          }
-          let Some(ComponentEditor(type_id)) = ancestors.iter_ancestors(event.focused_entity).find_map(|entity| target.get(entity).ok()) else {
-              return;
-          };
-          info!("Applying Data to component for type: {type_id:?}");
-        }}>
-            <with>
-            {
-                match type_info {
-                    TypeInfo::Struct(info) => {
-                        if info.field_len() != 0 {
-                            parent.spawn(struct_editor(info, reflect))
-                        } else {
-                            parent.spawn(unit_struct())
-                        }
-                    },
-                    TypeInfo::TupleStruct(info) => {
-                        parent.spawn(tuple_struct_editor(info, reflect))
-                    }
-                    TypeInfo::Enum(info) => {
-                        parent.spawn(enum_editor(info, reflect))
-                    }
-                    _ => parent.spawn(unknown_struct()),
-                };
-            }
-            </with>
-        </div>
-    }
-}
-
-fn unit_struct() -> impl Bundle {
-    html! {
-        <span linebreak={LineBreak::WordBoundary}>"Unit Struct"</span>
-    }
-}
-
-fn unknown_struct() -> impl Bundle {
-    html! {
-        <span linebreak={LineBreak::WordBoundary}>"Unknown Struct"</span>
-    }
-}
-
-fn struct_editor(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    let struct_data = reflect.reflect_owned().into_struct().unwrap();
-    let fields = info.iter().cloned().collect::<Vec<_>>();
-    html! {
-        <div
-            width="100%"
-            display="flex"
-            flex-direction="col"
-            row-gap="4px">
-            <iter>
-            {
-               fields.into_iter().map(move |field| {
-                   let name = format!("{}: ", field.name().capitalize_words());
-                   let value = struct_data
-                       .field(field.name())
-                       .map(|partial| partial.to_dynamic());
-                   html! {
-                       <div
-                          display="flex"
-                          flex-direction="row"
-                          align-items={AlignItems::Center}
-                          column-gap="4px">
-                          <div flex-grow="1">
-                            <span>{name}</span>
-                          </div>
-                          <with>
-                          {
-                              match value {
-                                  None => {
-                                      parent.spawn(Text::new("Unknown Field"));
-                                  }
-                                  Some(value) => match value.get_represented_type_info() {
-                                      Some(TypeInfo::TupleStruct(info)) => {
-                                          parent.spawn(reflected_tuple_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Struct(info)) => {
-                                          parent.spawn(reflected_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Tuple(_)) => {
-                                          parent.spawn(Text::new("Unknown Tuple"));
-                                      }
-                                      Some(TypeInfo::List(_)) => {
-                                          parent.spawn(Text::new("Unknown List"));
-                                      }
-                                      _ => {
-                                          parent.spawn(Text::new("Unknown Type"));
-                                      }
-                                  },
-                              };
-                          }
-                          </with>
-                       </div>
-                   }
-               })
-           }
-           </iter>
-        </div>
-    }
-}
-
-fn tuple_struct_editor(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    let struct_data = reflect.reflect_owned().into_tuple_struct().unwrap();
-    let fields = info.iter().cloned().collect::<Vec<_>>();
-    html! {
-        <div
-            width="100%"
-            display="flex"
-            flex-direction="col"
-            row-gap="4px">
-            <iter>
-            {
-               fields.into_iter().map(move |field| {
-                   let name = format!("{}: ", field.index());
-                   let value = struct_data
-                       .field(field.index())
-                       .map(|partial| partial.to_dynamic());
-                   html! {
-                       <div
-                          display="flex"
-                          flex-direction="row"
-                          column-gap="4px">
-                          <div flex-grow="1">
-                            <span>{name}</span>
-                          </div>
-                          <with>
-                          {
-                              match value {
-                                  None => {
-                                      parent.spawn(Text::new("Unknown Field"));
-                                  }
-                                  Some(value) => match value.get_represented_type_info() {
-                                      Some(TypeInfo::TupleStruct(info)) => {
-                                          parent.spawn(reflected_tuple_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Struct(info)) => {
-                                          parent.spawn(reflected_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Tuple(_)) => {
-                                          parent.spawn(Text::new("Unknown Tuple"));
-                                      }
-                                      Some(TypeInfo::List(_)) => {
-                                          parent.spawn(Text::new("Unknown List"));
-                                      }
-                                      Some(TypeInfo::Opaque(info)) => {
-                                          parent.spawn(Text::new(format!("{}:", info.type_path())));
-                                           parent.spawn(Text::new(format!("{value:?}")));
-                                      }
-                                      other => {
-                                          parent.spawn(Text::new("Unknown Type"));
-                                          parent.spawn(Text::new(format!("{other:?}")));
-                                      }
-                                  },
-                              };
-                          }
-                          </with>
-                       </div>
-                   }
-               })
-           }
-           </iter>
-        </div>
-    }
-}
-
-fn enum_editor(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    let enum_data = reflect.reflect_owned().into_enum().unwrap();
-    let variants = info.iter().cloned().collect::<Vec<_>>();
-    html! {
-        <div
-            width="100%"
-            display="flex"
-            flex-direction="col"
-            row-gap="4px">
-            <iter>
-            {
-               variants.into_iter().map(move |variant| {
-                   let name = format!("{}: ", variant.name());
-                   let is_this = enum_data
-                       .variant_name() == variant.name();
-                   html! {
-                       <div
-                          display="flex"
-                          flex-direction="row"
-                          column-gap="4px">
-                          <div flex-grow="1">
-                            <span>{name}</span>
-                          </div>
-                          <span>{format!("{is_this:?}")}</span>
-                       </div>
-                   }
-               })
-           }
-           </iter>
-        </div>
-    }
-}
-
-fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
-    let tuple_struct = reflect
-        .reflect_ref()
-        .as_tuple_struct()
-        .unwrap()
-        .iter_fields()
-        .map(|field| format!("{field:?}"))
-        .collect::<Vec<String>>();
-    html! {
-        <div
-           display="flex"
-           flex-direction="row"
-           column-gap="4px">
-           <span>{name}</span>
-           <div
-              display="flex"
-              flex-direction="row"
-              column-gap="2px">
-              <iter>
-              {
-                  tuple_struct.into_iter().map(|field| {
-                      Text::new(field)
-                  })
-              }
-              </iter>
-            </div>
-        </div>
-    }
-}
-
-fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
-    let reflect_struct = reflect.reflect_owned().into_struct().unwrap();
-    let children = info
-        .iter()
-        .zip(reflect_struct.iter_fields())
-        .map(|(field, value)| {
-            html! {
-                <div
-                   display="flex"
-                   flex-direction="row"
-                   align-items={AlignItems::Center}
-                   column-gap="4px">
-                   <span>{field.name().capitalize_words().to_string()}</span>
-                   {input_field::<String>(format!("{value:?}"))}
-                </div>
-            }
-        })
-        .collect::<Vec<_>>();
-    html! {
-        <div
-           display="flex"
-           flex-direction="row"
-           align-items={AlignItems::Center}
-           column-gap="16px">
-           <span>{name}</span>
-            <div
-                display={Display::Flex}
-                flex-direction="row"
-                column-gap="8px">
-                <iter>
-                {
-                    children.into_iter()
-                }
-                </iter>
-            </div>
-        </div>
     }
 }
 

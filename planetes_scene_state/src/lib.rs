@@ -78,29 +78,6 @@ pub struct CanonicalScene {
     pub entities: HashMap<Entity, CanonicalEntityState>,
 }
 
-pub struct CanonicalEntityState {
-    pub entity: Entity,
-    pub components: HashMap<TypeId, CanonicalComponentState>,
-    pub changed: bool,
-}
-
-impl CanonicalEntityState {
-    pub fn new(entity: Entity) -> Self {
-        CanonicalEntityState {
-            entity,
-            components: HashMap::new(),
-            changed: false,
-        }
-    }
-}
-
-pub struct CanonicalComponentState {
-    pub id: ComponentId,
-    pub name: DebugName,
-    pub type_id: TypeId,
-    pub data: Box<dyn PartialReflect>,
-}
-
 impl CanonicalScene {
     /// Returns the canonical data for a specific component by id on an entity.
     pub fn get_component_by_id(
@@ -184,6 +161,43 @@ impl CanonicalScene {
     /// Checks if an entity has any canonical data stored.
     pub fn contains_entity(&self, entity: Entity) -> bool {
         self.entities.contains_key(&entity)
+    }
+}
+
+pub struct CanonicalEntityState {
+    pub entity: Entity,
+    pub components: HashMap<TypeId, CanonicalComponentState>,
+    pub changed: bool,
+}
+
+impl CanonicalEntityState {
+    pub fn new(entity: Entity) -> Self {
+        CanonicalEntityState {
+            entity,
+            components: HashMap::new(),
+            changed: false,
+        }
+    }
+}
+
+pub struct CanonicalComponentState {
+    id: ComponentId,
+    name: DebugName,
+    type_id: TypeId,
+    pub data: Box<dyn PartialReflect>,
+}
+
+impl CanonicalComponentState {
+    pub fn id(&self) -> ComponentId {
+        self.id
+    }
+
+    pub fn name(&self) -> &DebugName {
+        &self.name
+    }
+
+    pub fn type_id(&self) -> TypeId {
+        self.type_id
     }
 }
 
