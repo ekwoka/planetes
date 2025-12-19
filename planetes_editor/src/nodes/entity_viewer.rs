@@ -12,10 +12,7 @@ use bevy::{
 use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
 
-use crate::{
-    ReflectEditorView, ReflectPlanetesComponent, editor_ui::Capitalize, nodes::accordion,
-    prelude::*,
-};
+use crate::{editor_ui::Capitalize, nodes::accordion, prelude::*};
 pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
@@ -66,10 +63,6 @@ pub fn update_entity_viewer(
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
 
-    info!("Checking Entity {}", target);
-
-    info!("scene entities: {}", canonical_scene.entities.len());
-
     let Some(components) = canonical_scene.get_entity_components(target) else {
         return;
     };
@@ -96,30 +89,16 @@ pub fn update_entity_viewer(
                   display="flex"
                   flex-direction="row"
                   align-items={AlignItems::Center}
-                  oninput={|event: On<FocusedInput<KeyboardInput>>, inputs: Query<&InputField<String>>, mut names: Query<&mut Name>, target: Single<Entity, With<ViewedBy>>, focused: Res<InputFocus>| {
-                    if event.input.logical_key != Key::Enter {
-                        return;
-                    }
-                    info!("Typed in name input: {:?}", focused);
-                    if let Some(focused) = focused.0.inspect(|_| {
-                        info!("Focused Input Exists");
-                    }) &&
-                    let Ok(field) = inputs.get(focused).inspect_err(|_| {
-                        info!("Failed to get field");
-                    }) && let Ok(mut name) = names.get_mut(*target).inspect_err(|_| {
-                        info!("Failed to get name");
-                    }) {
-                        info!("updated Name");
-                        *name = Name::new(field.value.clone());
-                    }
-                  }}
+                  oninput={update_name}
                 >
                     <span>"Selected: "</span>
-                    {input_field::<String>(if let Ok(name) = names.get(target) {
-                        format!("{name}")
-                    } else {
-                        format!("{target}")
-                    })}
+                    {
+                        input_field::<String>(if let Ok(name) = names.get(target) {
+                            format!("{name}")
+                        } else {
+                            format!("{target}")
+                        })
+                    }
                 </div>
             });
 
@@ -135,6 +114,36 @@ pub fn update_entity_viewer(
                 </div>
             });
         });
+}
+
+/// Handles committing an Entity Name Change
+fn update_name(
+    event: On<FocusedInput<KeyboardInput>>,
+    mut commands: Commands,
+    inputs: Query<&InputField<String>>,
+    mut names: Query<&mut Name>,
+    target: Single<Entity, With<ViewedBy>>,
+    focused: Res<InputFocus>,
+) {
+    if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
+        return;
+    }
+    info!("Typed in name input: {:?}", focused);
+    if let Some(focused) = focused.0.inspect(|_| {
+        info!("Focused Input Exists");
+    }) && let Ok(field) = inputs.get(focused).inspect_err(|_| {
+        info!("Failed to get field");
+    }) {
+        if let Ok(mut name) = names.get_mut(*target) {
+            info!("Updating Name");
+            *name = Name::new(field.value.clone());
+        } else {
+            info!("Adding new Name");
+            commands
+                .entity(*target)
+                .insert(Name::new(field.value.clone()));
+        }
+    }
 }
 
 pub fn input_field<T: Validable>(value: T) -> impl Bundle {

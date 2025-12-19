@@ -10,7 +10,7 @@
 //! - [`CanonicalScene`] - The source of truth for all editable entity data
 //! - [`EditOp`] - A single field-level edit operation (diff)
 //! - [`EditHistory`] - Undo/redo stacks for edit operations
-//! - [`ApplyEditMessage`] - Message to request applying an edit to canonical state
+//! - [`ApplyEdit`] - Message to request applying an edit to canonical state
 
 use std::{any::TypeId, collections::HashMap};
 
