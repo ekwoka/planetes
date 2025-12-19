@@ -23,37 +23,37 @@ impl Value {
 
                     if let Some(px_value) = value_string.strip_suffix("px") {
                         let num = syn::LitFloat::new(
-                            &format!("{}.0", px_value),
+                            &format!("{px_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
                         Some(quote! { ::bevy::ui::px(#num) })
                     } else if let Some(percent_value) = value_string.strip_suffix("%") {
                         let num = syn::LitFloat::new(
-                            &format!("{}.0", percent_value),
+                            &format!("{percent_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
                         Some(quote! { ::bevy::ui::percent(#num) })
                     } else if let Some(vw_value) = value_string.strip_suffix("vw") {
                         let num = syn::LitFloat::new(
-                            &format!("{}.0", vw_value),
+                            &format!("{vw_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
                         Some(quote! { ::bevy::ui::vw(#num) })
                     } else if let Some(vh_value) = value_string.strip_suffix("vh") {
                         let num = syn::LitFloat::new(
-                            &format!("{}.0", vh_value),
+                            &format!("{vh_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
                         Some(quote! { ::bevy::ui::vh(#num) })
                     } else if let Some(vmin_value) = value_string.strip_suffix("vmin") {
                         let num = syn::LitFloat::new(
-                            &format!("{}.0", vmin_value),
+                            &format!("{vmin_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
                         Some(quote! { ::bevy::ui::vmin(#num) })
                     } else if let Some(vmax_value) = value_string.strip_suffix("vmax") {
                         let num = syn::LitFloat::new(
-                            &format!("{}.0", vmax_value),
+                            &format!("{vmax_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
                         Some(quote! { ::bevy::ui::vmax(#num) })

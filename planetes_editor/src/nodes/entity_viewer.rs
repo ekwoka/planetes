@@ -390,11 +390,11 @@ fn tuple_struct_editor(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) 
                                       }
                                       Some(TypeInfo::Opaque(info)) => {
                                           parent.spawn(Text::new(format!("{}:", info.type_path())));
-                                           parent.spawn(Text::new(format!("{:?}", value)));
+                                           parent.spawn(Text::new(format!("{value:?}")));
                                       }
                                       other => {
                                           parent.spawn(Text::new("Unknown Type"));
-                                          parent.spawn(Text::new(format!("{:?}", other)));
+                                          parent.spawn(Text::new(format!("{other:?}")));
                                       }
                                   },
                               };
@@ -449,7 +449,7 @@ fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflec
         .as_tuple_struct()
         .unwrap()
         .iter_fields()
-        .map(|field| format!("{:?}", field))
+        .map(|field| format!("{field:?}"))
         .collect::<Vec<String>>();
     html! {
         <div
