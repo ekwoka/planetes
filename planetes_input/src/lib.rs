@@ -15,6 +15,7 @@ pub fn plugin(app: &mut App) {
     }
     app.add_plugins((
         input_field::input_field_plugin::<String>,
+        input_field::input_field_plugin::<f32>,
         input_field::editable_text_plugin,
     ));
 }

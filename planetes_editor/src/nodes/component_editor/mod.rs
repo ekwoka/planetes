@@ -313,6 +313,14 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         .iter()
         .zip(reflect_struct.iter_fields())
         .map(|(field, value)| {
+            let value = value.reflect_clone().unwrap();
+            let type_info = field.clone().type_info();
+            let input = type_info.and_then(|type_info| match type_info {
+                TypeInfo::Opaque(info) => {
+                    Some(info)
+                }
+                _ => None,
+            });
             html! {
                 <div
                    display="flex"
@@ -320,7 +328,19 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                    align-items={AlignItems::Center}
                    column-gap="4px">
                    <span>{field.name().capitalize_words().to_string()}</span>
-                   {input_field::<String>(format!("{value:?}"))}
+                   <with>
+                       {
+                           if let Some(input_type) = input {
+                               if input_type.is::<String>() {
+                                   parent.spawn(input_field::<String>(format!("{value:?}")));
+                               } else if input_type.is::<f32>() {
+                                   parent.spawn(input_field::<f32>(value.as_partial_reflect().try_downcast_ref::<f32>().cloned().unwrap()));
+                               }
+                           } else {
+                               parent.spawn(Text::new(format!("{value:?}")));
+                           }
+                       }
+                   </with>
                 </div>
             }
         })
