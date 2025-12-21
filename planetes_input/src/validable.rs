@@ -78,6 +78,6 @@ macro_rules! impl_validable_for_float_numeric {
     };
 }
 
-impl_validable_for_unsigned_numeric!(u8, u16, u32, u64, u128);
-impl_validable_for_integer_numeric!(i8, i16, i32, i64, i128);
+impl_validable_for_unsigned_numeric!(u8, u16, u32, u64, u128, isize);
+impl_validable_for_integer_numeric!(i8, i16, i32, i64, i128, usize);
 impl_validable_for_float_numeric!(f32, f64);
