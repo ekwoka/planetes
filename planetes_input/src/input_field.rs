@@ -53,7 +53,7 @@ fn on_value_changed<T: Validable>(
         );
         if input.value != input.old_value {
             input.old_value = input.value.clone();
-            text.0 = input.value.to_string();
+            text.text = input.value.to_string();
         }
     }
 }
@@ -69,10 +69,10 @@ fn on_input_text_changed<T: Validable>(
         info!(
             "Input text changed from: {} to: {}",
             input.value.to_string(),
-            text.0.clone()
+            text.text.clone()
         );
-        if input.value.to_string() != text.0 {
-            match T::validate(text.0.as_str()) {
+        if input.value.to_string() != text.text {
+            match T::validate(text.text.as_str()) {
                 Ok(value) => {
                     input.value = value;
                     commands.entity(entity).insert(Validation::Valid);
@@ -90,7 +90,8 @@ fn on_value_created<T: Validable>(
 ) {
     for (input, mut text) in created_inputs.iter_mut() {
         info!("Input field created: {}", input.value.to_string());
-        text.0 = input.value.to_string();
+        text.text = input.value.to_string();
+        text.accepted_chars = T::accepted_chars();
     }
 }
 
@@ -163,7 +164,7 @@ mod input_field {
                 old_value: 10
             }
         );
-        assert_eq!(editable_text.0, "10");
+        assert_eq!(editable_text.text, "10");
         assert_eq!(text.0, "10");
     }
 
@@ -198,14 +199,17 @@ mod input_field {
         let mut app = App::new();
 
         app.add_plugins((
-            input_field_plugin::<u32>,
+            input_field_plugin::<String>,
             bevy::input::InputPlugin,
             InputDispatchPlugin,
             editable_text_plugin,
         ));
         app.world_mut().spawn((Window::default(), PrimaryWindow));
 
-        let input = app.world_mut().spawn(InputField::<u32>::new(1)).id();
+        let input = app
+            .world_mut()
+            .spawn(InputField::<String>::new("1".to_string()))
+            .id();
         app.world_mut().insert_resource(InputFocus(Some(input)));
 
         app.update();
@@ -214,10 +218,10 @@ mod input_field {
             .run_system_once(move |helper: IsFocusedHelper| assert!(helper.is_focused(input)))
             .unwrap();
         {
-            let mut fields = app.world_mut().query::<(&InputField<u32>, &Text)>();
+            let mut fields = app.world_mut().query::<(&InputField<String>, &Text)>();
             let (input_field, text) = fields.get(app.world(), input).unwrap();
             assert_eq!(text.0, "1");
-            assert_eq!(input_field.value, 1);
+            assert_eq!(input_field.value, "1");
         }
 
         type_event!(app, Numpad0, 0);
@@ -225,10 +229,10 @@ mod input_field {
         app.update();
 
         {
-            let mut fields = app.world_mut().query::<(&InputField<u32>, &Text)>();
+            let mut fields = app.world_mut().query::<(&InputField<String>, &Text)>();
             let (input_field, text) = fields.get(app.world(), input).unwrap();
             assert_eq!(text.0, "10");
-            assert_eq!(input_field.value, 10);
+            assert_eq!(input_field.value, "10");
         }
 
         type_event!(app, Numpad1, 1);
@@ -238,36 +242,106 @@ mod input_field {
         {
             let mut fields = app
                 .world_mut()
-                .query::<(&InputField<u32>, &Text, &Validation)>();
+                .query::<(&InputField<String>, &Text, &Validation)>();
             let (input_field, text, validation) = fields.get(app.world(), input).unwrap();
             assert_eq!(text.0, "101");
-            assert_eq!(input_field.value, 101);
+            assert_eq!(input_field.value, "101");
             assert!(matches!(validation, &Validation::Valid));
         }
+    }
 
-        type_event!(app, KeyH, H);
+    #[test]
+    fn sets_invalid_when_fails_validation() {
+        let mut app = App::new();
+
+        app.add_plugins((
+            input_field_plugin::<f32>,
+            bevy::input::InputPlugin,
+            InputDispatchPlugin,
+            editable_text_plugin,
+        ));
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+
+        let input = app.world_mut().spawn(InputField::<f32>::new(1.0)).id();
+        app.world_mut().insert_resource(InputFocus(Some(input)));
+
+        app.update();
+
+        app.world_mut()
+            .run_system_once(move |helper: IsFocusedHelper| assert!(helper.is_focused(input)))
+            .unwrap();
+        {
+            let mut fields = app.world_mut().query::<(&InputField<f32>, &Text)>();
+            let (input_field, text) = fields.get(app.world(), input).unwrap();
+            assert_eq!(text.0, "1");
+            assert_eq!(input_field.value, 1.0);
+        }
+
+        type_event!(app, Period, .);
+
+        app.update();
+
+        {
+            let mut fields = app.world_mut().query::<(&InputField<f32>, &Text)>();
+            let (input_field, text) = fields.get(app.world(), input).unwrap();
+            assert_eq!(text.0, "1.");
+            assert_eq!(input_field.value, 1.0);
+        }
+
+        type_event!(app, Numpad2, 2);
 
         app.update();
 
         {
             let mut fields = app
                 .world_mut()
-                .query::<(&InputField<u32>, &Text, &Validation)>();
+                .query::<(&InputField<f32>, &Text, &Validation)>();
             let (input_field, text, validation) = fields.get(app.world(), input).unwrap();
-            assert_eq!(text.0, "101H");
-            assert_eq!(input_field.value, 101);
-            assert!(matches!(validation, &Validation::Invalid(_)));
+            assert_eq!(text.0, "1.2");
+            assert_eq!(input_field.value, 1.2);
+            assert_eq!(validation, &Validation::Valid);
+        }
+
+        type_event!(app, Period, .);
+
+        app.update();
+
+        {
+            let mut fields = app
+                .world_mut()
+                .query::<(&InputField<f32>, &Text, &Validation)>();
+            let (input_field, text, validation) = fields.get(app.world(), input).unwrap();
+            assert_eq!(text.0, "1.2.");
+            assert_eq!(input_field.value, 1.2);
+            assert_eq!(
+                validation,
+                &Validation::Invalid("Invalid f32 number".into())
+            );
         }
     }
 }
 
 #[derive(Component, Debug, PartialEq, Eq)]
 #[require(Text)]
-pub struct EditableText(pub String);
+pub struct EditableText {
+    pub text: String,
+    pub accepted_chars: &'static str,
+}
 
 impl EditableText {
     pub fn new(text: impl Into<String>) -> Self {
-        Self(text.into())
+        Self {
+            text: text.into(),
+            accepted_chars: "",
+        }
+    }
+
+    pub fn accepts(&self, char: &str) -> bool {
+        if self.accepted_chars.is_empty() {
+            true
+        } else {
+            self.accepted_chars.contains(char)
+        }
     }
 }
 
@@ -280,17 +354,19 @@ pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut Edi
     if event.input.state == ButtonState::Pressed
         && let Ok(mut editable_text) = text.get_mut(event.focused_entity)
     {
-        info!("Editable text input: {}", editable_text.0);
+        info!("Editable text input: {}", editable_text.text);
 
         match &event.input.logical_key {
             Key::Character(c) => {
-                editable_text.0.push_str(c.as_str());
+                if editable_text.accepts(c.as_str()) {
+                    editable_text.text.push_str(c.as_str());
+                }
             }
             Key::Backspace => {
-                editable_text.0.pop();
+                editable_text.text.pop();
             }
             Key::Space => {
-                editable_text.0.push(' ');
+                editable_text.text.push(' ');
             }
             _ => {}
         }
@@ -299,8 +375,8 @@ pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut Edi
 
 pub fn on_text_change(mut changed_texts: Query<(&EditableText, &mut Text), Changed<EditableText>>) {
     for (editable, mut text) in changed_texts.iter_mut() {
-        info!("Editable text changed: {}", editable.0);
-        text.0 = editable.0.clone();
+        info!("Editable text changed: {}", editable.text);
+        text.0 = editable.text.clone();
     }
 }
 
@@ -315,7 +391,7 @@ mod editable_text {
     use super::*;
 
     macro_rules! key_event {
-        ($key: ident, $text: ident) => {
+        ($key: ident, $text: tt) => {
             KeyboardInput {
                 key_code: KeyCode::$key,
                 logical_key: Key::Character(stringify!($text).into()),
@@ -328,7 +404,7 @@ mod editable_text {
     }
 
     macro_rules! type_event {
-        ($app: ident, $key: ident, $text: ident) => {
+        ($app: ident, $key: ident, $text: tt) => {
             $app.world_mut().write_message(key_event!($key, $text));
         };
     }
@@ -435,6 +511,55 @@ mod editable_text {
 
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("H".into()));
+    }
+
+    #[test]
+    fn only_allows_accepted_characters_unsigned() {
+        use bevy::ecs::system::RunSystemOnce;
+        use bevy::input::ButtonState;
+        use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
+        use bevy::input_focus::IsFocused;
+
+        let mut app = App::new();
+
+        let mut texts = app.world_mut().query::<&Text>();
+        app.add_plugins((
+            bevy::input::InputPlugin,
+            InputDispatchPlugin,
+            editable_text_plugin,
+            input_field_plugin::<u32>,
+        ));
+
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+
+        let input = app.world_mut().spawn(InputField::<u32>::new(10)).id();
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("10".into()));
+
+        app.world_mut().insert_resource(InputFocus(Some(input)));
+
+        app.update();
+
+        app.world_mut()
+            .run_system_once(move |helper: IsFocusedHelper| assert!(helper.is_focused(input)))
+            .unwrap();
+
+        type_event!(app, KeyH, H);
+        type_event!(app, KeyI, I);
+
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("10".into()));
+
+        type_event!(app, Numpad1, 1);
+
+        app.update();
+
+        let text = texts.get(app.world(), input).map(|text| text.0.clone());
+        assert_eq!(text, Ok("101".into()));
     }
 
     #[test]
