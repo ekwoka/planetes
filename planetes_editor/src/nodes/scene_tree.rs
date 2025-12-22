@@ -9,7 +9,7 @@ use crate::{
 use bevy::prelude::*;
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Update, (update_tree, update_branches))
+    app.add_systems(PostUpdate, (update_tree, update_branches))
         .add_observer(select_entity);
 }
 

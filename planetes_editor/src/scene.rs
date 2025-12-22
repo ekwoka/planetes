@@ -14,6 +14,7 @@ pub fn plugin(app: &mut App) {
         .register_type_data::<Name, ReflectPlanetesComponent>()
         .add_systems(OnEnter(EditorMode::Edit), load_scene)
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
+        .add_systems(Update, add_meshes_to_scene)
         .add_observer(sync_scene_elements);
 }
 
@@ -74,6 +75,22 @@ pub fn load_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
         Propagate(InScene),
         DynamicSceneRoot(scene_handle),
     ));
+}
+
+fn add_meshes_to_scene(
+    mut commands: Commands,
+    mut mesh_assets: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    entities: Query<Entity, (With<InScene>, Without<EditorScene>, Without<Mesh3d>)>,
+) {
+    let mesh = mesh_assets.add(Sphere::new(1.0));
+    let material = materials.add(StandardMaterial::default());
+    entities.iter().for_each(|entity| {
+        info!("Adding Mesh to Entity: {entity}");
+        commands
+            .entity(entity)
+            .try_insert((Mesh3d(mesh.clone()), MeshMaterial3d(material.clone())));
+    });
 }
 
 fn sync_scene_elements(event: On<Add, InScene>, mut commands: Commands) {

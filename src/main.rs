@@ -75,8 +75,13 @@ pub struct UICamera;
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Name::new("Camera"),
+        Camera {
+            order: 2,
+            is_active: true,
+            ..Default::default()
+        },
         Camera3d::default(),
-        Transform::default(),
+        Transform::from_xyz(0.0, 0.0, 30.0),
         UICamera,
         #[cfg(feature = "editor")]
         planetes_editor::MainView,

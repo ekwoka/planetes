@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 /// A trait for types that can be validated from a string input.
 ///
-/// Types implementing this trait can be used with `ValidatedInputField`.
+/// Types implementing this trait can be used with `InputField`.
 pub trait Validable: Send + Sync + Default + PartialEq + Clone + ToString + 'static {
     /// The characters that are accepted for this type.
     const ACCEPTED_CHARS: &'static str;

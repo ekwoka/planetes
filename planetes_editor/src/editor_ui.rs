@@ -1,9 +1,6 @@
 use bevy::{
-    app::HierarchyPropagatePlugin,
-    asset::embedded_asset,
-    camera::{Viewport, visibility::RenderLayers},
-    math::Affine2,
-    prelude::*,
+    app::HierarchyPropagatePlugin, asset::embedded_asset, camera::visibility::RenderLayers,
+    prelude::*, render::render_resource::TextureFormat,
 };
 
 use crate::{
@@ -42,10 +39,7 @@ pub fn plugin(app: &mut App) {
         OnEnter(EditorMode::Edit),
         (setup_camera_system, build_ui).chain(),
     )
-    .add_systems(
-        Update,
-        (update_viewport).chain().run_if(in_state(EditorMode::Edit)),
-    )
+    .add_systems(Update, update_viewport)
     .add_observer(button::hover_menu_item)
     .add_observer(button::unhover_menu_item);
     #[cfg(feature = "avian")]
@@ -120,8 +114,8 @@ pub fn build_ui(mut commands: Commands) {
                         justify-content={JustifyContent::Center}
                         align-items={AlignItems::Center}
                         border="1px"
-                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
-                        "Viewport"
+                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}
+                        components={ViewPort}>
                     </div>
                     <div
                         padding="1px"
@@ -148,8 +142,10 @@ pub fn setup_camera_system(mut commands: Commands) {
         RenderLayers::layer(1),
         Camera {
             order: 1,
+            is_active: true,
             ..default()
         },
+        IsDefaultUiCamera,
     ));
 
     commands.spawn((
@@ -165,20 +161,28 @@ pub fn setup_camera_system(mut commands: Commands) {
 }
 
 pub fn update_viewport(
-    view_target: Single<(&ComputedNode, &UiGlobalTransform), With<ViewPort>>,
-    mut camera: Single<&mut Camera, With<MainView>>,
+    mut commands: Commands,
+    view_target: Single<Entity, With<ViewPort>>,
+    camera: Single<(Entity, &mut Camera), (With<MainView>, Changed<MainView>)>,
+    mut images: ResMut<Assets<Image>>,
 ) {
-    let (viewport, transform) = *view_target;
-    let size = viewport.size();
-    if size.x == 0.0 || size.y == 0.0 {
-        return;
+    info!("Updating viewport");
+    let (entity, mut camera) = camera.into_inner();
+    let image = images.add(Image::default_target_texture());
+    camera.target = image.into();
+    commands
+        .entity(*view_target)
+        .insert(ViewportNode::new(entity));
+}
+
+trait DefaultTargetTexture {
+    fn default_target_texture() -> Self;
+}
+
+impl DefaultTargetTexture for Image {
+    fn default_target_texture() -> Self {
+        Self::new_target_texture(1, 1, TextureFormat::Rgba8UnormSrgb)
     }
-    let pos = Affine2::from(transform).translation - size * Vec2::new(0.5, 0.5);
-    camera.viewport = Some(Viewport {
-        physical_position: pos.as_uvec2(),
-        physical_size: UVec2::new(size.x as u32, size.y as u32),
-        ..default()
-    });
 }
 
 fn bottom_bar() -> impl Bundle {
