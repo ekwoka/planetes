@@ -73,15 +73,7 @@ pub fn base(type_id: TypeId) -> impl Bundle {
 
 pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     html! {
-        <div width="100%" onenter={move |event: On<FocusedInput<KeyboardInput>>, _inputs: Query<&InputField<String>>, target: Query<&ComponentEditor>, ancestors: Query<&ChildOf>, _focused: Res<InputFocus>| {
-          if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
-              return;
-          }
-          let Some(ComponentEditor(type_id)) = ancestors.iter_ancestors(event.focused_entity).find_map(|entity| target.get(entity).ok()) else {
-              return;
-          };
-          info!("Applying Data to component for type: {type_id:?}");
-        }}>
+        <div width="100%" onenter={handle_commit}>
             <with>
             {
                 match type_info {
@@ -104,6 +96,63 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
             </with>
         </div>
     }
+}
+
+fn handle_commit(
+    event: On<FocusedInput<KeyboardInput>>,
+    inputs: Query<&InputField<f32>>,
+    component_editor: Query<&ComponentEditor>,
+    target: Single<Entity, With<ViewedBy>>,
+    path_segments: Query<&Path>,
+    ancestors: Query<&ChildOf>,
+    focused: Res<InputFocus>,
+    mut canonical_scene: ResMut<CanonicalScene>,
+) {
+    if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
+        return;
+    }
+    let Some(focused_entity) = focused.0 else {
+        warn!("No focused entity");
+        return;
+    };
+    let Some(input_field) = inputs.get(focused_entity).ok() else {
+        warn!("No input field found");
+        return;
+    };
+    let Some(ComponentEditor(type_id)) = ancestors
+        .iter_ancestors(focused_entity)
+        .find_map(|entity| component_editor.get(entity).ok())
+    else {
+        warn!("No component editor found");
+        return;
+    };
+
+    let Some(reflected_component) = canonical_scene.get_component_mut_by_id(*target, *type_id)
+    else {
+        warn!("No component found");
+        return;
+    };
+    let mut paths = ancestors
+        .iter_ancestors(focused_entity)
+        .filter_map(|entity| path_segments.get(entity).ok())
+        .map(|path| path.0.clone())
+        .collect::<Vec<_>>();
+
+    paths.reverse();
+
+    let path = paths.join("");
+
+    info!("Applying Data on path: {path:?} to component for type: {type_id:?}");
+
+    let Ok(reflected_value) = path
+        .reflect_element_mut(reflected_component.data.as_partial_reflect_mut())
+        .inspect_err(|error| {
+            warn!("Failed to reflect element at path: {path:?}: {error}");
+        })
+    else {
+        return;
+    };
+    reflected_value.apply(&input_field.value);
 }
 
 fn unit_component() -> impl Bundle {
@@ -139,7 +188,8 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
                           display="flex"
                           flex-direction="row"
                           align-items={AlignItems::Center}
-                          column-gap="4px">
+                          column-gap="4px"
+                          components={Path(format!(".{}", field.name()))}>
                           <div flex-grow="1">
                             <span>{name}</span>
                           </div>
@@ -326,7 +376,8 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                    display="flex"
                    flex-direction="row"
                    align-items={AlignItems::Center}
-                   column-gap="4px">
+                   column-gap="4px"
+                   components={Path(format!(".{}", field.name()))}>
                    <span>{field.name().capitalize_words().to_string()}</span>
                    <with>
                        {
