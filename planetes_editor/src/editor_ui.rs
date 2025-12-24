@@ -83,7 +83,7 @@ pub fn build_ui(mut commands: Commands) {
             width="100%"
             height="100%"
             font-size="12"
-            text-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+            text-color="srgb(178 178 178)">
                 <MenuBar
                     padding="4px"
                     flex-grow="0"
@@ -92,7 +92,7 @@ pub fn build_ui(mut commands: Commands) {
                     column-gap="8px"
                     width="100%"
                     border-bottom="1px"
-                    border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                    border-color="srgb(178 178 178)">
                     <iter>
                         {["File", "Edit", "View", "Help"].into_iter().map(|item| {
                             button::render(item)
@@ -114,7 +114,7 @@ pub fn build_ui(mut commands: Commands) {
                         justify-content={JustifyContent::Center}
                         align-items={AlignItems::Center}
                         border="1px"
-                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}
+                        border-color="srgb(178 178 178)"
                         components={ViewPort}>
                     </div>
                     <div
@@ -125,7 +125,7 @@ pub fn build_ui(mut commands: Commands) {
                         flex-shrink="0"
                         width="40%"
                         border="1px"
-                        border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                        border-color="srgb(178 178 178)">
                         {scene_tree::view()}
                         {entity_viewer::view()}
                     </div>

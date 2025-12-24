@@ -7,7 +7,7 @@ pub fn input_field<T: Validable>(value: T) -> impl Bundle {
         <div
             border="1px"
             border-radius="4px"
-            border-color={Color::linear_rgb(0.3, 0.3, 0.3)}
+            border-color={Color::srgb_u8(77, 77, 77)}
             padding-top="1px"
             padding-bottom="1px"
             padding-left="3px"
@@ -36,11 +36,11 @@ pub fn highlight_selected_input(
         {
             commands
                 .entity(child_of.0)
-                .insert(BorderColor::from(Color::linear_rgb(0.7, 0.7, 0.7)));
+                .insert(BorderColor::from(Color::srgb_u8(178, 178, 178)));
         } else {
             commands
                 .entity(child_of.0)
-                .insert(BorderColor::from(Color::linear_rgb(0.3, 0.3, 0.3)));
+                .insert(BorderColor::from(Color::srgb_u8(77, 77, 77)));
         }
     }
 }

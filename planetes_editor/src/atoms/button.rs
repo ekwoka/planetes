@@ -18,7 +18,7 @@ pub fn hover_menu_item(
     mut menu_items: Query<&mut BackgroundColor, With<MenuButton>>,
 ) {
     if let Ok(mut color) = menu_items.get_mut(trigger.entity) {
-        *color = BackgroundColor::from(Color::linear_rgba(0.2, 0.2, 1.0, 0.50));
+        *color = BackgroundColor::from(Color::srgba_u8(100, 100, 255, 127));
     }
 }
 

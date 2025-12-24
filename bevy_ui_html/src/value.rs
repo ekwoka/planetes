@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Expr, ExprBlock, ExprLit, Ident, Lit, Path, parse_quote_spanned, spanned::Spanned};
 
+use crate::color::to_color;
+
 #[derive(Clone, Debug)]
 pub struct Value(Expr);
 
@@ -165,6 +167,20 @@ impl Value {
             }
         } else {
             Some(value.into_token_stream())
+        }
+    }
+
+    pub fn parse_as_color(&self) -> Option<TokenStream> {
+        let value = &self.0;
+        if let syn::Expr::Block(ExprBlock { block, .. }) = value {
+            if block.stmts.len() == 1 {
+                let stmt = &block.stmts[0];
+                Some(stmt.to_token_stream())
+            } else {
+                Some(block.into_token_stream())
+            }
+        } else {
+            to_color(value)
         }
     }
 }
