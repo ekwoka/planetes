@@ -1048,7 +1048,7 @@ mod tests {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(Color::BLACK),
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                         ))
@@ -1074,7 +1074,7 @@ mod tests {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(Color::WHITE),
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                         ))
@@ -1100,7 +1100,7 @@ mod tests {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(Color::NONE),
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                         ))
@@ -1127,7 +1127,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1153,7 +1153,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1179,7 +1179,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::srgb(0.7, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1205,7 +1205,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::srgb_u8(170, 170, 170)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1231,7 +1231,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::srgba(0.7, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1257,7 +1257,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::srgba_u8(170, 170, 170, 127)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1283,7 +1283,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::hsl(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1309,7 +1309,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::hsla(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1335,7 +1335,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::hsv(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1361,7 +1361,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::hsva(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1387,7 +1387,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::hwb(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1413,7 +1413,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::hwba(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1439,7 +1439,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::lab(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1465,7 +1465,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::laba(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1491,7 +1491,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::lch(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1517,7 +1517,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::lcha(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1543,7 +1543,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::oklab(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1569,7 +1569,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::oklaba(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1595,7 +1595,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::oklch(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1621,7 +1621,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::oklcha(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1647,7 +1647,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::xyz(170.0, 0.7, 0.7)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1673,7 +1673,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::xyza(170.0, 0.7, 0.7, 0.5)),
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
