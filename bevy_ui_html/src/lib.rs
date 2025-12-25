@@ -1267,6 +1267,422 @@ mod tests {
             let result = html_inner(input);
             assert_eq!(result.to_string(), expected.to_string());
         }
+
+        #[test]
+        fn allows_string_hsl_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="hsl(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::hsl(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_hsla_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="hsla(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::hsla(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_hsv_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="hsv(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::hsv(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_hsva_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="hsva(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::hsva(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_hwb_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="hwb(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::hwb(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_hwba_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="hwba(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::hwba(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_lab_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="lab(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::lab(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_laba_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="laba(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::laba(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_lch_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="lch(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::lch(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_lcha_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="lcha(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::lcha(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_oklab_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="oklab(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::oklab(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_oklaba_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="oklaba(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::oklaba(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_oklch_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="oklch(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::oklch(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_oklcha_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="oklcha(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::oklcha(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_xyz_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="xyz(170 0.7 0.7)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::xyz(170.0, 0.7, 0.7)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_string_xyza_colors() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="xyza(170 0.7 0.7 / 0.5)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(Color::xyza(170.0, 0.7, 0.7, 0.5)),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
     }
 
     mod nodes {
