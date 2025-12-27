@@ -1,3 +1,5 @@
+//! Provides simple rendering of a Button with Hover States
+
 use bevy::prelude::*;
 
 #[derive(Component)]

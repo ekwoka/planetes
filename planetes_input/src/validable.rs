@@ -1,3 +1,5 @@
+//! Provides the Validable trait for allowing an input field to safely handle validation and conversion of a type
+
 use bevy::prelude::*;
 
 /// A trait for types that can be validated from a string input.

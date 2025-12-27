@@ -1,3 +1,7 @@
+//! Editor UI
+//!
+//! Handles all the UI and functionality for the Editor
+
 use bevy::{
     app::HierarchyPropagatePlugin, asset::embedded_asset, camera::visibility::RenderLayers,
     prelude::*, render::render_resource::TextureFormat,
@@ -14,6 +18,7 @@ use crate::{
 #[cfg(feature = "avian")]
 use avian3d::schedule::{Physics, PhysicsTime};
 
+/// Plugin for adding all Editor Functionality and UI
 pub fn plugin(app: &mut App) {
     embedded_asset!(app, "assets/directory_icon.png");
     embedded_asset!(app, "assets/file_icon.png");
@@ -49,30 +54,39 @@ pub fn plugin(app: &mut App) {
     }
 }
 
+/// Pauses [avian3d] Physics when in Edit Mode
 #[cfg(feature = "avian")]
 fn pause_physics(mut time: ResMut<Time<Physics>>) {
     info!("Physics Paused");
     time.pause();
 }
 
+/// Resumes [avian3d] Physics when in View Mode
 #[cfg(feature = "avian")]
 fn resume_physics(mut time: ResMut<Time<Physics>>) {
     info!("Physics Resumed");
     time.unpause();
 }
 
+/// Indicates a camera is the primary view.
+///
+/// Add to your own primary camera
 #[derive(Component)]
 pub struct MainView;
 
+/// Indicates the Camera that the Editor UI is rendered with.
 #[derive(Component)]
 pub struct UiView;
 
+/// Indicates the UI Node that the [MainView] is rendered to.
 #[derive(Component)]
 pub struct ViewPort;
 
+/// Marker component for the MenuBar UI
 #[derive(Component)]
 pub struct MenuBar;
 
+/// Builds entire Editor UI
 pub fn build_ui(mut commands: Commands) {
     commands.spawn(html! {
         <div
@@ -135,6 +149,7 @@ pub fn build_ui(mut commands: Commands) {
     });
 }
 
+/// Sets up the camera system for the editor UI.
 pub fn setup_camera_system(mut commands: Commands) {
     commands.spawn((
         Camera2d,
@@ -160,6 +175,7 @@ pub fn setup_camera_system(mut commands: Commands) {
     ));
 }
 
+/// Sets up the [ViewPort] node as a Bevy UI [ViewportNode]
 pub fn update_viewport(
     mut commands: Commands,
     view_target: Single<Entity, With<ViewPort>>,
@@ -185,6 +201,7 @@ impl DefaultTargetTexture for Image {
     }
 }
 
+/// Renders the Application bottom status bar.
 fn bottom_bar() -> impl Bundle {
     html! {
         <div
@@ -205,6 +222,7 @@ fn bottom_bar() -> impl Bundle {
     }
 }
 
+/// Allows Capitalizing Strings
 pub trait Capitalize {
     fn capitalize(&self) -> String;
     fn capitalize_words(&self) -> String;

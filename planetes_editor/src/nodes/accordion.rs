@@ -1,3 +1,5 @@
+//! A simple Accordion UI component
+
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
     prelude::*,

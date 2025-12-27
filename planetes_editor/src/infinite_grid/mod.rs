@@ -1,4 +1,6 @@
-#![allow(missing_docs)]
+//! # Infinite Grid
+//!
+//! Renders an infinite grid in the scene with the render world
 
 mod render;
 

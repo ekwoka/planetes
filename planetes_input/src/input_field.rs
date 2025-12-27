@@ -1,3 +1,5 @@
+//! Provides systems and components for managing input fields
+
 use crate::validable::{Validable, Validation};
 use bevy::{
     input::{
@@ -8,6 +10,7 @@ use bevy::{
     prelude::*,
 };
 
+/// Component that manages the data managed by an input field.
 #[derive(Component, Debug, PartialEq, Eq)]
 #[require(Node, TabIndex, EditableText::new(""), Validation)]
 pub struct InputField<T: Validable> {
@@ -31,6 +34,7 @@ impl<T: Validable> InputField<T> {
     }
 }
 
+/// Adds systems for syncing the InputField data with the EditableText
 pub fn input_field_plugin<T: Validable>(app: &mut App) {
     app.add_systems(
         PreUpdate,
@@ -42,6 +46,7 @@ pub fn input_field_plugin<T: Validable>(app: &mut App) {
     );
 }
 
+/// Updates the EditableText to use the value that exists in the InputField
 fn on_value_changed<T: Validable>(
     mut changed_inputs: Query<(&mut InputField<T>, &mut EditableText), Changed<InputField<T>>>,
 ) {
@@ -58,6 +63,7 @@ fn on_value_changed<T: Validable>(
     }
 }
 
+/// When the EditableText changes, validates the text and updates the InputField
 fn on_input_text_changed<T: Validable>(
     mut changed_inputs: Query<
         (Entity, &mut InputField<T>, &mut EditableText),
@@ -85,6 +91,7 @@ fn on_input_text_changed<T: Validable>(
     }
 }
 
+/// Syncs the EditableText accepted_chars with those indicated by the InputField Type
 fn on_value_created<T: Validable>(
     mut created_inputs: Query<(&InputField<T>, &mut EditableText), Added<InputField<T>>>,
 ) {
@@ -321,10 +328,13 @@ mod input_field {
     }
 }
 
+/// Component that handles the actual text present in an input field.
 #[derive(Component, Debug, PartialEq, Eq)]
 #[require(Text)]
 pub struct EditableText {
+    /// Active input Value
     pub text: String,
+    /// Characters accepted by the input field
     pub accepted_chars: &'static str,
 }
 
@@ -345,11 +355,13 @@ impl EditableText {
     }
 }
 
+/// Adds systems and observers to handle input on EditableText
 pub fn editable_text_plugin(app: &mut App) {
     app.add_systems(Update, on_text_change);
     app.add_observer(on_input);
 }
 
+/// Consumes FocusedInput events on EditableText, applying the input to the text value
 pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut EditableText>) {
     if event.input.state == ButtonState::Pressed
         && let Ok(mut editable_text) = text.get_mut(event.focused_entity)
@@ -373,6 +385,7 @@ pub fn on_input(event: On<FocusedInput<KeyboardInput>>, mut text: Query<&mut Edi
     }
 }
 
+/// Updates the associated Text to use the value tracked by EditableText
 pub fn on_text_change(mut changed_texts: Query<(&EditableText, &mut Text), Changed<EditableText>>) {
     for (editable, mut text) in changed_texts.iter_mut() {
         info!("Editable text changed: {}", editable.text);

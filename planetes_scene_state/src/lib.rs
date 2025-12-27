@@ -20,11 +20,13 @@ use bevy::{
     reflect::{PartialReflect, ReflectPath},
 };
 
+/// Reflectable Trait to mark Components as being available to the Editor
 #[reflect_trait]
 pub trait PlanetesComponent {}
 
 impl<T: Reflect + Component> PlanetesComponent for T {}
 
+/// Reflectable Trait to mark Bundles
 #[reflect_trait]
 pub trait PlanetesBundle {}
 
@@ -61,13 +63,18 @@ pub fn plugin(app: &mut App) {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use planetes_scene_state::*;
+/// # use bevy::prelude::*;
 /// fn read_canonical_transform(
 ///     canonical: Res<CanonicalScene>,
+///     mut transforms: Query<&mut Transform>,
 ///     entity: Entity,
 /// ) {
-///     if let Some(transform_data) = canonical.get_component::<Transform>(entity) {
-///         // Use the canonical transform data
+///     if let Some(transform_data) = canonical.get_component::<Transform>(entity)
+///         && let Ok(mut transform) = transforms.get_mut(entity) {
+///         // Update the live Transform with the Canonical State
+///         transform.apply(transform_data.data.as_ref());
 ///     }
 /// }
 /// ```
@@ -164,9 +171,11 @@ impl CanonicalScene {
     }
 }
 
+/// Contains all the canonical data for an Entity
 pub struct CanonicalEntityState {
     pub entity: Entity,
     pub components: HashMap<TypeId, CanonicalComponentState>,
+    /// Whether the entity has been modified. Makes it easier to apply changes without extra work.
     pub changed: bool,
 }
 
@@ -180,10 +189,12 @@ impl CanonicalEntityState {
     }
 }
 
+/// Tracks the state of a specific Component.
 pub struct CanonicalComponentState {
     id: ComponentId,
     name: DebugName,
     type_id: TypeId,
+    /// The data that the component holds.
     pub data: Box<dyn PartialReflect>,
 }
 
@@ -315,10 +326,12 @@ pub struct ApplyEdit {
 }
 
 /// Message to request an undo operation.
+/// Opposite of [Redo]
 #[derive(Message)]
 pub struct Undo;
 
 /// Message to request a redo operation.
+/// Opposite of [Undo]
 #[derive(Message)]
 pub struct Redo;
 
@@ -452,6 +465,7 @@ fn apply_edit_messages(
     }
 }
 
+/// Collects all edit events and records them in the history, to provide Undo/Redo functionality.
 fn collect_edit_history(
     mut messages: MessageReader<ApplyEdit>,
     mut history: ResMut<EditHistory>,
@@ -583,6 +597,7 @@ fn handle_redo(
     }
 }
 
+/// When the [CanonicalScene] changes (due to edits, undo/redo, or whatever), the live scene needs to be updated to reflect the differences.
 fn update_scene_from_state(world: &mut World) {
     world.resource_scope(|world, mut canonical_scene: Mut<CanonicalScene>| {
         for state in canonical_scene

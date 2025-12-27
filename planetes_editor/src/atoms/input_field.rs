@@ -1,3 +1,5 @@
+//! Provides simple rendering of an [InputField] with hover states
+
 use bevy::{input_focus::InputFocus, prelude::*};
 use bevy_ui_html::html;
 use planetes_input::prelude::{InputField, Validable};

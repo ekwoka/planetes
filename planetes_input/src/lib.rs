@@ -1,3 +1,7 @@
+//! # Planetes Input
+//!
+//! Provides basic functionality for input fields and validation.
+
 pub mod input_field;
 pub mod validable;
 
@@ -6,6 +10,7 @@ use bevy::{
     prelude::*,
 };
 
+/// Sets up plugins necessary for input handling.
 pub fn plugin(app: &mut App) {
     if !app.is_plugin_added::<InputDispatchPlugin>() {
         app.add_plugins(InputDispatchPlugin);

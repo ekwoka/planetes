@@ -1,3 +1,5 @@
+//! Core Entity Viewer/Editor
+
 use std::iter::once;
 
 use bevy::{

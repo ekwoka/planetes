@@ -1,3 +1,4 @@
+//! Renders the UI for editing components
 use std::any::TypeId;
 
 use crate::{
@@ -19,6 +20,7 @@ pub fn plugin(app: &mut App) {
     app.add_systems(Update, update_component_editor);
 }
 
+/// Converts a basic Component Editor into a full Component Editor
 pub fn update_component_editor(
     mut commands: Commands,
     target: Single<Entity, With<ViewedBy>>,
@@ -53,6 +55,7 @@ pub struct ComponentEditor(pub TypeId);
 #[derive(Component)]
 pub struct Path(pub String);
 
+/// Renders a base Component Editor without content
 pub fn base(type_id: TypeId) -> impl Bundle {
     html! {
         <div
@@ -71,6 +74,7 @@ pub fn base(type_id: TypeId) -> impl Bundle {
     }
 }
 
+/// Builds out the full Component Editor with content
 pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     html! {
         <div width="100%" onenter={handle_commit}>
@@ -98,6 +102,7 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
     }
 }
 
+/// Commits the editing of an [InputField] to the [CanonicalScene]
 fn handle_commit(
     event: On<FocusedInput<KeyboardInput>>,
     inputs: Query<&InputField<f32>>,
@@ -155,18 +160,21 @@ fn handle_commit(
     reflected_value.apply(&input_field.value);
 }
 
+/// Renders the editor for a Unit Component
 fn unit_component() -> impl Bundle {
     html! {
         <span linebreak={LineBreak::WordBoundary}>"Unit Struct"</span>
     }
 }
 
+/// Renders the editor for an Unknown Component
 fn unknown_component() -> impl Bundle {
     html! {
         <span linebreak={LineBreak::WordBoundary}>"Unknown Struct"</span>
     }
 }
 
+/// Renders the editor for a Struct Component
 fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let struct_data = reflect.reflect_owned().into_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
@@ -228,6 +236,7 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
     }
 }
 
+/// Renders the editor for a Tuple Struct Component
 fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let struct_data = reflect.reflect_owned().into_tuple_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
@@ -292,6 +301,7 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
     }
 }
 
+/// Renders the editor for Enum Components
 fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let enum_data = reflect.reflect_owned().into_enum().unwrap();
     let variants = info.iter().cloned().collect::<Vec<_>>();

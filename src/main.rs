@@ -1,3 +1,13 @@
+//! # Planetes Sandbox
+//!
+//! This is a sandbox binary for playing around with the tools that make up the Planetes Ecosystem.
+//!
+//! Core logic is not implemented in this binary, but simply pulled together to test.
+//!
+//! ## Features
+//! - `editor` - Load and use the Planetes Editor
+//! - `dev` - Enables basic Bevy Dev features
+
 // Support configuring Bevy lints within code.
 #![cfg_attr(bevy_lint, feature(register_tool), register_tool(bevy))]
 // Disable console on Windows for non-dev builds.
@@ -15,11 +25,17 @@ use bevy_enhanced_input::prelude::EnhancedInputPlugin;
 use bevy_tnua::prelude::TnuaControllerPlugin;
 use bevy_tnua_avian3d::TnuaAvian3dPlugin;
 
+/// Runs the Sandbox
 fn main() -> AppExit {
     App::new().add_plugins(AppPlugin).run()
 }
 
+/// Current Core Planetes builder plugin
+#[cfg(feature = "dev")]
 pub struct AppPlugin;
+
+#[cfg(not(feature = "dev"))]
+struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut App) {
@@ -69,9 +85,11 @@ impl Plugin for AppPlugin {
     }
 }
 
+/// Identifies the camera to be used for Anchored UI Elements from [bevy_ui_anchor::AnchorUiPlugin]
 #[derive(Component)]
-pub struct UICamera;
+struct UICamera;
 
+/// Spawns the main view camera.
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Name::new("Camera"),
@@ -88,6 +106,7 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
+/// Creates the default image sampler to allow textures to be tiled.
 pub(crate) fn default_image_sampler_descriptor() -> ImageSamplerDescriptor {
     ImageSamplerDescriptor {
         address_mode_u: ImageAddressMode::Repeat,

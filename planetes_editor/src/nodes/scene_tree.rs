@@ -1,3 +1,5 @@
+//! Rendering of the Scene Tree UI Node
+
 use crate::{
     nodes::{
         accordion,
