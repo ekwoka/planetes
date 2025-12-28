@@ -11,7 +11,7 @@ use crate::{
 use bevy::prelude::*;
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(PostUpdate, (update_tree, update_branches))
+    app.add_systems(PreUpdate, (update_tree, update_branches).chain())
         .add_observer(select_entity);
 }
 
@@ -79,30 +79,34 @@ pub fn update_branches(
             let name =
                 name.map_or_else(|| format!("{entity}"), |name| format!("{name} ({entity})"));
             let text = format!("{name}:");
-            branch_view.despawn_children().with_children(|parent| {
-                if child_entities.is_empty() {
-                    parent.spawn(html! {
-                        <div
-                            name={name}
-                            padding="2px"
-                            display="flex"
-                            flex-direction="row"
-                            align-items={AlignItems::Center}
-                            column-gap="8px">
-                            <img src={asset_server
-                                .load("embedded://planetes_editor/assets/file_icon.png")}
-                                height="10px"/>
-                            <span>{text}</span>
-                        </div>
-                    });
-                } else {
-                    parent.spawn(accordion::view(
-                        text,
-                        SpawnIter(child_entities.into_iter().map(branch)),
-                        asset_server.clone(),
-                    ));
-                }
-            });
+            branch_view
+                .queue_silenced(|mut entity: EntityWorldMut| {
+                    entity.despawn_related::<Children>();
+                })
+                .with_children(|parent| {
+                    if child_entities.is_empty() {
+                        parent.spawn(html! {
+                            <div
+                                name={name}
+                                padding="2px"
+                                display="flex"
+                                flex-direction="row"
+                                align-items={AlignItems::Center}
+                                column-gap="8px">
+                                <img src={asset_server
+                                    .load("embedded://planetes_editor/assets/file_icon.png")}
+                                    height="10px"/>
+                                <span>{text}</span>
+                            </div>
+                        });
+                    } else {
+                        parent.spawn(accordion::view(
+                            text,
+                            SpawnIter(child_entities.into_iter().map(branch)),
+                            asset_server.clone(),
+                        ));
+                    }
+                });
         };
     }
 }

@@ -11,13 +11,13 @@ use bevy::{
     },
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
-    reflect::{EnumInfo, StructInfo, TupleStructInfo, TypeInfo},
+    reflect::{EnumInfo, OpaqueInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Update, update_component_editor);
+    app.add_systems(PreUpdate, update_component_editor);
 }
 
 /// Converts a basic Component Editor into a full Component Editor
@@ -220,6 +220,9 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
                                       Some(TypeInfo::List(_)) => {
                                           parent.spawn(Text::new("Unknown List"));
                                       }
+                                      Some(TypeInfo::Opaque(info)) => {
+                                          parent.spawn(reflected_opaque(info, value));
+                                      }
                                       _ => {
                                           parent.spawn(Text::new("Unknown Type"));
                                       }
@@ -281,8 +284,7 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
                                           parent.spawn(Text::new("Unknown List"));
                                       }
                                       Some(TypeInfo::Opaque(info)) => {
-                                          parent.spawn(Text::new(format!("{}:", info.type_path())));
-                                           parent.spawn(Text::new(format!("{value:?}")));
+                                          parent.spawn(reflected_opaque(info, value));
                                       }
                                       other => {
                                           parent.spawn(Text::new("Unknown Type"));
@@ -376,9 +378,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
             let value = value.reflect_clone().unwrap();
             let type_info = field.clone().type_info();
             let input = type_info.and_then(|type_info| match type_info {
-                TypeInfo::Opaque(info) => {
-                    Some(info)
-                }
+                TypeInfo::Opaque(info) => Some(info),
                 _ => None,
             });
             html! {
@@ -392,11 +392,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                    <with>
                        {
                            if let Some(input_type) = input {
-                               if input_type.is::<String>() {
-                                   parent.spawn(input_field::<String>(format!("{value:?}")));
-                               } else if input_type.is::<f32>() {
-                                   parent.spawn(input_field::<f32>(value.as_partial_reflect().try_downcast_ref::<f32>().cloned().unwrap()));
-                               }
+                               parent.spawn(reflected_opaque(input_type, value));
                            } else {
                                parent.spawn(Text::new(format!("{value:?}")));
                            }
@@ -423,6 +419,32 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                 }
                 </iter>
             </div>
+        </div>
+    }
+}
+
+fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+    let input_type = input_type.clone();
+    let reflect = reflect.to_dynamic();
+    html! {
+        <div>
+           <with>
+               {
+                    if input_type.is::<String>() {
+                        parent.spawn(input_field::<String>(format!("{reflect:?}")));
+                    } else if input_type.is::<f32>() {
+                        parent.spawn(input_field::<f32>(reflect.as_partial_reflect().try_downcast_ref::<f32>().cloned().unwrap()));
+                    } else if input_type.is::<u32>() {
+                        parent.spawn(input_field::<u32>(reflect.as_partial_reflect().try_downcast_ref::<u32>().cloned().unwrap()));
+                    } else if input_type.is::<u64>() {
+                        parent.spawn(input_field::<u64>(reflect.as_partial_reflect().try_downcast_ref::<u64>().cloned().unwrap()));
+                    } else if input_type.is::<i32>() {
+                        parent.spawn(input_field::<i32>(reflect.as_partial_reflect().try_downcast_ref::<i32>().cloned().unwrap()));
+                    } else {
+                       parent.spawn(Text::new(format!("{reflect:?}")));
+                   }
+               }
+           </with>
         </div>
     }
 }
