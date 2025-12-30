@@ -1,0 +1,49 @@
+[config]
+default_to_workspace = false
+load_cargo_aliases = true
+
+[tasks.default]
+alias = "build"
+
+[tasks.watch]
+command = "cargo"
+args = ["watch", "-x", "check --workspace", "-x", "run --features editor"]
+
+[tasks.check]
+command = "cargo"
+args = ["check", "--workspace"]
+
+[tasks.clippy]
+command = "cargo"
+args = ["clippy", "--allow-dirty", "--fix"]
+
+[tasks.nextest]
+command = "cargo"
+args = ["nextest", "--workspace"]
+
+[tasks.docs-deps]
+script = '''
+cargo doc --no-deps $({
+    cargo tree -p bevy --depth 2 --format "{p}" --prefix none
+    cargo tree --workspace --depth 1 --format "{p}" --prefix none
+  } \
+  | sed -E 's/^[^A-Za-z0-9_-]*//' \
+  | sed -E 's/^([A-Za-z0-9_-]+).*/-p \1/' \
+  | sort -u)
+'''
+
+[tasks.docs-own]
+script = "cargo doc --workspace --all-features --no-deps --document-private-items"
+
+[tasks.fmt]
+command = "cargo"
+args = ["fmt", "--all"]
+
+
+[tasks.precommit]
+dependencies = ["check", "clippy", "fmt", "nextest", "docs-deps", "docs-own", "build"]
+run_task = { name = ["build"], parallel = false }
+
+[tasks.build]
+command = "cargo"
+args = ["build", "--features", "editor"]
