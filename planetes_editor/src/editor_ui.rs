@@ -11,8 +11,9 @@ use crate::{
     EditorMode, ReflectPlanetesComponent,
     atoms::*,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
-    nodes::*,
+    nodes::{scene_tree::UpdateSceneTree, *},
     prelude::*,
+    scene::load_scene,
 };
 
 #[cfg(feature = "avian")]
@@ -42,11 +43,12 @@ pub fn plugin(app: &mut App) {
     .register_type_data::<Children, ReflectPlanetesComponent>()
     .add_systems(
         OnEnter(EditorMode::Edit),
-        (setup_camera_system, build_ui).chain(),
+        (setup_camera_system, build_ui).chain().before(load_scene),
     )
     .add_systems(Update, update_viewport)
     .add_observer(button::hover_menu_item)
-    .add_observer(button::unhover_menu_item);
+    .add_observer(button::unhover_menu_item)
+    .add_message::<UpdateSceneTree>();
     #[cfg(feature = "avian")]
     {
         app.add_systems(OnEnter(EditorMode::Edit), pause_physics);

@@ -2,7 +2,7 @@
 
 use std::{fs::File, io::Write};
 
-use crate::{EditorMode, ReflectPlanetesComponent};
+use crate::{EditorMode, ReflectPlanetesComponent, nodes::scene_tree::UpdateSceneTree};
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate},
     prelude::*,
@@ -70,13 +70,16 @@ pub fn save_scene(
 pub fn load_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     info!("loading scene");
     let scene_handle = asset_server.load::<DynamicScene>("test.scn.ron");
-    commands.spawn((
-        Name::new("Root"),
-        EditorScene,
-        Transform::default(),
-        Propagate(InScene),
-        DynamicSceneRoot(scene_handle),
-    ));
+    let scene_root = commands
+        .spawn((
+            Name::new("Root"),
+            EditorScene,
+            Transform::default(),
+            Propagate(InScene),
+            DynamicSceneRoot(scene_handle),
+        ))
+        .id();
+    commands.write_message(UpdateSceneTree { entity: scene_root });
 }
 
 fn add_meshes_to_scene(

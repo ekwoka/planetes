@@ -6,12 +6,11 @@ use crate::{
         entity_viewer::{EntityEditor, Viewing},
     },
     prelude::*,
-    scene::EditorScene,
 };
-use bevy::prelude::*;
+use bevy::{platform::collections::HashMap, prelude::*};
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(PreUpdate, (update_tree, update_branches).chain())
+    app.add_systems(PostUpdate, update_tree)
         .add_observer(select_entity);
 }
 
@@ -36,55 +35,104 @@ pub fn view() -> impl Bundle {
     }
 }
 
+#[derive(Message)]
+pub struct UpdateSceneTree {
+    /// The entity to sync from.
+    pub entity: Entity,
+}
+
 pub fn update_tree(
     mut commands: Commands,
+    mut messages: MessageReader<UpdateSceneTree>,
     scene_tree_view: Single<Entity, With<SceneTreeView>>,
-    scene_root: Single<&Children, (With<EditorScene>, Changed<Children>)>,
+    scene_children: Query<(Entity, Option<&Name>, Option<&Children>)>,
     asset_server: Res<AssetServer>,
 ) {
-    info!("Updating scene tree");
-    let branch_entities = scene_root.iter().collect::<Vec<_>>();
-    if let Ok(mut view_commands) = commands.get_entity(*scene_tree_view) {
-        view_commands.despawn_children().with_children(|parent| {
-            parent.spawn(accordion::view(
-                "Root:",
-                SpawnIter(branch_entities.into_iter().map(branch)),
-                asset_server.clone(),
-            ));
-        });
+    for message in messages.read() {
+        info!("Updating scene tree");
+        if let Ok(mut view_commands) = commands.get_entity(*scene_tree_view) {
+            let scene_children: HashMap<Entity, (Option<Name>, Option<Vec<Entity>>)> =
+                scene_children
+                    .iter()
+                    .map(|(entity, name, children)| {
+                        (
+                            entity,
+                            (
+                                name.cloned(),
+                                children.map(|children| children.iter().collect::<Vec<Entity>>()),
+                            ),
+                        )
+                    })
+                    .collect();
+            let Some((name, children)) = scene_children.get(&message.entity) else {
+                info!("No Scene Children");
+                continue;
+            };
+            let name = name
+                .clone()
+                .map(|name| format!("{name}:"))
+                .unwrap_or("Root:".into());
+            let branch_entities = children.as_ref().cloned().unwrap_or_default();
+            info!("root children found: {:?}", branch_entities);
+            let asset_server = asset_server.clone();
+            view_commands
+                .despawn_children()
+                .with_children(move |parent| {
+                    parent.spawn(accordion::view(
+                        name,
+                        SpawnIter(
+                            branch_entities
+                                .into_iter()
+                                .filter_map(|entity| {
+                                    branch(entity, scene_children.clone(), asset_server.clone())
+                                })
+                                .collect::<Vec<_>>()
+                                .into_iter(),
+                        ),
+                        asset_server,
+                    ));
+                });
+        } else {
+            info!("No SceneTreeView");
+        }
     }
 }
 
-pub fn update_branches(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    elements_in_scene: Query<
-        (Entity, Option<&Name>, Option<&Children>, &RepresentedBy),
-        Or<(Changed<Children>, Changed<RepresentedBy>)>,
-    >,
-) {
-    if elements_in_scene.is_empty() {
-        return;
-    }
-
-    info!("Updating ChangedBranches");
-
-    for (entity, name, children, represented_by) in elements_in_scene.iter() {
-        let child_entities = children
-            .map(|children| children.iter().collect::<Vec<_>>())
-            .unwrap_or_default();
-        if let Some(represented_by) = represented_by.iter().next()
-            && let Ok(mut branch_view) = commands.get_entity(represented_by)
-        {
-            let name =
-                name.map_or_else(|| format!("{entity}"), |name| format!("{name} ({entity})"));
-            let text = format!("{name}:");
-            branch_view
-                .queue_silenced(|mut entity: EntityWorldMut| {
-                    entity.despawn_related::<Children>();
-                })
-                .with_children(|parent| {
-                    if child_entities.is_empty() {
+pub fn branch(
+    target_entity: Entity,
+    scene_children: HashMap<Entity, (Option<Name>, Option<Vec<Entity>>)>,
+    asset_server: AssetServer,
+) -> Option<impl Bundle> {
+    if let Some((name, children)) = scene_children.get(&target_entity) {
+        let name = name.clone().map_or_else(
+            || format!("{target_entity}"),
+            |name| format!("{name} ({target_entity})"),
+        );
+        let children = children.clone();
+        let text = format!("{name}:");
+        Some(html! {
+            <SceneTreeBranch
+                padding-left="2px"
+                    flex-grow="0"
+                    flex-shrink="1"
+                display="flex"
+                flex-direction="col"
+                row-gap="8px"
+                width="100%"
+                components={Represents(target_entity)}>
+                <with>
+                {
+                    if let Some(children) = children && !children.is_empty() {
+                        parent.spawn(accordion::view(
+                            text,
+                            SpawnIter(children.into_iter().filter_map(|entity| {
+                                branch(entity, scene_children.clone(), asset_server.clone())
+                            })
+                            .collect::<Vec<_>>()
+                            .into_iter()),
+                            asset_server.clone(),
+                        ));
+                    } else {
                         parent.spawn(html! {
                             <div
                                 name={name}
@@ -99,31 +147,13 @@ pub fn update_branches(
                                 <span>{text}</span>
                             </div>
                         });
-                    } else {
-                        parent.spawn(accordion::view(
-                            text,
-                            SpawnIter(child_entities.into_iter().map(branch)),
-                            asset_server.clone(),
-                        ));
                     }
-                });
-        };
-    }
-}
-
-pub fn branch(target_entity: Entity) -> impl Bundle {
-    html! {
-        <SceneTreeBranch
-            padding-left="2px"
-                flex-grow="0"
-                flex-shrink="1"
-            display="flex"
-            flex-direction="col"
-            row-gap="8px"
-            width="100%"
-            components={Represents(target_entity)}>
-            <span>{format!("Child {target_entity}")}</span>
-        </SceneTreeBranch>
+                }
+                </with>
+            </SceneTreeBranch>
+        })
+    } else {
+        None
     }
 }
 
