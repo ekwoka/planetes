@@ -37,6 +37,7 @@
         "planetes_editor::sample_data::ThingyStruct": (
           field1: "this is a value",
           field2: 420,
+          field3: true,
         ),
         "planetes_editor::sample_data::ThingyTuple": (69, 420),
         "planetes_editor::sample_data::ThingyEnum": Tuple((69, 420))

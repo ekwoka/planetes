@@ -9,11 +9,12 @@ use crate::ReflectPlanetesComponent;
 #[reflect(Component, PlanetesComponent, Serialize, Deserialize)]
 pub struct ThingyUnit;
 
-#[derive(Component, Reflect, Serialize, Deserialize, Debug)]
+#[derive(Component, Reflect, Serialize, Deserialize, Debug, Default)]
 #[reflect(Component, PlanetesComponent, Serialize, Deserialize)]
 pub struct ThingyStruct {
     pub field1: String,
     pub field2: i32,
+    pub field3: bool,
 }
 
 #[derive(Component, Reflect, Serialize, Deserialize, Debug)]

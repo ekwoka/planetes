@@ -440,6 +440,12 @@ fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -
                         parent.spawn(input_field::<u64>(reflect.as_partial_reflect().try_downcast_ref::<u64>().cloned().unwrap()));
                     } else if input_type.is::<i32>() {
                         parent.spawn(input_field::<i32>(reflect.as_partial_reflect().try_downcast_ref::<i32>().cloned().unwrap()));
+                    } else if input_type.is::<bool>() {
+                        parent.spawn(html! {
+                            <div border-radius="2px" border="1px" border-color="srgb(178 178 178)" width="16px" height="16px" display="flex" flex-direction="col" justify-content={JustifyContent::Center} align-items={AlignItems::Center}>
+                                <span>{if reflect.as_partial_reflect().try_downcast_ref::<bool>().cloned().unwrap() { "Y" } else { "N" }}</span>
+                            </div>
+                        });
                     } else {
                        parent.spawn(Text::new(format!("{reflect:?}")));
                    }
