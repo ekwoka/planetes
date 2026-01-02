@@ -2,7 +2,7 @@
 
 use bevy::{input_focus::InputFocus, prelude::*};
 use bevy_ui_html::html;
-use planetes_input::prelude::{InputField, Validable};
+use planetes_input::prelude::{EditableText, InputField, Validable};
 
 pub fn input_field<T: Validable>(value: T) -> impl Bundle {
     html! {
@@ -26,7 +26,7 @@ pub fn input_field<T: Validable>(value: T) -> impl Bundle {
 
 pub fn highlight_selected_input(
     mut commands: Commands,
-    inputs: Query<(Entity, &ChildOf), With<InputField<String>>>,
+    inputs: Query<(Entity, &ChildOf), With<EditableText>>,
     focused: Res<InputFocus>,
 ) {
     if !focused.is_changed() {

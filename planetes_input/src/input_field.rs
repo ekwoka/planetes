@@ -34,23 +34,43 @@ impl<T: Validable> InputField<T> {
     }
 }
 
+/// Stores a Type Erased value to apply to the component field
+#[derive(Component, Default)]
+pub struct InputValue(Option<Box<dyn PartialReflect + 'static>>);
+
+impl InputValue {
+    /// Create a new validated input field with the given value
+    pub fn new(value: &dyn PartialReflect) -> Self {
+        Self(Some(value.to_dynamic()))
+    }
+
+    /// Gets the inner value
+    pub fn value(&self) -> Option<&dyn PartialReflect> {
+        self.0.as_deref()
+    }
+}
+
 /// Adds systems for syncing the InputField data with the EditableText
-pub fn input_field_plugin<T: Validable>(app: &mut App) {
+pub fn input_field_plugin<T: Validable + PartialReflect>(app: &mut App) {
     app.add_systems(
         PreUpdate,
-        (on_value_created::<T>, on_value_changed::<T>).chain(),
-    );
-    app.add_systems(
-        PostUpdate,
-        (on_value_created::<T>, on_input_text_changed::<T>).chain(),
+        (
+            on_value_created::<T>,
+            on_value_changed::<T>,
+            on_input_text_changed::<T>,
+        )
+            .chain(),
     );
 }
 
 /// Updates the EditableText to use the value that exists in the InputField
-fn on_value_changed<T: Validable>(
-    mut changed_inputs: Query<(&mut InputField<T>, &mut EditableText), Changed<InputField<T>>>,
+fn on_value_changed<T: Validable + PartialReflect>(
+    mut changed_inputs: Query<
+        (&mut InputField<T>, &mut EditableText, &mut InputValue),
+        Changed<InputField<T>>,
+    >,
 ) {
-    for (mut input, mut text) in changed_inputs.iter_mut() {
+    for (mut input, mut text, mut value) in changed_inputs.iter_mut() {
         info!(
             "Input field value changed from: {} to: {}",
             input.old_value.to_string(),
@@ -59,6 +79,7 @@ fn on_value_changed<T: Validable>(
         if input.value != input.old_value {
             input.old_value = input.value.clone();
             text.text = input.value.to_string();
+            value.0 = Some(Box::new(input.value.clone()));
         }
     }
 }
@@ -92,13 +113,17 @@ fn on_input_text_changed<T: Validable>(
 }
 
 /// Syncs the EditableText accepted_chars with those indicated by the InputField Type
-fn on_value_created<T: Validable>(
-    mut created_inputs: Query<(&InputField<T>, &mut EditableText), Added<InputField<T>>>,
+fn on_value_created<T: Validable + PartialReflect>(
+    mut commands: Commands,
+    mut created_inputs: Query<(Entity, &InputField<T>, &mut EditableText), Added<InputField<T>>>,
 ) {
-    for (input, mut text) in created_inputs.iter_mut() {
+    for (entity, input, mut text) in created_inputs.iter_mut() {
         info!("Input field created: {}", input.value.to_string());
         text.text = input.value.to_string();
         text.accepted_chars = T::accepted_chars();
+        commands
+            .entity(entity)
+            .insert(InputValue(Some(Box::new(input.value.clone()))));
     }
 }
 
@@ -130,7 +155,9 @@ mod input_field {
 
     macro_rules! type_event {
         ($app: ident, $key: ident, $text: tt) => {
+            $app.update();
             $app.world_mut().write_message(key_event!($key, $text));
+            $app.update();
         };
     }
 
@@ -233,8 +260,6 @@ mod input_field {
 
         type_event!(app, Numpad0, 0);
 
-        app.update();
-
         {
             let mut fields = app.world_mut().query::<(&InputField<String>, &Text)>();
             let (input_field, text) = fields.get(app.world(), input).unwrap();
@@ -244,16 +269,14 @@ mod input_field {
 
         type_event!(app, Numpad1, 1);
 
-        app.update();
-
         {
             let mut fields = app
                 .world_mut()
                 .query::<(&InputField<String>, &Text, &Validation)>();
             let (input_field, text, validation) = fields.get(app.world(), input).unwrap();
+            assert!(matches!(validation, &Validation::Valid));
             assert_eq!(text.0, "101");
             assert_eq!(input_field.value, "101");
-            assert!(matches!(validation, &Validation::Valid));
         }
     }
 
@@ -286,8 +309,6 @@ mod input_field {
 
         type_event!(app, Period, .);
 
-        app.update();
-
         {
             let mut fields = app.world_mut().query::<(&InputField<f32>, &Text)>();
             let (input_field, text) = fields.get(app.world(), input).unwrap();
@@ -296,8 +317,6 @@ mod input_field {
         }
 
         type_event!(app, Numpad2, 2);
-
-        app.update();
 
         {
             let mut fields = app
@@ -311,19 +330,17 @@ mod input_field {
 
         type_event!(app, Period, .);
 
-        app.update();
-
         {
             let mut fields = app
                 .world_mut()
                 .query::<(&InputField<f32>, &Text, &Validation)>();
             let (input_field, text, validation) = fields.get(app.world(), input).unwrap();
-            assert_eq!(text.0, "1.2.");
-            assert_eq!(input_field.value, 1.2);
             assert_eq!(
                 validation,
                 &Validation::Invalid("Invalid f32 number".into())
             );
+            assert_eq!(text.0, "1.2.");
+            assert_eq!(input_field.value, 1.2);
         }
     }
 }

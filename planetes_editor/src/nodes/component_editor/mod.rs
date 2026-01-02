@@ -2,7 +2,10 @@
 use std::any::TypeId;
 
 use crate::{
-    atoms::input_field, editor_ui::Capitalize, nodes::entity_viewer::ViewedBy, prelude::*,
+    atoms::{check_box, input_field},
+    editor_ui::Capitalize,
+    nodes::entity_viewer::ViewedBy,
+    prelude::*,
 };
 use bevy::{
     input::{
@@ -105,7 +108,7 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
 /// Commits the editing of an [InputField] to the [CanonicalScene]
 fn handle_commit(
     event: On<FocusedInput<KeyboardInput>>,
-    inputs: Query<&InputField<f32>>,
+    inputs: Query<&InputValue>,
     component_editor: Query<&ComponentEditor>,
     target: Single<Entity, With<ViewedBy>>,
     path_segments: Query<&Path>,
@@ -157,7 +160,10 @@ fn handle_commit(
     else {
         return;
     };
-    reflected_value.apply(&input_field.value);
+    let Some(value) = input_field.value() else {
+        return;
+    };
+    reflected_value.apply(value);
 }
 
 /// Renders the editor for a Unit Component
@@ -441,11 +447,7 @@ fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -
                     } else if input_type.is::<i32>() {
                         parent.spawn(input_field::<i32>(reflect.as_partial_reflect().try_downcast_ref::<i32>().cloned().unwrap()));
                     } else if input_type.is::<bool>() {
-                        parent.spawn(html! {
-                            <div border-radius="2px" border="1px" border-color="srgb(178 178 178)" width="16px" height="16px" display="flex" flex-direction="col" justify-content={JustifyContent::Center} align-items={AlignItems::Center}>
-                                <span>{if reflect.as_partial_reflect().try_downcast_ref::<bool>().cloned().unwrap() { "Y" } else { "N" }}</span>
-                            </div>
-                        });
+                        parent.spawn(check_box(reflect.as_partial_reflect().try_downcast_ref::<bool>().cloned().unwrap()));
                     } else {
                        parent.spawn(Text::new(format!("{reflect:?}")));
                    }

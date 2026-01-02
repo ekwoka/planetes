@@ -14,7 +14,9 @@ use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
 
 use crate::{
-    atoms::{highlight_selected_input, input_field},
+    atoms::{
+        highlight_selected_checkbox, highlight_selected_input, input_field, on_checkbox_change,
+    },
     nodes::{accordion, component_editor},
     prelude::*,
 };
@@ -25,6 +27,8 @@ pub fn plugin(app: &mut App) {
             update_entity_viewer,
             component_editor::update_component_editor,
             highlight_selected_input,
+            highlight_selected_checkbox,
+            on_checkbox_change,
         )
             .chain(),
     );
