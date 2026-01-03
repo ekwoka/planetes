@@ -331,6 +331,15 @@ impl ToTokens for NodeComponent {
                 });
             }
 
+            if let Some(value) = Self::get_attr(&self.attributes, "justify-content")
+                .map(Value::new)
+                .and_then(|val| val.as_justify_content())
+            {
+                fields.push(quote! {
+                    justify_content: #value
+                });
+            }
+
             // Process enum properties
             for prop in [
                 "position-type",
@@ -340,7 +349,6 @@ impl ToTokens for NodeComponent {
                 "align-self",
                 "justify-self",
                 "align-content",
-                "justify-content",
                 "box-sizing",
                 "grid-auto-flow",
             ] {

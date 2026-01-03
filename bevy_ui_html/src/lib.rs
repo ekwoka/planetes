@@ -1022,8 +1022,8 @@ mod tests {
                 ::bevy::ui::Node {
                   display: Display::Flex,
                   flex_direction: FlexDirection::Column,
-                  align_items: AlignItems::Center,
                   justify_content: JustifyContent::SpaceBetween,
+                  align_items: AlignItems::Center,
                   flex_grow: 1.0,
                   flex_shrink: 0.5,
                   ..Default::default()

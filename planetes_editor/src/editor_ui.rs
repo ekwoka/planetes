@@ -127,7 +127,7 @@ pub fn build_ui(mut commands: Commands) {
                         flex-shrink="1"
                         width="50%"
                         height="100%"
-                        justify-content={JustifyContent::Center}
+                        justify-content="center"
                         align-items={AlignItems::Center}
                         border="1px"
                         border-color="srgb(178 178 178)"

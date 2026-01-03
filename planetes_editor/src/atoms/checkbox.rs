@@ -23,7 +23,7 @@ pub fn check_box(value: bool) -> impl Bundle {
             height="16px"
             display="flex"
             flex-direction="col"
-            justify-content={JustifyContent::Center}
+            justify-content="center"
             align-items={AlignItems::Center}
             components={(Checkbox(value), InputValue::new(&value))}
             onClick={on_checkbox_click}>
