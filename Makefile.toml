@@ -6,12 +6,18 @@ load_cargo_aliases = true
 alias = "build"
 
 [tasks.watch]
+dependencies = ["check"]
+run_task = { name = ["editor"], parallel = false }
+watch = true
+
+[tasks.editor]
 command = "cargo"
-args = ["watch", "-x", "make check", "-x", "run --features editor"]
+args = ["run", "--features", "editor"]
 
 [tasks.watch-test]
-command = "cargo"
-args = ["watch", "-x", "make check", "-x", "make nextest"]
+dependencies = ["check"]
+run_task = { name = ["nextest"], parallel = false }
+watch = true
 
 [tasks.check]
 command = "cargo"
