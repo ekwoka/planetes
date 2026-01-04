@@ -435,7 +435,9 @@ mod editable_text {
 
     macro_rules! type_event {
         ($app: ident, $key: ident, $text: tt) => {
+            $app.update();
             $app.world_mut().write_message(key_event!($key, $text));
+            $app.update();
         };
     }
 
@@ -447,6 +449,7 @@ mod editable_text {
         app.add_plugins(editable_text_plugin);
 
         let input = app.world_mut().spawn(EditableText::new("Hello")).id();
+
         app.update();
 
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
@@ -490,8 +493,6 @@ mod editable_text {
         type_event!(app, KeyO, O);
         type_event!(app, KeyM, M);
 
-        app.update();
-
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("HIMOM".into()));
     }
@@ -527,6 +528,8 @@ mod editable_text {
         app.world_mut()
             .run_system_once(move |helper: IsFocusedHelper| assert!(helper.is_focused(input)))
             .unwrap();
+
+        app.update();
 
         app.world_mut().write_message(KeyboardInput {
             key_code: KeyCode::KeyA,
@@ -579,14 +582,10 @@ mod editable_text {
         type_event!(app, KeyH, H);
         type_event!(app, KeyI, I);
 
-        app.update();
-
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("10".into()));
 
         type_event!(app, Numpad1, 1);
-
-        app.update();
 
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("101".into()));
@@ -636,8 +635,6 @@ mod editable_text {
         type_event!(app, KeyM, M);
         type_event!(app, KeyO, O);
         type_event!(app, KeyM, M);
-
-        app.update();
 
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("Hi MOM".into()));

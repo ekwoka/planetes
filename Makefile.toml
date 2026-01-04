@@ -7,7 +7,11 @@ alias = "build"
 
 [tasks.watch]
 command = "cargo"
-args = ["watch", "-x", "check --workspace", "-x", "run --features editor"]
+args = ["watch", "-x", "make check", "-x", "run --features editor"]
+
+[tasks.watch-test]
+command = "cargo"
+args = ["watch", "-x", "make check", "-x", "make nextest"]
 
 [tasks.check]
 command = "cargo"
@@ -41,7 +45,7 @@ args = ["fmt", "--all"]
 
 
 [tasks.precommit]
-dependencies = ["check", "clippy", "fmt", "nextest", "docs-deps", "docs-own", "build"]
+dependencies = ["check", "clippy", "fmt", "nextest", "docs-deps", "docs-own"]
 run_task = { name = ["build"], parallel = false }
 
 [tasks.build]
