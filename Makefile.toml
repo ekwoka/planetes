@@ -49,10 +49,20 @@ script = "cargo doc --workspace --all-features --no-deps --document-private-item
 command = "cargo"
 args = ["fmt", "--all"]
 
+[tasks.test-build]
+run_task = { name = ["nextest", "build"], parallel = false }
+
+[tasks.do-docs]
+run_task = { name = ["docs-deps", "docs-own"], parallel = false }
+
+[tasks.lint]
+run_task = { name = ["check", "clippy", "fmt"], parallel = false }
+
+[tasks.build-all]
+run_task = { name = ["test-build", "do-docs"], parallel = false }
 
 [tasks.precommit]
-dependencies = ["check", "clippy", "fmt", "nextest", "docs-deps", "docs-own"]
-run_task = { name = ["build"], parallel = false }
+run_task = { name = ["lint", "build-all"], parallel = false }
 
 [tasks.build]
 command = "cargo"
