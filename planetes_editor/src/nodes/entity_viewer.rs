@@ -15,9 +15,10 @@ use planetes_scene_state::CanonicalScene;
 
 use crate::{
     atoms::{
-        highlight_selected_checkbox, highlight_selected_input, input_field, on_checkbox_change,
+        button, highlight_selected_checkbox, highlight_selected_input, input_field,
+        on_checkbox_change,
     },
-    nodes::{accordion, component_editor},
+    nodes::{accordion, component_editor, component_selector::OpenAddComponent},
     prelude::*,
 };
 pub fn plugin(app: &mut App) {
@@ -88,7 +89,6 @@ pub fn update_entity_viewer(
             )
         })
         .collect::<Vec<_>>();
-
     commands
         .entity(editor)
         .despawn_children()
@@ -98,7 +98,7 @@ pub fn update_entity_viewer(
                   display="flex"
                   flex-direction="row"
                   align-items={AlignItems::Center}
-                  oninput={update_name}
+                  onInput={update_name}
                 >
                     <span>"Selected: "</span>
                     {
@@ -111,6 +111,19 @@ pub fn update_entity_viewer(
                 </div>
             });
 
+            parent.spawn(html! {
+                <div
+                  display="flex"
+                  flex-direction="row"
+                  align-items={AlignItems::Center}
+                  onClick={|event: On<Pointer<Click>>, mut commands: Commands| {
+                      commands.trigger(OpenAddComponent { entity: event.entity });
+                  }}
+                >
+                    <span>"Add Component: "</span>
+                    {button::render("+")}
+                </div>
+            });
             parent.spawn(html! {
                 <div
                    display="flex"

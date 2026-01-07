@@ -36,6 +36,7 @@ pub fn plugin(app: &mut App) {
         HierarchyPropagatePlugin::<TextFont>::new(Update),
         HierarchyPropagatePlugin::<TextColor>::new(Update),
         planetes_input::plugin,
+        component_selector::plugin,
     ))
     .init_state::<EditorMode>()
     .register_type_data::<Transform, ReflectPlanetesComponent>()
