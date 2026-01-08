@@ -1,13 +1,28 @@
-use bevy::{app::Propagate, prelude::*, reflect::TypeInfo};
+use std::any::TypeId;
+
+use bevy::{app::Propagate, ecs::reflect::ReflectCommandExt, prelude::*, reflect::TypeInfo};
 use bevy_ui_html::html;
+use planetes_scene_state::SyncCanonicalMessage;
+
+use crate::nodes::entity_viewer::{UpdateEntityViewer, ViewedBy};
 
 pub fn plugin(app: &mut App) {
-    app.add_observer(handle_open_add_component);
+    app.add_observer(handle_open_add_component)
+        .add_observer(handle_close_add_component);
 }
 #[derive(Event)]
 pub struct OpenAddComponent {
     pub entity: Entity,
 }
+
+#[derive(Event)]
+pub struct CloseAddComponent;
+
+#[derive(Component)]
+pub struct AddComponentButton(pub TypeId);
+
+#[derive(Component)]
+pub struct AddComponentModal;
 
 pub fn handle_open_add_component(
     _event: On<OpenAddComponent>,
@@ -18,7 +33,7 @@ pub fn handle_open_add_component(
     all_components
         .sort_by_cached_key(|info| info.type_path_table().crate_name().unwrap_or("Unknown"));
     commands.spawn(html! {
-        <div
+        <AddComponentModal
           display="flex"
           flex-direction="column"
           justify-content="center"
@@ -42,7 +57,12 @@ pub fn handle_open_add_component(
                 <iter>
                     {all_components.into_iter().take(25).map(|info| {
                         html!{
-                            <div display="flex" justify-content="space-between" column-gap="12px">
+                            <div
+                                display="flex"
+                                justify-content="space-between"
+                                column-gap="12px"
+                                onClick={handle_add_component}
+                                components={AddComponentButton(info.type_id())}>
                                 <span>{
                                     info.type_path_table().ident().unwrap_or("Unknown")
                                 }</span>
@@ -56,8 +76,39 @@ pub fn handle_open_add_component(
                     })}
                 </iter>
             </div>
-        </div>
+        </AddComponentModal>
     });
+}
+
+pub fn handle_close_add_component(
+    _event: On<CloseAddComponent>,
+    mut commands: Commands,
+    modals: Query<Entity, With<AddComponentModal>>,
+) {
+    for modal in modals.iter() {
+        commands.entity(modal).try_despawn();
+    }
+}
+
+pub fn handle_add_component(
+    event: On<Pointer<Click>>,
+    mut commands: Commands,
+    buttons: Query<&AddComponentButton>,
+    editing: Single<Entity, With<ViewedBy>>,
+    registry: Res<AppTypeRegistry>,
+) {
+    if let Ok(button) = buttons.get(event.entity) {
+        let entity = *editing;
+        info!("Adding component: {:?} to {:?}", button.0, entity);
+        let registry = registry.read();
+        let component_default = registry.get_type_data::<ReflectDefault>(button.0).unwrap();
+        commands.trigger(CloseAddComponent);
+        commands
+            .entity(entity)
+            .insert_reflect(component_default.default());
+        commands.write_message(SyncCanonicalMessage { entity });
+        commands.trigger(UpdateEntityViewer(entity));
+    }
 }
 
 pub fn collect_default_components(registry: &Res<AppTypeRegistry>) -> Vec<TypeInfo> {

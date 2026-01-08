@@ -98,8 +98,14 @@ fn add_meshes_to_scene(
     });
 }
 
-fn sync_scene_elements(event: On<Add, InScene>, mut commands: Commands) {
-    commands.write_message(SyncCanonicalMessage {
-        entity: event.entity,
-    });
+fn sync_scene_elements(
+    event: On<Add, InScene>,
+    scene_members: Query<Entity, (With<InScene>, Without<EditorScene>)>,
+    mut commands: Commands,
+) {
+    if scene_members.contains(event.entity) {
+        commands.write_message(SyncCanonicalMessage {
+            entity: event.entity,
+        });
+    }
 }

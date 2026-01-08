@@ -8,6 +8,7 @@ use crate::{
     prelude::*,
 };
 use bevy::{platform::collections::HashMap, prelude::*};
+use planetes_scene_state::ReflectHiddenComponent;
 
 pub fn plugin(app: &mut App) {
     app.add_systems(PostUpdate, update_tree)
@@ -176,6 +177,7 @@ pub fn select_entity(
 #[relationship(relationship_target = RepresentedBy)]
 pub struct Represents(pub Entity);
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 #[relationship_target(relationship = Represents, linked_spawn)]
+#[reflect(HiddenComponent)]
 pub struct RepresentedBy(Entity);

@@ -26,11 +26,23 @@ pub trait PlanetesComponent {}
 
 impl<T: Reflect + Component> PlanetesComponent for T {}
 
+/// Reflectable Trait to mark Components as being Hidden from the Editor
+#[reflect_trait]
+pub trait HiddenComponent {}
+
+impl<T: Reflect + Component> HiddenComponent for T {}
+
 /// Reflectable Trait to mark Bundles
 #[reflect_trait]
 pub trait PlanetesBundle {}
 
 impl<T: Reflect + Bundle> PlanetesBundle for T {}
+
+macro_rules! register_hidden_components {
+    ($app: ident, $($t:ty),*) => {
+        $app$(.register_type_data::<$t, ReflectHiddenComponent>())*;
+    };
+}
 
 /// Plugin that registers canonical scene management systems.
 pub fn plugin(app: &mut App) {
@@ -52,6 +64,7 @@ pub fn plugin(app: &mut App) {
             )
                 .chain(),
         );
+    register_hidden_components!(app, GlobalTransform, TransformTreeChanged);
 }
 
 /// The canonical "saveable" state of all editable entities.
@@ -365,9 +378,20 @@ fn sync_canonical_scene(
     let registry = world.resource::<AppTypeRegistry>().clone();
     let registry_guard = registry.read();
     let allowed_types: Vec<_> = registry_guard
-        .iter_with_data::<ReflectPlanetesComponent>()
+        .iter_with_data::<ReflectComponent>()
         .map(|(type_reg, _)| type_reg.type_id())
         .collect();
+    let allowed_types = allowed_types
+        .into_iter()
+        .filter(|ty| {
+            registry_guard
+                .get_type_data::<ReflectHiddenComponent>(*ty)
+                .is_none()
+                && registry_guard
+                    .get_type_data::<ReflectDefault>(*ty)
+                    .is_some()
+        })
+        .collect::<Vec<_>>();
 
     // Collect component data for each entity
 
@@ -405,6 +429,11 @@ fn sync_canonical_scene(
             let Some(reflected) = reflect_component.reflect(entity_ref) else {
                 continue;
             };
+
+            if reflected.is::<Children>() || reflected.is::<ChildOf>() {
+                info!("Found Children or ChildOf component");
+                continue;
+            }
 
             component_states.insert(
                 type_id,
@@ -626,14 +655,14 @@ mod tests {
     use bevy::reflect::Reflect;
 
     #[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
-    #[reflect(Component, PlanetesComponent)]
+    #[reflect(Component, PlanetesComponent, Default)]
     struct TestComponent {
         value: f32,
         name: String,
     }
 
     #[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
-    #[reflect(Component, PlanetesComponent)]
+    #[reflect(Component, PlanetesComponent, Default)]
     struct AnotherComponent {
         count: i32,
     }

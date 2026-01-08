@@ -32,7 +32,8 @@ pub fn plugin(app: &mut App) {
             on_checkbox_change,
         )
             .chain(),
-    );
+    )
+    .add_observer(handle_update_entity_viewer);
 }
 
 pub fn view() -> impl Bundle {
@@ -72,6 +73,87 @@ pub fn update_entity_viewer(
     assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
+
+    let Some(components) = canonical_scene.get_entity_components(target) else {
+        return;
+    };
+
+    info!("Found Components: {}", components.len());
+    let components = components
+        .values()
+        .filter(|component| component.name() != &"bevy_ecs::name::Name".into())
+        .map(|component| {
+            accordion::view(
+                component.name().shortname().to_string(),
+                SpawnIter(once(component_editor::base(component.type_id()))),
+                assets.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    commands
+        .entity(editor)
+        .despawn_children()
+        .with_children(move |parent| {
+            parent.spawn(html! {
+                <div
+                  display="flex"
+                  flex-direction="row"
+                  align-items={AlignItems::Center}
+                  onInput={update_name}
+                >
+                    <span>"Selected: "</span>
+                    {
+                        input_field::<String>(if let Ok(name) = names.get(target) {
+                            format!("{name}")
+                        } else {
+                            format!("{target}")
+                        })
+                    }
+                </div>
+            });
+
+            parent.spawn(html! {
+                <div
+                  display="flex"
+                  flex-direction="row"
+                  align-items={AlignItems::Center}
+                  onClick={|event: On<Pointer<Click>>, mut commands: Commands| {
+                      commands.trigger(OpenAddComponent { entity: event.entity });
+                  }}
+                >
+                    <span>"Add Component: "</span>
+                    {button::render("+")}
+                </div>
+            });
+            parent.spawn(html! {
+                <div
+                   display="flex"
+                   flex-direction="col"
+                   flex-grow="1"
+                   row-gap="4px">
+                   <iter>
+                    {components.into_iter()}
+                   </iter>
+                </div>
+            });
+        });
+}
+
+#[derive(Event)]
+pub struct UpdateEntityViewer(pub Entity);
+
+pub fn handle_update_entity_viewer(
+    event: On<UpdateEntityViewer>,
+    mut commands: Commands,
+    entity_viewer: Single<(Entity, &Viewing), With<EntityEditor>>,
+    names: Query<&Name>,
+    canonical_scene: Res<CanonicalScene>,
+    assets: Res<AssetServer>,
+) {
+    let (editor, &Viewing(target)) = *entity_viewer;
+    if event.0 != target {
+        return;
+    }
 
     let Some(components) = canonical_scene.get_entity_components(target) else {
         return;

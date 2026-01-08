@@ -381,8 +381,8 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         .iter()
         .zip(reflect_struct.iter_fields())
         .map(|(field, value)| {
-            let value = value.reflect_clone().unwrap();
             let type_info = field.clone().type_info();
+            let value = value.to_dynamic();
             let input = type_info.and_then(|type_info| match type_info {
                 TypeInfo::Opaque(info) => Some(info),
                 _ => None,
