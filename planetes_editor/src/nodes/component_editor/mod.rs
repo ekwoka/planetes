@@ -2,9 +2,9 @@
 use std::any::TypeId;
 
 use crate::{
-    atoms::{check_box, input_field},
+    atoms::{button, check_box, input_field},
     editor_ui::Capitalize,
-    nodes::entity_viewer::ViewedBy,
+    nodes::entity_viewer::{UpdateEntityViewer, ViewedBy},
     prelude::*,
 };
 use bevy::{
@@ -17,7 +17,7 @@ use bevy::{
     reflect::{EnumInfo, OpaqueInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 use planetes_input::prelude::*;
-use planetes_scene_state::CanonicalScene;
+use planetes_scene_state::{CanonicalScene, SyncCanonicalMessage};
 
 pub fn plugin(app: &mut App) {
     app.add_systems(PreUpdate, update_component_editor);
@@ -77,10 +77,14 @@ pub fn base(type_id: TypeId) -> impl Bundle {
     }
 }
 
+#[derive(Component)]
+pub struct RemoveComponentButton(pub TypeId);
+
 /// Builds out the full Component Editor with content
 pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     html! {
-        <div width="100%" onenter={handle_commit}>
+        <div display="flex" flex-direction="column" row-gap="2px" width="100%" onenter={handle_commit}>
+            <div onClick={handle_remove_component} components={RemoveComponentButton(type_info.type_id())}>{button::render("Remove X")}</div>
             <with>
             {
                 match type_info {
@@ -102,6 +106,26 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
             }
             </with>
         </div>
+    }
+}
+
+pub fn handle_remove_component(
+    event: On<Pointer<Click>>,
+    mut commands: Commands,
+    buttons: Query<&RemoveComponentButton>,
+    editing: Single<Entity, With<ViewedBy>>,
+    world: &World,
+) {
+    if let Ok(button) = buttons.get(event.entity) {
+        let entity = *editing;
+        info!("Removing component: {:?} from {:?}", button.0, entity);
+        if let Some(component_id) = world.components().get_id(button.0) {
+            commands.entity(entity).remove_by_id(component_id);
+            commands.write_message(SyncCanonicalMessage { entity });
+            commands.trigger(UpdateEntityViewer(entity));
+        } else {
+            error!("Component to remove is not a valid component");
+        }
     }
 }
 
