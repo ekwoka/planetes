@@ -1,4 +1,7 @@
 //! Renders the UI for editing components
+pub mod component_ui;
+pub use component_ui::*;
+
 use std::any::TypeId;
 
 use crate::{
@@ -41,12 +44,29 @@ pub fn update_component_editor(
             continue;
         };
 
-        let reflected = reflected.data.to_dynamic();
+        let reflected = &reflected.data;
 
-        commands
-            .entity(editor)
-            .despawn_children()
-            .with_child(full(type_info.clone(), reflected));
+        if let Some(editor_view) = registry.get_type_data::<ReflectEditorView>(type_id) {
+            let Some(reflected) = reflected.try_as_reflect() else {
+                warn!("Not reflectable");
+                continue;
+            };
+            let Some(component_with_view) = editor_view.get(&*reflected) else {
+                warn!("Not Editor View");
+                continue;
+            };
+            commands
+                .entity(editor)
+                .despawn_children()
+                .with_children(|parent| {
+                    component_with_view.add_to_parent(parent);
+                });
+        } else {
+            commands
+                .entity(editor)
+                .despawn_children()
+                .with_child(full(type_info.clone(), reflected.to_dynamic()));
+        };
     }
 }
 

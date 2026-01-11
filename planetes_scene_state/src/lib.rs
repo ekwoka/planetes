@@ -435,15 +435,19 @@ fn sync_canonical_scene(
                 continue;
             }
 
-            component_states.insert(
-                type_id,
-                CanonicalComponentState {
-                    id: component_info.id(),
+            if let Ok(reflected) = reflected.reflect_clone() {
+                component_states.insert(
                     type_id,
-                    name: component_info.name(),
-                    data: reflected.to_dynamic(),
-                },
-            );
+                    CanonicalComponentState {
+                        id: component_info.id(),
+                        type_id,
+                        name: component_info.name(),
+                        data: reflected,
+                    },
+                );
+            } else {
+                warn!("Component not Clonable");
+            };
         }
         world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
             canonical.insert_entity(entity, component_states);
