@@ -17,6 +17,7 @@ pub fn plugin(app: &mut App) {
         .add_systems(OnEnter(EditorMode::Edit), load_scene)
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(Update, add_meshes_to_scene)
+        .add_systems(Update, on_load)
         .add_observer(sync_scene_elements);
 }
 
@@ -80,6 +81,33 @@ pub fn load_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
         ))
         .id();
     commands.write_message(UpdateSceneTree { entity: scene_root });
+}
+
+pub fn on_load(
+    mut events: MessageReader<AssetEvent<DynamicScene>>,
+    assets: Res<Assets<DynamicScene>>,
+) {
+    for event in events.read() {
+        match event {
+            AssetEvent::Added { id } => {
+                info!("Scene added {id}");
+            }
+            AssetEvent::LoadedWithDependencies { id } => {
+                info!("Scene Loaded {id}");
+                if let Some(scene) = assets.get(*id) {
+                    info!("Scene Available");
+                    info!("With {} Entities", scene.entities.len());
+                    for entity in scene.entities.iter() {
+                        info!("   Entity: {}", entity.entity);
+                        info!("   With {} Components", entity.components.len());
+                    }
+                }
+            }
+            _ => {
+                info!("{event:?}");
+            }
+        }
+    }
 }
 
 fn add_meshes_to_scene(

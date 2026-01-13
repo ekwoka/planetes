@@ -13,7 +13,7 @@
     ),
     4294967161: (
       components: {
-      "bevy_ecs::name::Name": "Branch",
+        "bevy_ecs::name::Name": "Branch",
         "bevy_ecs::hierarchy::ChildOf": (4294967167),
         "bevy_ecs::hierarchy::Children": ([
           4294967160,
