@@ -53,19 +53,18 @@ pub fn plugin(app: &mut App) {
         .add_message::<Undo>()
         .add_message::<Redo>()
         .add_message::<SyncCanonicalMessage>()
-        // .add_systems(
-        //     Update,
-        //     (
-        //         sync_canonical_scene,
-        //         collect_edit_history,
-        //         apply_edit_messages,
-        //         handle_undo,
-        //         handle_redo,
-        //         update_scene_from_state.run_if(resource_changed::<CanonicalScene>),
-        //     )
-        //         .chain(),
-        // )
-;
+        .add_systems(
+            Update,
+            (
+                // sync_canonical_scene,
+                // collect_edit_history,
+                apply_edit_messages,
+                // handle_undo,
+                // handle_redo,
+                // update_scene_from_state.run_if(resource_changed::<CanonicalScene>),
+            )
+                .chain(),
+        );
     register_hidden_components!(app, GlobalTransform, TransformTreeChanged);
 }
 
@@ -160,23 +159,44 @@ impl CanonicalScene {
     }
 
     /// Returns mutable access to the canonical data for a specific component.
-    pub fn get_component_mut_by_id(
-        &mut self,
+    pub fn get_component_mut_by_id<'a>(
+        &self,
+        assets: &'a mut Assets<DynamicScene>,
         entity: Entity,
         type_id: TypeId,
-    ) -> Option<&mut CanonicalComponentState> {
-        None
-        // self.entities.get_mut(&entity).and_then(|state| {
-        //     state.changed = true;
-        //     state.components.get_mut(&type_id)
-        // })
+    ) -> Option<&'a mut dyn PartialReflect> {
+        assets
+            .get_mut(&self.handle)
+            .and_then(|scene| scene.entities.iter_mut().find(|e| e.entity == entity))
+            .and_then(|entity| {
+                entity.components.iter_mut().find(|c| {
+                    c.as_ref()
+                        .get_represented_type_info()
+                        .map(|info| info.type_id() == type_id)
+                        .unwrap_or_default()
+                })
+            })
+            .map(|component| component.as_mut())
     }
 
-    pub fn get_component_mut<T: Component + 'static>(
-        &mut self,
+    pub fn get_component_mut<'a, T: Component + FromReflect + 'static>(
+        &self,
+        assets: &'a mut Assets<DynamicScene>,
         entity: Entity,
-    ) -> Option<&mut CanonicalComponentState> {
-        self.get_component_mut_by_id(entity, TypeId::of::<T>())
+    ) -> Option<&'a mut T> {
+        assets
+            .get_mut(&self.handle)
+            .and_then(|scene| scene.entities.iter_mut().find(|e| e.entity == entity))
+            .and_then(|entity| {
+                entity.components.iter_mut().find(|c| {
+                    c.as_ref()
+                        .get_represented_type_info()
+                        .map(|info| info.type_id() == TypeId::of::<T>())
+                        .unwrap_or_default()
+                })
+            })
+            .and_then(|c| c.as_mut().try_as_reflect_mut())
+            .and_then(|c| c.downcast_mut::<T>())
     }
 
     pub fn insert_entity(
@@ -500,48 +520,49 @@ pub struct SyncCanonicalMessage {
 //     }
 // }
 
-// /// System that applies edit messages to the canonical scene.
-// fn apply_edit_messages(
-//     mut messages: MessageReader<ApplyEdit>,
-//     mut canonical_scene: ResMut<CanonicalScene>,
-// ) {
-//     for msg in messages.read() {
-//         let Some(component_data) =
-//             canonical_scene.get_component_mut_by_id(msg.entity, msg.component_type)
-//         else {
-//             warn!(
-//                 "Cannot apply edit: no canonical data for entity {:?} component {:?}",
-//                 msg.entity, msg.component_type
-//             );
-//             continue;
-//         };
+/// System that applies edit messages to the canonical scene.
+fn apply_edit_messages(
+    mut messages: MessageReader<ApplyEdit>,
+    mut assets: ResMut<Assets<DynamicScene>>,
+    canonical_scene: Res<CanonicalScene>,
+) {
+    for msg in messages.read() {
+        let Some(component_data) =
+            canonical_scene.get_component_mut_by_id(&mut assets, msg.entity, msg.component_type)
+        else {
+            warn!(
+                "Cannot apply edit: no canonical data for entity {:?} component {:?}",
+                msg.entity, msg.component_type
+            );
+            continue;
+        };
 
-//         // Apply new value
-//         let apply_result = if msg.field_path.is_empty() {
-//             component_data.data.apply(msg.new_value.as_ref());
-//             Ok(())
-//         } else {
-//             msg.field_path
-//                 .as_str()
-//                 .reflect_element_mut(component_data.data.as_mut())
-//                 .map(|field| field.apply(msg.new_value.as_ref()))
-//         };
+        // Apply new value
+        let apply_result = if msg.field_path.is_empty() {
+            component_data.apply(msg.new_value.as_ref());
+            Ok(())
+        } else {
+            msg.field_path
+                .as_str()
+                .reflect_element_mut(component_data)
+                .map(|field| field.apply(msg.new_value.as_ref()))
+        };
 
-//         if let Err(e) = apply_result {
-//             warn!(
-//                 "Cannot apply edit to field path '{}': {:?}",
-//                 msg.field_path, e
-//             );
-//             continue;
-//         }
+        if let Err(e) = apply_result {
+            warn!(
+                "Cannot apply edit to field path '{}': {:?}",
+                msg.field_path, e
+            );
+            continue;
+        }
 
-//         // Record in history
-//         info!(
-//             "Applied edit to {:?}.{} on entity {:?}",
-//             msg.component_type, msg.field_path, msg.entity
-//         );
-//     }
-// }
+        // Record in history
+        info!(
+            "Applied edit to {:?}.{} on entity {:?}",
+            msg.component_type, msg.field_path, msg.entity
+        );
+    }
+}
 
 // /// Collects all edit events and records them in the history, to provide Undo/Redo functionality.
 // fn collect_edit_history(
@@ -697,7 +718,10 @@ pub struct SyncCanonicalMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::reflect::Reflect;
+    use bevy::{
+        reflect::Reflect,
+        scene::{ScenePlugin, scene_spawner_system},
+    };
 
     #[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
     #[reflect(Component, PlanetesComponent, Default)]
@@ -715,8 +739,12 @@ mod tests {
     fn setup_test_app() -> App {
         use bevy::scene::DynamicEntity;
         let mut app = App::new();
-        app.add_plugins((MinimalPlugins, AssetPlugin::default(), plugin))
-            .init_asset::<DynamicScene>();
+        app.add_plugins((
+            MinimalPlugins,
+            AssetPlugin::default(),
+            ScenePlugin::default(),
+            plugin,
+        ));
 
         app.world_mut()
             .resource_scope(|world, server: Mut<AssetServer>| {
@@ -732,10 +760,14 @@ mod tests {
                 };
                 let handle = server.add(scene);
                 world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
-                    canonical.insert(handle);
+                    canonical.insert(handle.clone());
                 });
+                world.spawn(DynamicSceneRoot(handle));
             });
-        app.update();
+        app.world_mut().flush();
+        for _ in 0..16 {
+            app.update();
+        }
         app
     }
 
@@ -821,223 +853,102 @@ mod tests {
                 }
                 _ => panic!("Unexpected component type"),
             }
+
+            assert!(
+                canonical
+                    .get_component::<Children>(&assets, entity)
+                    .is_none()
+            );
         }
     }
 
-    //     #[test]
-    //     fn syncs_entity_and_children() {
-    //         let mut app = setup_test_app();
+    #[test]
+    fn edit_overwrites_canonical_value() {
+        let mut app = setup_test_app();
+        let entity = Entity::from_bits(4294967160);
+        {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                panic!("Failed to get Server");
+            };
 
-    //         let parent = app
-    //             .world_mut()
-    //             .spawn(TestComponent {
-    //                 value: 42.0,
-    //                 name: "test".to_string(),
-    //             })
-    //             .id();
+            let Some(canonical) = app.world().get_resource_ref::<CanonicalScene>() else {
+                panic!("Failed to get CanonicalScene");
+            };
 
-    //         let child = app
-    //             .world_mut()
-    //             .spawn((
-    //                 TestComponent {
-    //                     value: 40.0,
-    //                     name: "child".to_string(),
-    //                 },
-    //                 ChildOf(parent),
-    //             ))
-    //             .id();
+            let component = canonical
+                .get_component::<TestComponent>(&assets, entity)
+                .unwrap();
+            assert_eq!(component.value, 42.0);
+        }
 
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity: parent });
-    //         app.update();
+        app.update();
 
-    //         let canonical = app.world().resource::<CanonicalScene>();
-    //         let retrieved_parent = canonical.get_component::<TestComponent>(parent);
-    //         assert!(retrieved_parent.is_some());
+        app.world_mut().write_message(ApplyEdit {
+            entity,
+            component_type: TypeId::of::<TestComponent>(),
+            field_path: "value".to_string(),
+            new_value: Box::new(99.0f32),
+        });
 
-    //         let retrieved_child = canonical.get_component::<TestComponent>(child);
-    //         assert!(retrieved_child.is_some());
+        app.update();
 
-    //         let value_field = "value"
-    //             .reflect_element(retrieved_parent.unwrap().data.as_ref())
-    //             .unwrap();
-    //         assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&42.0));
+        {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                panic!("Failed to get Server");
+            };
 
-    //         let value_field = "value"
-    //             .reflect_element(retrieved_child.unwrap().data.as_ref())
-    //             .unwrap();
-    //         assert_eq!(value_field.try_downcast_ref::<f32>(), Some(&40.0));
-    //     }
+            let Some(canonical) = app.world().get_resource_ref::<CanonicalScene>() else {
+                panic!("Failed to get CanonicalScene");
+            };
 
-    //     #[test]
-    //     fn get_nonexistent_component_returns_none() {
-    //         let mut app = setup_test_app();
+            let component = canonical
+                .get_component::<TestComponent>(&assets, entity)
+                .unwrap();
+            assert_eq!(component.value, 99.0);
+        }
+    }
 
-    //         let entity = app.world_mut().spawn_empty().id();
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
+    #[test]
+    fn edit_applies_to_live_entity() {
+        let mut app = setup_test_app();
 
-    //         let canonical = app.world().resource::<CanonicalScene>();
-    //         assert!(canonical.get_component::<TestComponent>(entity).is_none());
-    //     }
+        {
+            let mut query = app.world_mut().query::<&TestComponent>();
+            let component = query.single(&app.world()).unwrap();
+            assert_eq!(component.value, 42.0);
+            app.world_mut().write_message(ApplyEdit {
+                entity: Entity::from_bits(4294967160),
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(99.0f32),
+            });
+        }
 
-    //     #[test]
-    //     fn contains_entity_after_sync() {
-    //         let mut app = setup_test_app();
+        for _ in 0..16 {
+            app.update();
+        }
 
-    //         let entity = app.world_mut().spawn(TestComponent::default()).id();
+        {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                panic!("Failed to get Server");
+            };
 
-    //         let other_entity = app.world_mut().spawn_empty().id();
+            let Some(canonical) = app.world().get_resource_ref::<CanonicalScene>() else {
+                panic!("Failed to get CanonicalScene");
+            };
 
-    //         {
-    //             let canonical = app.world().resource::<CanonicalScene>();
-    //             assert!(!canonical.contains_entity(entity));
-    //             assert!(!canonical.contains_entity(other_entity));
-    //         }
+            let component = canonical
+                .get_component::<TestComponent>(&assets, Entity::from_bits(4294967160))
+                .unwrap();
+            assert_eq!(component.value, 99.0);
+        }
 
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.world_mut().write_message(SyncCanonicalMessage {
-    //             entity: other_entity,
-    //         });
-    //         app.update();
-
-    //         let canonical = app.world().resource::<CanonicalScene>();
-    //         assert!(canonical.contains_entity(entity));
-    //         assert!(canonical.contains_entity(other_entity));
-    //     }
-
-    //     #[test]
-    //     fn get_entity_components_returns_all_synced() {
-    //         let mut app = setup_test_app();
-
-    //         let entity = app
-    //             .world_mut()
-    //             .spawn((TestComponent::default(), AnotherComponent::default()))
-    //             .id();
-
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
-
-    //         let canonical = app.world().resource::<CanonicalScene>();
-    //         let components = canonical.get_entity_components(entity);
-    //         assert!(components.is_some());
-
-    //         let components = components.unwrap();
-    //         assert_eq!(components.len(), 2);
-    //         assert!(components.contains_key(&TypeId::of::<TestComponent>()));
-    //         assert!(components.contains_key(&TypeId::of::<AnotherComponent>()));
-    //     }
-
-    //     #[test]
-    //     fn multiple_entities_independent() {
-    //         let mut app = setup_test_app();
-
-    //         let entity1 = app
-    //             .world_mut()
-    //             .spawn(TestComponent {
-    //                 value: 1.0,
-    //                 name: "first".to_string(),
-    //             })
-    //             .id();
-
-    //         let entity2 = app
-    //             .world_mut()
-    //             .spawn(TestComponent {
-    //                 value: 2.0,
-    //                 name: "second".to_string(),
-    //             })
-    //             .id();
-
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity: entity1 });
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity: entity2 });
-    //         app.update();
-
-    //         let canonical = app.world().resource::<CanonicalScene>();
-    //         let comp1 = canonical.get_component::<TestComponent>(entity1).unwrap();
-    //         let comp2 = canonical.get_component::<TestComponent>(entity2).unwrap();
-
-    //         let value1 = "value"
-    //             .reflect_element(comp1.data.as_ref())
-    //             .unwrap()
-    //             .try_downcast_ref::<f32>();
-    //         let value2 = "value"
-    //             .reflect_element(comp2.data.as_ref())
-    //             .unwrap()
-    //             .try_downcast_ref::<f32>();
-
-    //         assert_eq!(value1, Some(&1.0));
-    //         assert_eq!(value2, Some(&2.0));
-    //     }
-
-    //     #[test]
-    //     fn edit_overwrites_canonical_value() {
-    //         let mut app = setup_test_app();
-
-    //         let entity = app
-    //             .world_mut()
-    //             .spawn(TestComponent {
-    //                 value: 1.0,
-    //                 name: "original".to_string(),
-    //             })
-    //             .id();
-
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
-
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(99.0f32),
-    //         });
-    //         app.update();
-
-    //         let canonical = app.world().resource::<CanonicalScene>();
-    //         let retrieved = canonical.get_component::<TestComponent>(entity).unwrap();
-    //         let value = "value"
-    //             .reflect_element(retrieved.data.as_ref())
-    //             .unwrap()
-    //             .try_downcast_ref::<f32>();
-    //         assert_eq!(value, Some(&99.0));
-    //     }
-
-    //     #[test]
-    //     fn edit_applies_to_live_entity() {
-    //         let mut app = setup_test_app();
-
-    //         let entity = app
-    //             .world_mut()
-    //             .spawn(TestComponent {
-    //                 value: 1.0,
-    //                 name: "original".to_string(),
-    //             })
-    //             .id();
-
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
-
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(99.0f32),
-    //         });
-    //         app.update();
-
-    //         let retrieved = app
-    //             .world()
-    //             .entity(entity)
-    //             .get_components::<&TestComponent>()
-    //             .unwrap();
-    //         assert_eq!(retrieved.value, 99.0);
-    //     }
+        {
+            let mut query = app.world_mut().query::<&TestComponent>();
+            let component = query.single(&app.world()).unwrap();
+            assert_eq!(component.value, 99.0);
+        }
+    }
 
     //     #[test]
     //     fn edit_syncs_all_data_on_entity() {
