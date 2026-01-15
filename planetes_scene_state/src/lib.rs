@@ -52,16 +52,13 @@ pub fn plugin(app: &mut App) {
         .add_message::<ApplyEdit>()
         .add_message::<Undo>()
         .add_message::<Redo>()
-        .add_message::<SyncCanonicalMessage>()
         .add_systems(
             Update,
             (
-                // sync_canonical_scene,
                 collect_edit_history,
                 apply_edit_messages,
                 handle_undo,
                 handle_redo,
-                // update_scene_from_state.run_if(resource_changed::<CanonicalScene>),
             )
                 .chain(),
         );
@@ -413,113 +410,6 @@ pub struct Undo;
 #[derive(Message)]
 pub struct Redo;
 
-/// Message to request syncing canonical state from live entities.
-///
-/// This is typically sent when an entity is first selected for editing,
-/// to populate the canonical scene with the current live state.
-#[derive(Message)]
-pub struct SyncCanonicalMessage {
-    /// The entity to sync.
-    pub entity: Entity,
-}
-
-// /// Exclusive system that syncs canonical state from live entities when requested.
-// ///
-// /// This is an exclusive system because it needs both world access for entity
-// /// inspection and mutable access to the CanonicalScene resource.
-// fn sync_canonical_scene(
-//     world: &mut World,
-//     params: &mut SystemState<MessageReader<SyncCanonicalMessage>>,
-// ) {
-//     let mut messages = params.get_mut(world);
-//     // Collect entity IDs first
-//     let mut entities: Vec<Entity> = messages.read().map(|m| m.entity).collect();
-
-//     if entities.is_empty() {
-//         return;
-//     }
-
-//     // Get allowed types from registry
-//     let registry = world.resource::<AppTypeRegistry>().clone();
-//     let registry_guard = registry.read();
-//     let allowed_types: Vec<_> = registry_guard
-//         .iter_with_data::<ReflectComponent>()
-//         .map(|(type_reg, _)| type_reg.type_id())
-//         .collect();
-//     let allowed_types = allowed_types
-//         .into_iter()
-//         .filter(|ty| {
-//             registry_guard
-//                 .get_type_data::<ReflectHiddenComponent>(*ty)
-//                 .is_none()
-//                 && registry_guard
-//                     .get_type_data::<ReflectDefault>(*ty)
-//                     .is_some()
-//         })
-//         .collect::<Vec<_>>();
-
-//     // Collect component data for each entity
-
-//     while let Some(entity) = entities.pop() {
-//         let Ok(entity_ref) = world.get_entity(entity) else {
-//             continue;
-//         };
-
-//         if let Some(children) = entity_ref.get_components::<&Children>() {
-//             entities.extend(children.iter());
-//         }
-
-//         let Ok(components) = world.inspect_entity(entity) else {
-//             continue;
-//         };
-
-//         let mut component_states: HashMap<TypeId, CanonicalComponentState> = HashMap::new();
-//         for component_info in components {
-//             let Some(type_id) = component_info.type_id() else {
-//                 continue;
-//             };
-
-//             if !allowed_types.contains(&type_id) {
-//                 continue;
-//             }
-
-//             let Some(registration) = registry_guard.get(type_id) else {
-//                 continue;
-//             };
-
-//             let Some(reflect_component) = registration.data::<ReflectComponent>() else {
-//                 continue;
-//             };
-
-//             let Some(reflected) = reflect_component.reflect(entity_ref) else {
-//                 continue;
-//             };
-
-//             if reflected.is::<Children>() || reflected.is::<ChildOf>() {
-//                 info!("Found Children or ChildOf component");
-//                 continue;
-//             }
-
-//             if let Ok(reflected) = reflected.reflect_clone() {
-//                 component_states.insert(
-//                     type_id,
-//                     CanonicalComponentState {
-//                         id: component_info.id(),
-//                         type_id,
-//                         name: component_info.name(),
-//                         data: reflected,
-//                     },
-//                 );
-//             } else {
-//                 warn!("Component not Clonable");
-//             };
-//         }
-//         world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
-//             canonical.insert_entity(entity, component_states);
-//         });
-//     }
-// }
-
 /// System that applies edit messages to the canonical scene.
 fn apply_edit_messages(
     mut messages: MessageReader<ApplyEdit>,
@@ -696,29 +586,6 @@ fn handle_redo(
         info!("Redo applied");
     }
 }
-
-// /// When the [CanonicalScene] changes (due to edits, undo/redo, or whatever), the live scene needs to be updated to reflect the differences.
-// fn update_scene_from_state(world: &mut World) {
-//     world.resource_scope(|world, mut canonical_scene: Mut<CanonicalScene>| {
-//         // for state in canonical_scene
-//         //     .entities
-//         //     .values_mut()
-//         //     .filter(|state| state.changed)
-//         // {
-//         //     for (type_id, data) in state.components.iter() {
-//         //         if let Ok(mut component) = world.get_reflect_mut(state.entity, *type_id)
-//         //             && let Err(e) = component.try_apply(data.data.as_ref())
-//         //         {
-//         //             warn!(
-//         //                 "Cannot update component of type {:?} for entity {:?}: {:?}",
-//         //                 type_id, state.entity, e
-//         //             );
-//         //         };
-//         //     }
-//         //     state.changed = false;
-//         // }
-//     });
-// }
 
 #[cfg(test)]
 mod tests {
