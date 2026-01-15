@@ -57,9 +57,9 @@ pub fn plugin(app: &mut App) {
             Update,
             (
                 // sync_canonical_scene,
-                // collect_edit_history,
+                collect_edit_history,
                 apply_edit_messages,
-                // handle_undo,
+                handle_undo,
                 // handle_redo,
                 // update_scene_from_state.run_if(resource_changed::<CanonicalScene>),
             )
@@ -564,87 +564,90 @@ fn apply_edit_messages(
     }
 }
 
-// /// Collects all edit events and records them in the history, to provide Undo/Redo functionality.
-// fn collect_edit_history(
-//     mut messages: MessageReader<ApplyEdit>,
-//     mut history: ResMut<EditHistory>,
-//     canonical_scene: ResMut<CanonicalScene>,
-// ) {
-//     if messages.is_empty() {
-//         return;
-//     }
+/// Collects all edit events and records them in the history, to provide Undo/Redo functionality.
+fn collect_edit_history(
+    mut messages: MessageReader<ApplyEdit>,
+    mut history: ResMut<EditHistory>,
+    assets: Res<Assets<DynamicScene>>,
+    canonical_scene: Res<CanonicalScene>,
+) {
+    if messages.is_empty() {
+        return;
+    }
 
-//     history.extend(messages.read().filter_map(|msg| {
-//         canonical_scene
-//             .get_component_by_id(msg.entity, msg.component_type)
-//             .and_then(|component_state| {
-//                 if msg.field_path.is_empty() {
-//                     Some(component_state.to_dynamic())
-//                 } else {
-//                     match msg.field_path.as_str().reflect_element(component_state) {
-//                         Ok(field) => Some(field.to_dynamic()),
-//                         Err(e) => {
-//                             warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
-//                             None
-//                         }
-//                     }
-//                 }
-//             })
-//             .map(|old_value| EditOp {
-//                 entity: msg.entity,
-//                 component_type: msg.component_type,
-//                 field_path: msg.field_path.clone(),
-//                 old_value,
-//                 new_value: msg.new_value.to_dynamic(),
-//             })
-//     }));
-// }
+    history.extend(messages.read().filter_map(|msg| {
+        canonical_scene
+            .get_component_by_id(&assets, msg.entity, msg.component_type)
+            .and_then(|component_state| {
+                if msg.field_path.is_empty() {
+                    Some(component_state.to_dynamic())
+                } else {
+                    match msg.field_path.as_str().reflect_element(component_state) {
+                        Ok(field) => Some(field.to_dynamic()),
+                        Err(e) => {
+                            warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
+                            None
+                        }
+                    }
+                }
+            })
+            .map(|old_value| EditOp {
+                entity: msg.entity,
+                component_type: msg.component_type,
+                field_path: msg.field_path.clone(),
+                old_value,
+                new_value: msg.new_value.to_dynamic(),
+            })
+    }));
+}
 
-// /// System that handles undo requests.
-// fn handle_undo(
-//     mut messages: MessageReader<Undo>,
-//     mut canonical: ResMut<CanonicalScene>,
-//     mut history: ResMut<EditHistory>,
-// ) {
-//     for _ in messages.read() {
-//         let Some(op) = history.pop_undo() else {
-//             info!("Nothing to undo");
-//             continue;
-//         };
+/// System that handles undo requests.
+fn handle_undo(
+    mut messages: MessageReader<Undo>,
+    mut assets: ResMut<Assets<DynamicScene>>,
+    canonical_scene: Res<CanonicalScene>,
+    mut history: ResMut<EditHistory>,
+) {
+    for _ in messages.read() {
+        let Some(op) = history.pop_undo() else {
+            info!("Nothing to undo");
+            continue;
+        };
 
-//         let Some(component_data) = canonical.get_component_mut_by_id(op.entity, op.component_type)
-//         else {
-//             warn!(
-//                 "Cannot undo: no canonical data for entity {:?} component {:?}",
-//                 op.entity, op.component_type
-//             );
-//             continue;
-//         };
+        let Some(component_data) =
+            canonical_scene.get_component_mut_by_id(&mut assets, op.entity, op.component_type)
+        else {
+            warn!(
+                "Cannot undo: no canonical data for entity {:?} component {:?}",
+                op.entity, op.component_type
+            );
+            continue;
+        };
 
-//         // Apply old value (reverse the edit)
-//         let apply_result = if op.field_path.is_empty() {
-//             component_data.data.apply(op.old_value.as_ref());
-//             Ok(())
-//         } else {
-//             op.field_path
-//                 .as_str()
-//                 .reflect_element_mut(component_data.data.as_mut())
-//                 .map(|field| field.apply(op.old_value.as_ref()))
-//         };
+        // Apply old value (reverse the edit)
+        let apply_result = if op.field_path.is_empty() {
+            component_data.apply(op.old_value.as_ref());
+            Ok(())
+        } else {
+            op.field_path
+                .as_str()
+                .reflect_element_mut(component_data)
+                .map(|field| field.apply(op.old_value.as_ref()))
+        };
 
-//         if let Err(e) = apply_result {
-//             warn!(
-//                 "Cannot undo edit to field path '{}': {:?}",
-//                 op.field_path, e
-//             );
-//             continue;
-//         }
+        if let Err(e) = apply_result {
+            warn!(
+                "Cannot undo edit to field path '{}': {:?}",
+                op.field_path, e
+            );
+            continue;
+        }
 
-//         // Move to redo stack
-//         history.push_redo(op);
-//         info!("Undo applied");
-//     }
-// }
+        // Move to redo stack
+        history.push_redo(op);
+        info!("Undo applied");
+    }
+}
 
 // /// System that handles redo requests.
 // fn handle_redo(
@@ -950,183 +953,117 @@ mod tests {
         }
     }
 
-    //     #[test]
-    //     fn edit_syncs_all_data_on_entity() {
-    //         let mut app = setup_test_app();
+    mod edit_history {
+        use super::*;
 
-    //         let entity = app
-    //             .world_mut()
-    //             .spawn(TestComponent {
-    //                 value: 1.0,
-    //                 name: "original".to_string(),
-    //             })
-    //             .id();
+        const ENTITY: Entity = Entity::from_bits(4294967160);
 
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
+        #[test]
+        fn edit_adds_to_undo_stack() {
+            let mut app = setup_test_app();
 
-    //         let mut entity_ref = app.world_mut().entity_mut(entity);
-    //         let mut retrieved = entity_ref.get_mut::<TestComponent>().unwrap();
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(!history.can_undo());
+            }
 
-    //         retrieved.name = "edited".to_string();
+            app.world_mut().write_message(ApplyEdit {
+                entity: ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(1.0f32),
+            });
+            app.update();
 
-    //         app.update();
+            let history = app.world().resource::<EditHistory>();
+            assert!(history.can_undo());
+            assert!(!history.can_redo());
+            assert!(history.undo_stack.len() == 1);
+            let edit_op = history.undo_stack.get(0).unwrap();
+            assert_eq!(edit_op.entity, ENTITY);
+            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+            assert_eq!(edit_op.field_path, "value".to_string());
+            assert_eq!(
+                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&42.0f32)
+            );
+            assert_eq!(
+                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                Some(&1.0f32)
+            );
+        }
 
-    //         let retrieved = app
-    //             .world()
-    //             .entity(entity)
-    //             .get_components::<&TestComponent>()
-    //             .unwrap();
+        #[test]
+        fn new_edit_clears_redo_stack() {
+            let mut app = setup_test_app();
 
-    //         assert_eq!(retrieved.name, "edited".to_string());
-    //         assert_eq!(retrieved.value, 1.0);
+            app.world_mut().write_message(ApplyEdit {
+                entity: ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(1.0f32),
+            });
+            app.update();
 
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(99.0f32),
-    //         });
-    //         app.update();
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(!history.can_redo());
+            }
 
-    //         let retrieved = app
-    //             .world()
-    //             .entity(entity)
-    //             .get_components::<&TestComponent>()
-    //             .unwrap();
-    //         assert_eq!(retrieved.name, "original".to_string());
-    //         assert_eq!(retrieved.value, 99.0);
-    //     }
-    // }
+            app.world_mut().write_message(Undo);
+            app.update();
 
-    // mod edit_history {
-    //     use super::*;
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(history.can_redo());
+            }
 
-    //     #[test]
-    //     fn edit_adds_to_undo_stack() {
-    //         let mut app = setup_test_app();
+            app.world_mut().write_message(ApplyEdit {
+                entity: ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(3.0f32),
+            });
+            app.update();
 
-    //         let entity = app.world_mut().spawn(TestComponent::default()).id();
+            let history = app.world().resource::<EditHistory>();
+            assert!(!history.can_redo());
+        }
 
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
+        #[test]
+        fn clear_history_removes_all() {
+            let mut app = setup_test_app();
 
-    //         {
-    //             let history = app.world().resource::<EditHistory>();
-    //             assert!(!history.can_undo());
-    //         }
+            app.world_mut().write_message(ApplyEdit {
+                entity: ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(1.0f32),
+            });
+            app.update();
 
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(1.0f32),
-    //         });
-    //         app.update();
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(history.can_undo());
+                assert!(!history.can_redo());
+            }
 
-    //         let history = app.world().resource::<EditHistory>();
-    //         assert!(history.can_undo());
-    //         assert!(!history.can_redo());
-    //         assert!(history.undo_stack.len() == 1);
-    //         let edit_op = history.undo_stack.get(0).unwrap();
-    //         assert_eq!(edit_op.entity, entity);
-    //         assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
-    //         assert_eq!(edit_op.field_path, "value".to_string());
-    //         assert_eq!(
-    //             edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
-    //             Some(&0.0f32)
-    //         );
-    //         assert_eq!(
-    //             edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
-    //             Some(&1.0f32)
-    //         );
-    //     }
+            app.world_mut().write_message(Undo);
+            app.update();
 
-    //     #[test]
-    //     fn new_edit_clears_redo_stack() {
-    //         let mut app = setup_test_app();
+            {
+                let history = app.world().resource::<EditHistory>();
+                assert!(history.can_redo());
+                assert!(!history.can_undo());
+            }
 
-    //         let entity = app.world_mut().spawn(TestComponent::default()).id();
+            app.world_mut().resource_mut::<EditHistory>().clear();
 
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
-
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(1.0f32),
-    //         });
-    //         app.update();
-
-    //         {
-    //             let history = app.world().resource::<EditHistory>();
-    //             assert!(!history.can_redo());
-    //         }
-
-    //         app.world_mut().write_message(Undo);
-    //         app.update();
-
-    //         {
-    //             let history = app.world().resource::<EditHistory>();
-    //             assert!(history.can_redo());
-    //         }
-
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(3.0f32),
-    //         });
-    //         app.update();
-
-    //         let history = app.world().resource::<EditHistory>();
-    //         assert!(!history.can_redo());
-    //     }
-
-    //     #[test]
-    //     fn clear_history_removes_all() {
-    //         let mut app = setup_test_app();
-
-    //         let entity = app.world_mut().spawn(TestComponent::default()).id();
-
-    //         app.world_mut()
-    //             .write_message(SyncCanonicalMessage { entity });
-    //         app.update();
-
-    //         app.world_mut().write_message(ApplyEdit {
-    //             entity,
-    //             component_type: TypeId::of::<TestComponent>(),
-    //             field_path: "value".to_string(),
-    //             new_value: Box::new(1.0f32),
-    //         });
-    //         app.update();
-
-    //         {
-    //             let history = app.world().resource::<EditHistory>();
-    //             assert!(history.can_undo());
-    //             assert!(!history.can_redo());
-    //         }
-
-    //         app.world_mut().write_message(Undo);
-    //         app.update();
-
-    //         {
-    //             let history = app.world().resource::<EditHistory>();
-    //             assert!(history.can_redo());
-    //             assert!(!history.can_undo());
-    //         }
-
-    //         app.world_mut().resource_mut::<EditHistory>().clear();
-
-    //         let history = app.world().resource::<EditHistory>();
-    //         assert!(!history.can_undo());
-    //         assert!(!history.can_redo());
-    //     }
-    // }
+            let history = app.world().resource::<EditHistory>();
+            assert!(!history.can_undo());
+            assert!(!history.can_redo());
+        }
+    }
 
     // mod undo_redo {
     //     use super::*;
