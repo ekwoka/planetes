@@ -15,7 +15,7 @@
 use std::{any::TypeId, collections::HashMap};
 
 use bevy::{
-    ecs::{component::ComponentId, system::SystemState},
+    ecs::component::ComponentId,
     prelude::*,
     reflect::{PartialReflect, ReflectPath},
     scene::DynamicEntity,
@@ -194,55 +194,6 @@ impl CanonicalScene {
             })
             .and_then(|c| c.as_mut().try_as_reflect_mut())
             .and_then(|c| c.downcast_mut::<T>())
-    }
-
-    pub fn insert_entity(
-        &mut self,
-        entity: Entity,
-        components: HashMap<TypeId, CanonicalComponentState>,
-    ) {
-        // self.entities.insert(
-        //     entity,
-        //     CanonicalEntityState {
-        //         entity,
-        //         components,
-        //         changed: true,
-        //     },
-        // );
-    }
-
-    /// Inserts or updates canonical data for a component on an entity.
-    pub fn insert_component(
-        &mut self,
-        entity: Entity,
-        type_id: TypeId,
-        component: CanonicalComponentState,
-    ) {
-        // self.entities
-        //     .entry(entity)
-        //     .or_insert(CanonicalEntityState::new(entity))
-        //     .components
-        //     .insert(type_id, component);
-    }
-
-    /// Removes all canonical data for an entity.
-    pub fn remove_entity(&mut self, entity: Entity) {
-        // self.entities.remove(&entity);
-    }
-
-    /// Returns all component type IDs stored for an entity.
-    pub fn get_entity_components(
-        &self,
-        entity: Entity,
-    ) -> Option<&HashMap<TypeId, CanonicalComponentState>> {
-        None
-        // self.entities.get(&entity).map(|state| &state.components)
-    }
-
-    /// Checks if an entity has any canonical data stored.
-    pub fn contains_entity(&self, entity: Entity) -> bool {
-        false
-        // self.entities.contains_key(&entity)
     }
 }
 

@@ -20,7 +20,7 @@ use bevy::{
     reflect::{EnumInfo, OpaqueInfo, StructInfo, TupleStructInfo, TypeInfo},
 };
 use planetes_input::prelude::*;
-use planetes_scene_state::{CanonicalScene, SyncCanonicalMessage};
+use planetes_scene_state::CanonicalScene;
 
 pub fn plugin(app: &mut App) {
     app.add_systems(PreUpdate, update_component_editor);
@@ -31,6 +31,7 @@ pub fn update_component_editor(
     mut commands: Commands,
     target: Single<Entity, With<ViewedBy>>,
     editors: Query<(Entity, &ComponentEditor), Changed<ComponentEditor>>,
+    scenes: Res<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
     registry: Res<AppTypeRegistry>,
 ) {
@@ -40,11 +41,9 @@ pub fn update_component_editor(
             continue;
         };
 
-        let Some(reflected) = canonical_scene.get_component_by_id(*target, type_id) else {
+        let Some(reflected) = canonical_scene.get_component_by_id(&scenes, *target, type_id) else {
             continue;
         };
-
-        let reflected = &reflected.data;
 
         if let Some(editor_view) = registry.get_type_data::<ReflectEditorView>(type_id) {
             let Some(reflected) = reflected.try_as_reflect() else {
@@ -141,7 +140,6 @@ pub fn handle_remove_component(
         info!("Removing component: {:?} from {:?}", button.0, entity);
         if let Some(component_id) = world.components().get_id(button.0) {
             commands.entity(entity).remove_by_id(component_id);
-            commands.write_message(SyncCanonicalMessage { entity });
             commands.trigger(UpdateEntityViewer(entity));
         } else {
             error!("Component to remove is not a valid component");
@@ -158,7 +156,8 @@ fn handle_commit(
     path_segments: Query<&Path>,
     ancestors: Query<&ChildOf>,
     focused: Res<InputFocus>,
-    mut canonical_scene: ResMut<CanonicalScene>,
+    mut scenes: ResMut<Assets<DynamicScene>>,
+    canonical_scene: Res<CanonicalScene>,
 ) {
     if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
         return;
@@ -179,7 +178,8 @@ fn handle_commit(
         return;
     };
 
-    let Some(reflected_component) = canonical_scene.get_component_mut_by_id(*target, *type_id)
+    let Some(reflected_component) =
+        canonical_scene.get_component_mut_by_id(&mut scenes, *target, *type_id)
     else {
         warn!("No component found");
         return;
@@ -197,7 +197,7 @@ fn handle_commit(
     info!("Applying Data on path: {path:?} to component for type: {type_id:?}");
 
     let Ok(reflected_value) = path
-        .reflect_element_mut(reflected_component.data.as_partial_reflect_mut())
+        .reflect_element_mut(reflected_component)
         .inspect_err(|error| {
             warn!("Failed to reflect element at path: {path:?}: {error}");
         })

@@ -70,24 +70,33 @@ pub fn update_entity_viewer(
     entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
     names: Query<&Name>,
     canonical_scene: Res<CanonicalScene>,
+    scenes: Res<Assets<DynamicScene>>,
     assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
 
-    let Some(components) = canonical_scene.get_entity_components(target) else {
+    let Some(entity) = canonical_scene.get_entity(&scenes, target) else {
         return;
     };
 
+    let components = &entity.components;
+
     info!("Found Components: {}", components.len());
     let components = components
-        .values()
-        .filter(|component| component.name() != &"bevy_ecs::name::Name".into())
-        .map(|component| {
-            accordion::view(
-                component.name().shortname().to_string(),
-                SpawnIter(once(component_editor::base(component.type_id()))),
-                assets.clone(),
-            )
+        .iter()
+        .filter(|component| !component.represents::<Name>())
+        .filter_map(|component| {
+            component.get_represented_type_info().map(|type_info| {
+                accordion::view(
+                    type_info
+                        .type_path_table()
+                        .ident()
+                        .map(|ident| ident.to_string())
+                        .unwrap_or("Unknown".into()),
+                    SpawnIter(once(component_editor::base(type_info.type_id()))),
+                    assets.clone(),
+                )
+            })
         })
         .collect::<Vec<_>>();
     commands
@@ -147,6 +156,7 @@ pub fn handle_update_entity_viewer(
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), With<EntityEditor>>,
     names: Query<&Name>,
+    scenes: Res<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
     assets: Res<AssetServer>,
 ) {
@@ -155,20 +165,28 @@ pub fn handle_update_entity_viewer(
         return;
     }
 
-    let Some(components) = canonical_scene.get_entity_components(target) else {
+    let Some(entity) = canonical_scene.get_entity(&scenes, target) else {
         return;
     };
 
+    let components = &entity.components;
+
     info!("Found Components: {}", components.len());
     let components = components
-        .values()
-        .filter(|component| component.name() != &"bevy_ecs::name::Name".into())
-        .map(|component| {
-            accordion::view(
-                component.name().shortname().to_string(),
-                SpawnIter(once(component_editor::base(component.type_id()))),
-                assets.clone(),
-            )
+        .iter()
+        .filter(|component| !component.represents::<Name>())
+        .filter_map(|component| {
+            component.get_represented_type_info().map(|type_info| {
+                accordion::view(
+                    type_info
+                        .type_path_table()
+                        .ident()
+                        .map(|ident| ident.to_string())
+                        .unwrap_or("Unknown".into()),
+                    SpawnIter(once(component_editor::base(type_info.type_id()))),
+                    assets.clone(),
+                )
+            })
         })
         .collect::<Vec<_>>();
     commands

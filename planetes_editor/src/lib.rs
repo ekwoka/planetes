@@ -17,8 +17,7 @@ pub use editor_ui::{MainView, plugin};
 
 pub use planetes_scene_state::{
     self as canonical, ApplyEdit, CanonicalScene, EditHistory, EditOp, PlanetesBundle,
-    PlanetesComponent, Redo, ReflectPlanetesBundle, ReflectPlanetesComponent, SyncCanonicalMessage,
-    Undo,
+    PlanetesComponent, Redo, ReflectPlanetesBundle, ReflectPlanetesComponent, Undo,
 };
 
 /// State for tracking if the Editor is available or not.

@@ -2,7 +2,6 @@ use std::any::TypeId;
 
 use bevy::{app::Propagate, ecs::reflect::ReflectCommandExt, prelude::*, reflect::TypeInfo};
 use bevy_ui_html::html;
-use planetes_scene_state::SyncCanonicalMessage;
 
 use crate::nodes::entity_viewer::{UpdateEntityViewer, ViewedBy};
 
@@ -106,7 +105,6 @@ pub fn handle_add_component(
         commands
             .entity(entity)
             .insert_reflect(component_default.default());
-        commands.write_message(SyncCanonicalMessage { entity });
         commands.trigger(UpdateEntityViewer(entity));
     }
 }

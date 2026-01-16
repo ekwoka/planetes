@@ -8,7 +8,7 @@ use bevy::{
     prelude::*,
     tasks::IoTaskPool,
 };
-use planetes_scene_state::SyncCanonicalMessage;
+use planetes_scene_state::CanonicalScene;
 
 pub fn plugin(app: &mut App) {
     info!("Plugin SCENE");
@@ -17,8 +17,7 @@ pub fn plugin(app: &mut App) {
         .add_systems(OnEnter(EditorMode::Edit), load_scene)
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(Update, add_meshes_to_scene)
-        .add_systems(Update, on_load)
-        .add_observer(sync_scene_elements);
+        .add_systems(Update, on_load);
 }
 
 #[derive(Component)]
@@ -68,7 +67,11 @@ pub fn save_scene(
     }
 }
 
-pub fn load_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn load_scene(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut canonical: ResMut<CanonicalScene>,
+) {
     info!("loading scene");
     let scene_handle = asset_server.load::<DynamicScene>("test.scn.ron");
     let scene_root = commands
@@ -77,10 +80,11 @@ pub fn load_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
             EditorScene,
             Transform::default(),
             Propagate(InScene),
-            DynamicSceneRoot(scene_handle),
+            DynamicSceneRoot(scene_handle.clone()),
         ))
         .id();
     commands.write_message(UpdateSceneTree { entity: scene_root });
+    canonical.insert(scene_handle);
 }
 
 pub fn on_load(
@@ -124,16 +128,4 @@ fn add_meshes_to_scene(
             .entity(entity)
             .try_insert((Mesh3d(mesh.clone()), MeshMaterial3d(material.clone())));
     });
-}
-
-fn sync_scene_elements(
-    event: On<Add, InScene>,
-    scene_members: Query<Entity, (With<InScene>, Without<EditorScene>)>,
-    mut commands: Commands,
-) {
-    if scene_members.contains(event.entity) {
-        commands.write_message(SyncCanonicalMessage {
-            entity: event.entity,
-        });
-    }
 }
