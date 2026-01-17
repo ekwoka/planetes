@@ -1,9 +1,10 @@
 use std::any::TypeId;
 
-use bevy::{app::Propagate, ecs::reflect::ReflectCommandExt, prelude::*, reflect::TypeInfo};
+use bevy::{app::Propagate, prelude::*, reflect::TypeInfo};
 use bevy_ui_html::html;
+use planetes_scene_state::CanonicalScene;
 
-use crate::nodes::entity_viewer::{UpdateEntityViewer, ViewedBy};
+use crate::nodes::entity_viewer::{UpdateEntityViewer, Viewing};
 
 pub fn plugin(app: &mut App) {
     app.add_observer(handle_open_add_component)
@@ -93,18 +94,20 @@ pub fn handle_add_component(
     event: On<Pointer<Click>>,
     mut commands: Commands,
     buttons: Query<&AddComponentButton>,
-    editing: Single<Entity, With<ViewedBy>>,
+    editing: Single<&Viewing>,
     registry: Res<AppTypeRegistry>,
+    canonical_scene: Res<CanonicalScene>,
+    mut scenes: ResMut<Assets<DynamicScene>>,
 ) {
     if let Ok(button) = buttons.get(event.entity) {
-        let entity = *editing;
+        let entity = editing.0;
         info!("Adding component: {:?} to {:?}", button.0, entity);
         let registry = registry.read();
         let component_default = registry.get_type_data::<ReflectDefault>(button.0).unwrap();
         commands.trigger(CloseAddComponent);
-        commands
-            .entity(entity)
-            .insert_reflect(component_default.default());
+        if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, entity) {
+            entity.components.push(component_default.default());
+        }
         commands.trigger(UpdateEntityViewer(entity));
     }
 }

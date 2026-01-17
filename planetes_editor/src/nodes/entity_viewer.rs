@@ -68,7 +68,6 @@ pub fn view() -> impl Bundle {
 pub fn update_entity_viewer(
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
-    names: Query<&Name>,
     canonical_scene: Res<CanonicalScene>,
     scenes: Res<Assets<DynamicScene>>,
     assets: Res<AssetServer>,
@@ -79,10 +78,10 @@ pub fn update_entity_viewer(
         return;
     };
 
-    let components = &entity.components;
+    let components_data = &entity.components;
 
-    info!("Found Components: {}", components.len());
-    let components = components
+    info!("Found Components: {}", components_data.len());
+    let components = components_data
         .iter()
         .filter(|component| !component.represents::<Name>())
         .filter_map(|component| {
@@ -99,6 +98,10 @@ pub fn update_entity_viewer(
             })
         })
         .collect::<Vec<_>>();
+    let name = components_data
+        .iter()
+        .find(|component| component.represents::<Name>())
+        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
     commands
         .entity(editor)
         .despawn_children()
@@ -112,7 +115,7 @@ pub fn update_entity_viewer(
                 >
                     <span>"Selected: "</span>
                     {
-                        input_field::<String>(if let Ok(name) = names.get(target) {
+                        input_field::<String>(if let Some(name) = name {
                             format!("{name}")
                         } else {
                             format!("{target}")
@@ -126,8 +129,8 @@ pub fn update_entity_viewer(
                   display="flex"
                   flex-direction="row"
                   align-items={AlignItems::Center}
-                  onClick={|event: On<Pointer<Click>>, mut commands: Commands| {
-                      commands.trigger(OpenAddComponent { entity: event.entity });
+                  onClick={|_event: On<Pointer<Click>>, mut commands: Commands, target: Single<&Viewing>| {
+                      commands.trigger(OpenAddComponent { entity: target.0 });
                   }}
                 >
                     <span>"Add Component: "</span>
@@ -155,7 +158,6 @@ pub fn handle_update_entity_viewer(
     event: On<UpdateEntityViewer>,
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), With<EntityEditor>>,
-    names: Query<&Name>,
     scenes: Res<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
     assets: Res<AssetServer>,
@@ -169,10 +171,10 @@ pub fn handle_update_entity_viewer(
         return;
     };
 
-    let components = &entity.components;
+    let components_data = &entity.components;
 
-    info!("Found Components: {}", components.len());
-    let components = components
+    info!("Found Components: {}", components_data.len());
+    let components = components_data
         .iter()
         .filter(|component| !component.represents::<Name>())
         .filter_map(|component| {
@@ -189,6 +191,10 @@ pub fn handle_update_entity_viewer(
             })
         })
         .collect::<Vec<_>>();
+    let name = components_data
+        .iter()
+        .find(|component| component.represents::<Name>())
+        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
     commands
         .entity(editor)
         .despawn_children()
@@ -202,7 +208,7 @@ pub fn handle_update_entity_viewer(
                 >
                     <span>"Selected: "</span>
                     {
-                        input_field::<String>(if let Ok(name) = names.get(target) {
+                        input_field::<String>(if let Some(name) = name {
                             format!("{name}")
                         } else {
                             format!("{target}")
@@ -210,14 +216,13 @@ pub fn handle_update_entity_viewer(
                     }
                 </div>
             });
-
             parent.spawn(html! {
                 <div
                   display="flex"
                   flex-direction="row"
                   align-items={AlignItems::Center}
-                  onClick={|event: On<Pointer<Click>>, mut commands: Commands| {
-                      commands.trigger(OpenAddComponent { entity: event.entity });
+                  onClick={|_event: On<Pointer<Click>>, mut commands: Commands, target: Single<&Viewing>| {
+                      commands.trigger(OpenAddComponent { entity: target.0 });
                   }}
                 >
                     <span>"Add Component: "</span>
@@ -244,7 +249,7 @@ fn update_name(
     mut commands: Commands,
     inputs: Query<&InputField<String>>,
     mut names: Query<&mut Name>,
-    target: Single<Entity, With<ViewedBy>>,
+    target: Single<&Viewing>,
     focused: Res<InputFocus>,
 ) {
     if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
@@ -256,13 +261,13 @@ fn update_name(
     }) && let Ok(field) = inputs.get(focused).inspect_err(|_| {
         info!("Failed to get field");
     }) {
-        if let Ok(mut name) = names.get_mut(*target) {
+        if let Ok(mut name) = names.get_mut(target.0) {
             info!("Updating Name");
             *name = Name::new(field.value.clone());
         } else {
             info!("Adding new Name");
             commands
-                .entity(*target)
+                .entity(target.0)
                 .insert(Name::new(field.value.clone()));
         }
     }
@@ -275,9 +280,4 @@ pub struct EntityViewer;
 pub struct EntityEditor;
 
 #[derive(Component)]
-#[relationship(relationship_target = ViewedBy)]
 pub struct Viewing(pub Entity);
-
-#[derive(Component)]
-#[relationship_target(relationship = Viewing)]
-pub struct ViewedBy(Entity);

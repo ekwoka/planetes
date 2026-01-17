@@ -7,7 +7,7 @@ use std::any::TypeId;
 use crate::{
     atoms::{button, check_box, input_field},
     editor_ui::Capitalize,
-    nodes::entity_viewer::{UpdateEntityViewer, ViewedBy},
+    nodes::entity_viewer::{UpdateEntityViewer, Viewing},
     prelude::*,
 };
 use bevy::{
@@ -29,7 +29,7 @@ pub fn plugin(app: &mut App) {
 /// Converts a basic Component Editor into a full Component Editor
 pub fn update_component_editor(
     mut commands: Commands,
-    target: Single<Entity, With<ViewedBy>>,
+    target: Single<&Viewing>,
     editors: Query<(Entity, &ComponentEditor), Changed<ComponentEditor>>,
     scenes: Res<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
@@ -41,7 +41,8 @@ pub fn update_component_editor(
             continue;
         };
 
-        let Some(reflected) = canonical_scene.get_component_by_id(&scenes, *target, type_id) else {
+        let Some(reflected) = canonical_scene.get_component_by_id(&scenes, target.0, type_id)
+        else {
             continue;
         };
 
@@ -132,11 +133,11 @@ pub fn handle_remove_component(
     event: On<Pointer<Click>>,
     mut commands: Commands,
     buttons: Query<&RemoveComponentButton>,
-    editing: Single<Entity, With<ViewedBy>>,
+    editing: Single<&Viewing>,
     world: &World,
 ) {
     if let Ok(button) = buttons.get(event.entity) {
-        let entity = *editing;
+        let entity = editing.0;
         info!("Removing component: {:?} from {:?}", button.0, entity);
         if let Some(component_id) = world.components().get_id(button.0) {
             commands.entity(entity).remove_by_id(component_id);
@@ -152,7 +153,7 @@ fn handle_commit(
     event: On<FocusedInput<KeyboardInput>>,
     inputs: Query<&InputValue>,
     component_editor: Query<&ComponentEditor>,
-    target: Single<Entity, With<ViewedBy>>,
+    target: Single<&Viewing>,
     path_segments: Query<&Path>,
     ancestors: Query<&ChildOf>,
     focused: Res<InputFocus>,
@@ -179,7 +180,7 @@ fn handle_commit(
     };
 
     let Some(reflected_component) =
-        canonical_scene.get_component_mut_by_id(&mut scenes, *target, *type_id)
+        canonical_scene.get_component_mut_by_id(&mut scenes, target.0, *type_id)
     else {
         warn!("No component found");
         return;

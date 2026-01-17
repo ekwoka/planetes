@@ -115,6 +115,16 @@ impl CanonicalScene {
             .and_then(|scene| scene.entities.iter().find(|e| e.entity == entity))
     }
 
+    pub fn get_entity_mut<'a>(
+        &self,
+        assets: &'a mut Assets<DynamicScene>,
+        entity: Entity,
+    ) -> Option<&'a mut DynamicEntity> {
+        assets
+            .get_mut(&self.handle)
+            .and_then(|scene| scene.entities.iter_mut().find(|e| e.entity == entity))
+    }
+
     pub fn get_component_by_id<'a>(
         &self,
         assets: &'a Assets<DynamicScene>,
@@ -194,6 +204,25 @@ impl CanonicalScene {
             })
             .and_then(|c| c.as_mut().try_as_reflect_mut())
             .and_then(|c| c.downcast_mut::<T>())
+    }
+    pub fn get_root_entities<'a>(
+        &self,
+        assets: &'a Assets<DynamicScene>,
+    ) -> Vec<&'a DynamicEntity> {
+        assets
+            .get(&self.handle)
+            .map(|scene| {
+                scene
+                    .entities
+                    .iter()
+                    .filter(|e| {
+                        !e.components
+                            .iter()
+                            .any(|component| component.represents::<ChildOf>())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -542,8 +571,8 @@ fn handle_redo(
 mod tests {
     use super::*;
     use bevy::{
-        reflect::Reflect,
-        scene::{ScenePlugin, scene_spawner_system},
+        reflect::{DynamicList, DynamicTupleStruct, Reflect},
+        scene::ScenePlugin,
     };
 
     #[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
@@ -560,6 +589,7 @@ mod tests {
     }
 
     const TEST_ENTITY: Entity = Entity::from_bits(4294967160);
+    const TEST_ENTITY_CHILD: Entity = Entity::from_bits(4294967161);
 
     fn setup_test_app() -> App {
         use bevy::scene::DynamicEntity;
@@ -574,13 +604,36 @@ mod tests {
         app.world_mut()
             .resource_scope(|world, server: Mut<AssetServer>| {
                 let scene = DynamicScene {
-                    entities: vec![DynamicEntity {
-                        entity: TEST_ENTITY,
-                        components: vec![Box::new(TestComponent {
-                            value: 42.0,
-                            name: "test".to_string(),
-                        })],
-                    }],
+                    entities: vec![
+                        DynamicEntity {
+                            entity: TEST_ENTITY,
+                            components: vec![
+                                Box::new(TestComponent {
+                                    value: 42.0,
+                                    name: "test".to_string(),
+                                }),
+                                Box::new(
+                                    Children::from_reflect(
+                                        DynamicTupleStruct::from_iter(
+                                            vec![
+                                                Box::new(DynamicList::from_iter(vec![
+                                                    TEST_ENTITY_CHILD,
+                                                ]))
+                                                .into_partial_reflect(),
+                                            ]
+                                            .into_iter(),
+                                        )
+                                        .as_partial_reflect(),
+                                    )
+                                    .unwrap_or_default(),
+                                ),
+                            ],
+                        },
+                        DynamicEntity {
+                            entity: TEST_ENTITY_CHILD,
+                            components: vec![Box::new(ChildOf(TEST_ENTITY))],
+                        },
+                    ],
                     resources: Vec::new(),
                 };
                 let handle = server.add(scene);
@@ -669,9 +722,27 @@ mod tests {
 
             assert!(
                 canonical
-                    .get_component::<Children>(&assets, TEST_ENTITY)
+                    .get_component::<ChildOf>(&assets, TEST_ENTITY)
                     .is_none()
             );
+        }
+
+        #[test]
+        fn get_root_entities() {
+            let app = setup_test_app();
+
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                panic!("Failed to get Server");
+            };
+
+            let Some(canonical) = app.world().get_resource_ref::<CanonicalScene>() else {
+                panic!("Failed to get CanonicalScene");
+            };
+
+            let roots = canonical.get_root_entities(&assets);
+            assert_eq!(roots.len(), 1);
+
+            assert_eq!(roots[0].entity, TEST_ENTITY);
         }
     }
 

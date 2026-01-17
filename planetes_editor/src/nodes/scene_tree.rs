@@ -8,7 +8,7 @@ use crate::{
     prelude::*,
 };
 use bevy::{platform::collections::HashMap, prelude::*};
-use planetes_scene_state::ReflectHiddenComponent;
+use planetes_scene_state::{CanonicalScene, ReflectHiddenComponent};
 
 pub fn plugin(app: &mut App) {
     app.add_systems(PostUpdate, update_tree)
@@ -46,43 +46,54 @@ pub fn update_tree(
     mut commands: Commands,
     mut messages: MessageReader<UpdateSceneTree>,
     scene_tree_view: Single<Entity, With<SceneTreeView>>,
-    scene_children: Query<(Entity, Option<&Name>, Option<&Children>)>,
+    canonical_scene: Res<CanonicalScene>,
+    scenes: Res<Assets<DynamicScene>>,
     asset_server: Res<AssetServer>,
 ) {
-    for message in messages.read() {
+    for _message in messages.read() {
         info!("Updating scene tree");
         if let Ok(mut view_commands) = commands.get_entity(*scene_tree_view) {
             let scene_children: HashMap<Entity, (Option<Name>, Option<Vec<Entity>>)> =
-                scene_children
-                    .iter()
-                    .map(|(entity, name, children)| {
-                        (
-                            entity,
-                            (
-                                name.cloned(),
-                                children.map(|children| children.iter().collect::<Vec<Entity>>()),
-                            ),
-                        )
+                canonical_scene
+                    .get_scene(&scenes)
+                    .map(|scene| {
+                        scene
+                            .entities
+                            .iter()
+                            .map(|entity| {
+                                let name = entity
+                                    .components
+                                    .iter()
+                                    .find(|component| component.represents::<Name>())
+                                    .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
+                                let children = entity
+                                    .components
+                                    .iter()
+                                    .find(|component| component.represents::<Children>())
+                                    .and_then(|children| {
+                                        Children::from_reflect(children.as_partial_reflect()).map(
+                                            |children| children.iter().collect::<Vec<Entity>>(),
+                                        )
+                                    });
+                                (entity.entity, (name, children))
+                            })
+                            .collect::<HashMap<_, _>>()
                     })
-                    .collect();
-            let Some((name, children)) = scene_children.get(&message.entity) else {
-                info!("No Scene Children");
-                continue;
-            };
-            let name = name
-                .clone()
-                .map(|name| format!("{name}:"))
-                .unwrap_or("Root:".into());
-            let branch_entities = children.as_ref().cloned().unwrap_or_default();
-            info!("root children found: {:?}", branch_entities);
+                    .unwrap_or_default();
+            let root_entities = canonical_scene
+                .get_root_entities(&scenes)
+                .iter()
+                .map(|entity| entity.entity)
+                .collect::<Vec<Entity>>();
+
             let asset_server = asset_server.clone();
             view_commands
                 .despawn_children()
                 .with_children(move |parent| {
                     parent.spawn(accordion::view(
-                        name,
+                        "Root:",
                         SpawnIter(
-                            branch_entities
+                            root_entities
                                 .into_iter()
                                 .filter_map(|entity| {
                                     branch(entity, scene_children.clone(), asset_server.clone())

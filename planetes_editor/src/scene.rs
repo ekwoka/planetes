@@ -83,8 +83,8 @@ pub fn load_scene(
             DynamicSceneRoot(scene_handle.clone()),
         ))
         .id();
-    commands.write_message(UpdateSceneTree { entity: scene_root });
     canonical.insert(scene_handle);
+    commands.write_message(UpdateSceneTree { entity: scene_root });
 }
 
 pub fn on_load(
