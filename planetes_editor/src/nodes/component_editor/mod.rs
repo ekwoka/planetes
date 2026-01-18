@@ -134,17 +134,23 @@ pub fn handle_remove_component(
     mut commands: Commands,
     buttons: Query<&RemoveComponentButton>,
     editing: Single<&Viewing>,
-    world: &World,
+    canonical_scene: Res<CanonicalScene>,
+    mut scenes: ResMut<Assets<DynamicScene>>,
 ) {
     if let Ok(button) = buttons.get(event.entity) {
         let entity = editing.0;
         info!("Removing component: {:?} from {:?}", button.0, entity);
-        if let Some(component_id) = world.components().get_id(button.0) {
-            commands.entity(entity).remove_by_id(component_id);
-            commands.trigger(UpdateEntityViewer(entity));
+        if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, entity) {
+            entity.components.retain(|component| {
+                component
+                    .get_represented_type_info()
+                    .map(|info| info.type_id() != button.0)
+                    .unwrap_or(true)
+            });
         } else {
-            error!("Component to remove is not a valid component");
+            error!("Component to remove is not on a valid entity");
         }
+        commands.trigger(UpdateEntityViewer(entity));
     }
 }
 
