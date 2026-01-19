@@ -3,6 +3,7 @@
 use std::iter::once;
 
 use bevy::{
+    app::Propagate,
     input::{
         ButtonState,
         keyboard::{Key, KeyboardInput},
@@ -33,7 +34,8 @@ pub fn plugin(app: &mut App) {
         )
             .chain(),
     )
-    .add_observer(handle_update_entity_viewer);
+    .add_observer(handle_update_entity_viewer)
+    .add_observer(update_required_components);
 }
 
 pub fn view() -> impl Bundle {
@@ -141,14 +143,67 @@ pub fn update_entity_viewer(
                 <div
                    display="flex"
                    flex-direction="col"
-                   flex-grow="1"
                    row-gap="4px">
                    <iter>
                     {components.into_iter()}
                    </iter>
                 </div>
             });
+            parent.spawn(html! {
+                <div display="flex" flex-direction="col" row-gap="4px" components={Propagate(TextColor(Color::srgb_u8(120, 120, 120)))}>
+                   <span>"Required Components:"</span>
+                   <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
+
+                   </div>
+                </div>
+            });
         });
+}
+
+#[derive(Component)]
+pub struct RequiredComponentsUI(pub Entity);
+
+pub fn update_required_components(
+    event: On<Add, RequiredComponentsUI>,
+    query: Query<&RequiredComponentsUI>,
+    world: &World,
+    canonical: Res<CanonicalScene>,
+    scenes: Res<Assets<DynamicScene>>,
+    mut commands: Commands,
+) {
+    let Ok(&RequiredComponentsUI(target)) = query.get(event.entity) else {
+        return;
+    };
+    let Some(dyn_entity) = canonical.get_entity(&scenes, target) else {
+        return;
+    };
+    let components = world.components();
+    let mut required_components = Vec::<String>::new();
+    for component in &dyn_entity.components {
+        let Some(id) = component
+            .get_represented_type_info()
+            .map(|info| info.type_id())
+        else {
+            continue;
+        };
+        let Some(component_id) = components.get_id(id) else {
+            continue;
+        };
+        let Some(component_info) = components.get_info(component_id) else {
+            continue;
+        };
+        for required_component_id in component_info.required_components().iter_ids() {
+            let Some(required_component_info) = components.get_info(required_component_id) else {
+                continue;
+            };
+            required_components.push(required_component_info.name().shortname().to_string());
+        }
+    }
+    commands.entity(event.entity).with_children(|parent| {
+        for name in required_components.into_iter() {
+            parent.spawn(Text::new(name));
+        }
+    });
 }
 
 #[derive(Event)]
