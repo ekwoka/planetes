@@ -9,6 +9,7 @@ use bevy::{
         keyboard::{Key, KeyboardInput},
     },
     input_focus::{FocusedInput, InputFocus},
+    platform::collections::HashSet,
     prelude::*,
 };
 use planetes_input::prelude::*;
@@ -178,7 +179,12 @@ pub fn update_required_components(
         return;
     };
     let components = world.components();
-    let mut required_components = Vec::<String>::new();
+    let mut required_components = HashSet::<String>::new();
+    let existing_ids = dyn_entity
+        .components
+        .iter()
+        .map(|c| c.get_represented_type_info().map(|info| info.type_id()))
+        .collect::<Vec<_>>();
     for component in &dyn_entity.components {
         let Some(id) = component
             .get_represented_type_info()
@@ -196,7 +202,10 @@ pub fn update_required_components(
             let Some(required_component_info) = components.get_info(required_component_id) else {
                 continue;
             };
-            required_components.push(required_component_info.name().shortname().to_string());
+            if existing_ids.contains(&required_component_info.type_id()) {
+                continue;
+            }
+            required_components.insert(required_component_info.name().shortname().to_string());
         }
     }
     commands.entity(event.entity).with_children(|parent| {
