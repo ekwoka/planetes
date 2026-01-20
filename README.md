@@ -1,8 +1,13 @@
 # Planetes (Wanderer)
 
+> Planetes Editor
+> If you're here for just the Bevy game editor, head to the [planetes_editor crate](/planetes_editor/) for more information.
+
 **A Massively Single-Player extraction game about braving the unknown depths of procedurally-collapsed space**
 
 > *Like sailors venturing beyond charted waters, you dive into unstable wormhole networks where the path home is never guaranteed.*
+
+
 
 ---
 
