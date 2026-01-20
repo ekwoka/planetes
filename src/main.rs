@@ -22,8 +22,6 @@ use bevy::{
     prelude::*,
 };
 use bevy_enhanced_input::prelude::EnhancedInputPlugin;
-use bevy_tnua::prelude::TnuaControllerPlugin;
-use bevy_tnua_avian3d::TnuaAvian3dPlugin;
 
 /// Runs the Sandbox
 fn main() -> AppExit {
@@ -66,15 +64,9 @@ impl Plugin for AppPlugin {
                 .set(ImagePlugin {
                     default_sampler: default_image_sampler_descriptor(),
                 })
-                .set(GltfPlugin {
-                    use_model_forward_direction: true,
-                    ..default()
-                }),
-            bevy_ui_anchor::AnchorUiPlugin::<UICamera>::new(),
+                .set(GltfPlugin::default()),
             EnhancedInputPlugin,
             PhysicsPlugins::default(),
-            TnuaAvian3dPlugin::new(PhysicsSchedule),
-            TnuaControllerPlugin::new(PhysicsSchedule),
         ));
         // Add other plugins.
         #[cfg(feature = "editor")]
@@ -85,7 +77,7 @@ impl Plugin for AppPlugin {
     }
 }
 
-/// Identifies the camera to be used for Anchored UI Elements from [bevy_ui_anchor::AnchorUiPlugin]
+/// Identifies the camera to be used for Anchored UI Elements from bevy_ui_anchor::AnchorUiPlugin
 #[derive(Component)]
 struct UICamera;
 

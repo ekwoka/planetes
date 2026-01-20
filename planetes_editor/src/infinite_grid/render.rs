@@ -527,7 +527,7 @@ impl SpecializedRenderPipeline for InfiniteGridPipeline {
 
         RenderPipelineDescriptor {
             label: Some(Cow::Borrowed("grid-render-pipeline")),
-            layout: vec![self.view_layout.clone(), self.infinite_grid_layout.clone()],
+            layout: vec![],
             push_constant_ranges: Vec::new(),
             vertex: VertexState {
                 shader: GRID_SHADER_HANDLE,

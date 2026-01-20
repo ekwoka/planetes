@@ -14,13 +14,13 @@ planetes_scene_state = { path = "planetes_scene_state" }
 planetes_editor = { path = "planetes_editor" }
 planetes_input = { path = "planetes_input" }
 
-bevy = { version = "0.17", features = [
+bevy = { version = "0.18", features = [
     "serialize",
     # Due to some Bevy bug, we need to enable the UI debug plugin even in non-dev builds,
     # otherwise we only render the view model and the skybox.
-    "bevy_ui_debug",
+    "bevy_ui_debug"
 ] }
-bevy_enhanced_input = "0.20"
+bevy_enhanced_input = "0.22"
 
 # Keep this in sync with Bevy
 rand = "0.9"
@@ -35,16 +35,16 @@ tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
-bevy_gizmos = "0.17"
-bevy_ui_anchor = "0.10"
+bevy_gizmos = "0.18"
+# bevy_ui_anchor = "0.10"
 
 # Physics
-avian3d = "0.4"
+avian3d = "0.5"
 avian_pickup = "0.3"
 
 # Character Controller
-bevy-tnua = "0.26"
-bevy-tnua-avian3d = "0.8"
+bevy-tnua = "0.29"
+bevy-tnua-avian3d = "0.10"
 
 serde = { version = "1.0", features = ["derive"] }
 
@@ -86,14 +86,9 @@ planetes_editor = { workspace = true, optional = true, features = ["avian"] }
 
 bevy.workspace = true
 bevy_enhanced_input.workspace = true
-bevy_ui_anchor.workspace = true
 
 # Physics
 avian3d.workspace = true
-
-# Character Controller
-bevy-tnua.workspace = true
-bevy-tnua-avian3d.workspace = true
 
 serde.workspace = true
 
@@ -101,7 +96,7 @@ serde.workspace = true
 [features]
 # Default to a native dev build.
 default = ["dev_native"]
-editor = ["dep:planetes_editor"]
+editor = ["dep:planetes_editor", "bevy/debug"]
 dev = [
     # Improve compile times for dev builds by linking Bevy as a dynamic library.
     "bevy/dynamic_linking",

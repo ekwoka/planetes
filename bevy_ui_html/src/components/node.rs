@@ -1,14 +1,14 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-use crate::{Attribute, Value};
+use crate::{Attribute, BorderRadius, Value};
 #[derive(Clone, Debug)]
 pub struct NodeComponent {
     attributes: Vec<Attribute>,
 }
 
 impl NodeComponent {
-    const KEYS: [&'static str; 45] = [
+    const KEYS: [&'static str; 46] = [
         "padding",
         "padding-top",
         "padding-left",
@@ -54,6 +54,7 @@ impl NodeComponent {
         "aspect-ratio",
         "overflow",
         "overflow-clip-margin",
+        "border-radius",
     ];
 
     pub fn ok(self) -> Option<Self> {
@@ -256,6 +257,13 @@ impl ToTokens for NodeComponent {
             if let Some(border_tokens) = Self::build_spacing_chain(&self.attributes, "border") {
                 fields.push(quote! {
                     border: #border_tokens
+                });
+            }
+
+            // Process BorderRadius attributes
+            if let Some(border_radius) = BorderRadius::from(&self.attributes).ok() {
+                fields.push(quote! {
+                    border_radius: #border_radius
                 });
             }
 

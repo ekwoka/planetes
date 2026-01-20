@@ -3,8 +3,11 @@
 //! Handles all the UI and functionality for the Editor
 
 use bevy::{
-    app::HierarchyPropagatePlugin, asset::embedded_asset, camera::visibility::RenderLayers,
-    prelude::*, render::render_resource::TextureFormat,
+    app::HierarchyPropagatePlugin,
+    asset::embedded_asset,
+    camera::{ImageRenderTarget, RenderTarget, visibility::RenderLayers},
+    prelude::*,
+    render::render_resource::TextureFormat,
 };
 
 use crate::{
@@ -182,13 +185,18 @@ pub fn setup_camera_system(mut commands: Commands) {
 pub fn update_viewport(
     mut commands: Commands,
     view_target: Single<Entity, With<ViewPort>>,
-    camera: Single<(Entity, &mut Camera), (With<MainView>, Changed<MainView>)>,
+    camera: Single<Entity, (With<Camera>, With<MainView>, Changed<MainView>)>,
     mut images: ResMut<Assets<Image>>,
 ) {
     info!("Updating viewport");
-    let (entity, mut camera) = camera.into_inner();
+    let entity = camera.into_inner();
     let image = images.add(Image::default_target_texture());
-    camera.target = image.into();
+    commands
+        .entity(entity)
+        .insert(RenderTarget::Image(ImageRenderTarget {
+            handle: image,
+            scale_factor: 1.0,
+        }));
     commands
         .entity(*view_target)
         .insert(ViewportNode::new(entity));
@@ -200,7 +208,7 @@ trait DefaultTargetTexture {
 
 impl DefaultTargetTexture for Image {
     fn default_target_texture() -> Self {
-        Self::new_target_texture(1, 1, TextureFormat::Rgba8UnormSrgb)
+        Self::new_target_texture(1, 1, TextureFormat::Rgba8UnormSrgb, None)
     }
 }
 

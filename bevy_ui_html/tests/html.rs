@@ -90,7 +90,7 @@ fn test_editor_menu_button() {
         .id();
     let root_entity = app
         .world_mut()
-        .query_filtered::<(&Node, &BorderRadius, &Children), With<MenuButton>>()
+        .query_filtered::<(&Node, &Children), With<MenuButton>>()
         .get(app.world(), root);
     assert!(root_entity.is_ok());
     let root_entity = root_entity.unwrap();
@@ -98,13 +98,13 @@ fn test_editor_menu_button() {
         root_entity.0,
         &Node {
             padding: px(4.0).all(),
+            border_radius: BorderRadius::all(px(2.0)),
             ..default()
         }
     );
-    assert_eq!(root_entity.1, &BorderRadius::all(px(2.0)));
-    assert_eq!(root_entity.2.len(), 1);
+    assert_eq!(root_entity.1.len(), 1);
     assert_eq!(
-        text.iter_many(app.world(), root_entity.2)
+        text.iter_many(app.world(), root_entity.1)
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Menu")]
     )

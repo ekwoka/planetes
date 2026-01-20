@@ -620,7 +620,6 @@ impl ToTokens for ElementNode {
         }
         components.push_some(NodeComponent::from(&self.attributes).ok());
         components.push_some(Image::from(&self.attributes).ok());
-        components.push_some(BorderRadius::from(&self.attributes).ok());
         components.push_some(BorderColor::from(&self.attributes).ok());
         components.push_some(BackgroundColor::from(&self.attributes).ok());
         components.push_some(TextFont::from(&self.attributes).ok());
@@ -1216,9 +1215,9 @@ mod tests {
             (
                 ::bevy::ui::Node {
                     padding: ::bevy::ui::px(4.0).all(),
+                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                     ..Default::default()
                 },
-                ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 ))
@@ -1295,9 +1294,9 @@ mod tests {
                 MenuButton,
                 ::bevy::ui::Node {
                     padding: ::bevy::ui::px(4.0).all(),
+                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                     ..Default::default()
                 },
-                ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 ))
