@@ -67,3 +67,6 @@ run_task = { name = ["lint", "build-all"], parallel = false }
 [tasks.build]
 command = "cargo"
 args = ["build", "--features", "editor"]
+
+[tasks.cranelift]
+script = "RUSTFLAGS=-Zcodegen-backend=cranelift cargo +nightly build"
