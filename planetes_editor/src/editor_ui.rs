@@ -9,6 +9,9 @@ use bevy::{
     prelude::*,
     render::render_resource::TextureFormat,
 };
+use bevy_feathers::{
+    FeathersPlugin, FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme,
+};
 
 use crate::{
     EditorMode, ReflectPlanetesComponent,
@@ -31,6 +34,7 @@ pub fn plugin(app: &mut App) {
 
     app.add_plugins((
         InfiniteGridPlugin,
+        FeathersPlugins,
         crate::canonical::plugin,
         crate::scene::plugin,
         scene_tree::plugin,
@@ -41,6 +45,7 @@ pub fn plugin(app: &mut App) {
         planetes_input::plugin,
         component_selector::plugin,
     ))
+    .insert_resource(UiTheme(create_dark_theme()))
     .init_state::<EditorMode>()
     .register_type_data::<Transform, ReflectPlanetesComponent>()
     .register_type_data::<Transform, component_editor::ReflectEditorView>()

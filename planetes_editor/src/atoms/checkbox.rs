@@ -3,7 +3,9 @@
 use bevy::{
     input_focus::{InputFocus, tab_navigation::TabIndex},
     prelude::*,
+    ui::Checked,
 };
+use bevy_feathers::controls::checkbox;
 use bevy_ui_html::html;
 use planetes_input::prelude::InputValue;
 
@@ -14,24 +16,7 @@ pub struct Checkbox(pub bool);
 
 /// Renders a checkbox
 pub fn check_box(value: bool) -> impl Bundle {
-    html! {
-        <div
-            border-radius="4px"
-            border="1px"
-            border-color="srgb(77 77 77)"
-            width="16px"
-            height="16px"
-            display="flex"
-            flex-direction="col"
-            justify-content="center"
-            align-items={AlignItems::Center}
-            components={(Checkbox(value), InputValue::new(&value))}
-            onClick={on_checkbox_click}>
-            <span>{
-                if value { "Y" } else { "N" }
-            }</span>
-        </div>
-    }
+    checkbox(Checked, ())
 }
 
 /// Un/Checks checkbox
