@@ -1,5 +1,7 @@
 pub mod background;
 pub mod border;
+#[cfg(feature = "feathers")]
+pub mod feathers;
 pub mod image;
 pub mod name;
 pub mod node;

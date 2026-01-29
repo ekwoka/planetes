@@ -610,13 +610,30 @@ impl ElementNode {
 
 impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let tag_names = vec![
+            "div",
+            "img",
+            #[cfg(feature = "feathers")]
+            "button",
+        ];
         let mut components = Vec::<TokenStream>::new();
         components.push_some(Name::from(&self.attributes).ok());
-        if self.tag_name.to_string() != "div" && self.tag_name.to_string() != "img" {
+        if !tag_names.contains(&self.tag_name.to_string().as_str()) {
             let tag_name = &self.tag_name;
             components.push(quote! {
                 #tag_name
             })
+        }
+        #[cfg(feature = "feathers")]
+        {
+            if self.tag_name.to_string() == "button" {
+                let button =
+                    feathers::Button::from(&self.attributes).with_children(self.children.clone());
+                tokens.extend(quote! {
+                    #button
+                });
+                return;
+            }
         }
         components.push_some(NodeComponent::from(&self.attributes).ok());
         components.push_some(Image::from(&self.attributes).ok());
@@ -2350,6 +2367,42 @@ mod tests {
                                     linebreak: LineBreak::NoWrap,
                                     ..Default::default()
                                 }
+                            )
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+    }
+
+    #[cfg(feature = "feathers")]
+    mod feathers_elements {
+        use super::*;
+
+        #[test]
+        fn renders_button() {
+            let input = quote! {
+                <div>
+                    <button
+                        variant="normal"
+                        corners="rounded">"Hello"</button>
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            ::bevy::feathers::controls::button(
+                                ::bevy::feathers::controls::ButtonProps {
+                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                    ..Default::default()
+                                },
+                                (),
+                                (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
                             )
                         )
                     ))

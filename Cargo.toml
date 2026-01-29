@@ -9,7 +9,7 @@ rust-version = "1.92"
 [workspace.dependencies]
 # Local Packages
 avian_bullet_trajectory = { path = "avian_bullet_trajectory" }
-bevy_ui_html = { path = "bevy_ui_html", features = ["propagate"] }
+bevy_ui_html = { path = "bevy_ui_html", features = ["propagate", "feathers"] }
 planetes_scene_state = { path = "planetes_scene_state" }
 planetes_editor = { path = "planetes_editor" }
 planetes_input = { path = "planetes_input" }

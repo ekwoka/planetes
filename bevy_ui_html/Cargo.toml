@@ -21,5 +21,7 @@ workspace = true
 proc-macro = true
 
 [features]
-# feature for avian3d support
+# Auto propagates values that are typically propagated in CSS
 propagate = []
+# Allows Bevy Feathers usage for additional Elements
+feathers = []

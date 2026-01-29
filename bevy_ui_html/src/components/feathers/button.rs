@@ -1,0 +1,143 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
+
+use crate::{Attribute, ChildNode, Observer, PushSomeTokens};
+
+#[derive(Clone, Debug)]
+pub struct Button {
+    attributes: Vec<Attribute>,
+    children: Option<Vec<ChildNode>>,
+}
+
+impl Button {
+    const KEYS: [&'static str; 2] = ["variant", "corners"];
+
+    pub fn with_children(self, children: Vec<ChildNode>) -> Self {
+        Self {
+            attributes: self.attributes,
+            children: Some(children),
+        }
+    }
+}
+
+impl From<&Vec<Attribute>> for Button {
+    fn from(attributes: &Vec<Attribute>) -> Self {
+        Self {
+            attributes: attributes
+                .iter()
+                .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
+                .cloned()
+                .collect(),
+            children: None,
+        }
+    }
+}
+
+impl ToTokens for Button {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let mut children = self
+            .children
+            .as_ref()
+            .unwrap_or(&vec![])
+            .iter()
+            .map(|child| child.to_token_stream())
+            .collect::<Vec<_>>();
+        children.push_some(Observer::from(&self.attributes).ok());
+        let props = ButtonProps::from(&self.attributes);
+        tokens.extend(quote! {
+            ::bevy::feathers::controls::button(
+                #props,
+                (),
+                (
+                    #(#children),*
+                )
+            )
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ButtonProps {
+    attributes: Vec<Attribute>,
+}
+
+impl ButtonProps {
+    const KEYS: [&'static str; 2] = ["variant", "corners"];
+}
+
+impl From<&Vec<Attribute>> for ButtonProps {
+    fn from(attributes: &Vec<Attribute>) -> Self {
+        Self {
+            attributes: attributes
+                .iter()
+                .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
+impl ToTokens for ButtonProps {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        if self.attributes.is_empty() {
+            tokens.extend(quote! { ::bevy::feathers::controls::ButtonProps::default() })
+        } else {
+            let fields = self
+                .attributes
+                .iter()
+                .map(|attr| {
+                    let field = attr.key.clone();
+                    let value = attr.value.clone();
+                    let value_tokens = if let syn::Expr::Block(expr_block) = value {
+                        let stmts = &expr_block.block.stmts;
+                        quote! { #(#stmts)* }
+                    } else {
+                        quote! { #value }
+                    };
+
+                    // Try to parse as a string literal (CSS-style values)
+                    let value_str = value_tokens.to_string().trim_matches('"').to_string();
+                    let value = match field.as_str() {
+                        "variant" => {
+                            let value = match value_str.as_str() {
+                                "normal" | "Normal" => {
+                                    syn::Ident::new("Normal", proc_macro2::Span::call_site())
+                                }
+                                "primary" | "Primary" => {
+                                    syn::Ident::new("Primary", proc_macro2::Span::call_site())
+                                }
+                                &_ => unreachable!(),
+                            };
+                            quote! {
+                                ::bevy::feathers::controls::ButtonVariant::#value
+                            }
+                        }
+                        "corners" => {
+                            let value = match value_str.as_str() {
+                                "all" | "All" | "rounded" | "Rounded" => {
+                                    syn::Ident::new("All", proc_macro2::Span::call_site())
+                                }
+                                &_ => unreachable!(),
+                            };
+                            quote! {
+                                ::bevy::feathers::rounded_corners::RoundedCorners::#value
+                            }
+                        }
+                        &_ => unreachable!(),
+                    };
+                    let field_name = syn::Ident::new(&field, proc_macro2::Span::call_site());
+                    quote! {
+                        #field_name: #value
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            tokens.extend(quote! {
+                ::bevy::feathers::controls::ButtonProps {
+                    #(#fields,)*
+                    ..Default::default()
+                }
+            });
+        }
+    }
+}
