@@ -1,6 +1,7 @@
 //! Provides simple rendering of an [InputField] with hover states
 
-use bevy::{input_focus::InputFocus, prelude::*};
+use bevy::{input_focus::InputFocus, prelude::*, window::SystemCursorIcon};
+use bevy_feathers::cursor::EntityCursor;
 use bevy_ui_html::html;
 use planetes_input::prelude::{EditableText, InputField, Validable};
 
@@ -14,6 +15,7 @@ pub fn input_field<T: Validable>(value: T) -> impl Bundle {
             padding-bottom="1px"
             padding-left="3px"
             padding-right="3px"
+            components={EntityCursor::System(SystemCursorIcon::Text)}
             >
             <div
                 components={InputField::<T>::new(value)}

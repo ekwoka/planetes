@@ -11,6 +11,7 @@ use bevy::{
     input_focus::{FocusedInput, InputFocus},
     platform::collections::HashSet,
     prelude::*,
+    ui_widgets::Activate,
 };
 use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
@@ -127,19 +128,7 @@ pub fn update_entity_viewer(
                 </div>
             });
 
-            parent.spawn(html! {
-                <div
-                  display="flex"
-                  flex-direction="row"
-                  align-items={AlignItems::Center}
-                  onClick={|_event: On<Pointer<Click>>, mut commands: Commands, target: Single<&Viewing>| {
-                      commands.trigger(OpenAddComponent { entity: target.0 });
-                  }}
-                >
-                    <span>"Add Component: "</span>
-                    {button::render("+")}
-                </div>
-            });
+
             parent.spawn(html! {
                 <div
                    display="flex"
@@ -148,6 +137,13 @@ pub fn update_entity_viewer(
                    <iter>
                     {components.into_iter()}
                    </iter>
+                </div>
+            });
+            parent.spawn(html! {
+                <div>
+                    {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
+                        commands.trigger(OpenAddComponent { entity: target.0 });
+                    })}
                 </div>
             });
             parent.spawn(html! {
@@ -280,28 +276,33 @@ pub fn handle_update_entity_viewer(
                     }
                 </div>
             });
+
+
             parent.spawn(html! {
                 <div
-                  display="flex"
-                  flex-direction="row"
-                  align-items={AlignItems::Center}
-                  onClick={|_event: On<Pointer<Click>>, mut commands: Commands, target: Single<&Viewing>| {
-                      commands.trigger(OpenAddComponent { entity: target.0 });
-                  }}
-                >
-                    <span>"Add Component: "</span>
-                    {button::render("+")}
+                    display="flex"
+                    flex-direction="col"
+                    row-gap="4px">
+                    <iter>
+                    {components.into_iter()}
+                    </iter>
                 </div>
             });
             parent.spawn(html! {
                 <div
-                   display="flex"
-                   flex-direction="col"
-                   flex-grow="1"
-                   row-gap="4px">
-                   <iter>
-                    {components.into_iter()}
-                   </iter>
+                    display="block"
+                >
+                    {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
+                        commands.trigger(OpenAddComponent { entity: target.0 });
+                    })}
+                </div>
+            });
+            parent.spawn(html! {
+                <div display="flex" flex-direction="col" row-gap="4px" components={Propagate(TextColor(Color::srgb_u8(120, 120, 120)))}>
+                    <span>"Required Components:"</span>
+                    <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
+
+                    </div>
                 </div>
             });
         });

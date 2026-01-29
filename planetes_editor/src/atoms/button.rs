@@ -1,34 +1,35 @@
 //! Provides simple rendering of a Button with Hover States
 
-use bevy::prelude::*;
+use bevy::{
+    ecs::{relationship::RelatedSpawner, system::IntoObserverSystem},
+    prelude::*,
+};
+use bevy_feathers::{
+    controls::{ButtonProps, ButtonVariant},
+    rounded_corners::RoundedCorners,
+};
 
 #[derive(Component)]
 pub struct MenuButton;
 
-pub fn render(text: impl Into<String>) -> impl Bundle {
-    bevy_ui_html::html! {
-        <MenuButton
-          padding="4px"
-          border-radius="2px">
-              <span>{text}</span>
-        </MenuButton>
-    }
-}
-
-pub fn hover_menu_item(
-    trigger: On<Pointer<Over>>,
-    mut menu_items: Query<&mut BackgroundColor, With<MenuButton>>,
-) {
-    if let Ok(mut color) = menu_items.get_mut(trigger.entity) {
-        *color = BackgroundColor::from(Color::srgba_u8(100, 100, 255, 127));
-    }
-}
-
-pub fn unhover_menu_item(
-    trigger: On<Pointer<Out>>,
-    mut menu_items: Query<&mut BackgroundColor, With<MenuButton>>,
-) {
-    if let Ok(mut color) = menu_items.get_mut(trigger.entity) {
-        *color = BackgroundColor::DEFAULT;
-    }
+pub fn render<E: Event, B: Bundle, M, I: IntoObserverSystem<E, B, M> + Sync>(
+    text: impl Into<String>,
+    handler: I,
+) -> impl Bundle {
+    bevy::feathers::controls::button(
+        ButtonProps {
+            variant: ButtonVariant::Normal,
+            corners: RoundedCorners::All,
+        },
+        MenuButton,
+        (
+            Spawn(bevy_ui_html::html! {
+               <span>{text}</span>
+            }),
+            SpawnWith(|parent: &mut RelatedSpawner<ChildOf>| {
+                let entity = parent.target_entity();
+                parent.spawn(Observer::new(handler).with_entity(entity));
+            }),
+        ),
+    )
 }

@@ -8,10 +8,9 @@ use bevy::{
     camera::{ImageRenderTarget, RenderTarget, visibility::RenderLayers},
     prelude::*,
     render::render_resource::TextureFormat,
+    ui_widgets::Activate,
 };
-use bevy_feathers::{
-    FeathersPlugin, FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme,
-};
+use bevy_feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme};
 
 use crate::{
     EditorMode, ReflectPlanetesComponent,
@@ -55,8 +54,6 @@ pub fn plugin(app: &mut App) {
         (setup_camera_system, build_ui).chain().before(load_scene),
     )
     .add_systems(Update, update_viewport)
-    .add_observer(button::hover_menu_item)
-    .add_observer(button::unhover_menu_item)
     .add_message::<UpdateSceneTree>();
     #[cfg(feature = "avian")]
     {
@@ -120,9 +117,12 @@ pub fn build_ui(mut commands: Commands) {
                     border-color="srgb(178 178 178)">
                     <iter>
                         {["File", "Edit", "View", "Help"].into_iter().map(|item| {
-                            button::render(item)
+                            button::render(item, move |_event: On<Activate>| {
+                                info!("Button Activated: {}", item);
+                            })
                         })}
                     </iter>
+                    <div flex-grow="20"></div>
                 </MenuBar>
                 <div
                     display="flex"

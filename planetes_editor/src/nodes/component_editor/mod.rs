@@ -18,6 +18,7 @@ use bevy::{
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
     reflect::{EnumInfo, OpaqueInfo, StructInfo, TupleStructInfo, TypeInfo},
+    ui_widgets::Activate,
 };
 use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
@@ -102,12 +103,12 @@ pub struct RemoveComponentButton(pub TypeId);
 
 /// Builds out the full Component Editor with content
 pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+    let cloned_type_info = type_info.clone();
     html! {
         <div display="flex" flex-direction="column" row-gap="2px" width="100%" onenter={handle_commit}>
-            <div onClick={handle_remove_component} components={RemoveComponentButton(type_info.type_id())}>{button::render("Remove X")}</div>
             <with>
             {
-                match type_info {
+                match cloned_type_info {
                     TypeInfo::Struct(info) => {
                         if info.field_len() != 0 {
                             parent.spawn(struct_component(info, reflect))
@@ -125,6 +126,13 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
                 };
             }
             </with>
+            <div
+                onClick={handle_remove_component}
+                components={RemoveComponentButton(type_info.type_id())}>
+                {button::render("X Remove", move |_event: On<Activate>| {
+                    info!("Remove button Activated");
+                })}
+            </div>
         </div>
     }
 }
