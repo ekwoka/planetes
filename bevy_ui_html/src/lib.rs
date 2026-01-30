@@ -2411,5 +2411,52 @@ mod tests {
             let result = html_inner(input);
             assert_eq!(result.to_string(), expected.to_string());
         }
+
+        #[test]
+        fn spawns_observer() {
+            let input = quote! {
+                <div>
+                    <button
+                        variant="primary"
+                        corners="top left"
+                        onActivate={|event: On<Activate>| { info!("{:?}",event.entity); }}>
+                        "Hello"
+                    </button>
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            ::bevy::feathers::controls::button(
+                                ::bevy::feathers::controls::ButtonProps {
+                                    variant: ::bevy::feathers::controls::ButtonVariant::Primary,
+                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                                    ..Default::default()
+                                },
+                                (),
+                                (
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                        let entity = parent.target_entity();
+                                        parent.spawn(
+                                            ::bevy::ecs::observer::Observer::new(
+                                                |event: On<Activate>| {
+                                                    info!("{:?}",event.entity);
+                                                }
+                                            )
+                                            .with_entity(entity)
+                                        );
+                                    })
+                                )
+                            )
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
     }
 }

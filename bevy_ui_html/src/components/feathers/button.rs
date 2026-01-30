@@ -25,7 +25,9 @@ impl From<&Vec<Attribute>> for Button {
         Self {
             attributes: attributes
                 .iter()
-                .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
+                .filter(|attr| {
+                    Self::KEYS.contains(&attr.key.as_str()) || attr.key.starts_with("on")
+                })
                 .cloned()
                 .collect(),
             children: None,
@@ -116,6 +118,33 @@ impl ToTokens for ButtonProps {
                             let value = match value_str.as_str() {
                                 "all" | "All" | "rounded" | "Rounded" => {
                                     syn::Ident::new("All", proc_macro2::Span::call_site())
+                                }
+                                "top" | "Top" => {
+                                    syn::Ident::new("Top", proc_macro2::Span::call_site())
+                                }
+                                "bottom" | "Bottom" => {
+                                    syn::Ident::new("Bottom", proc_macro2::Span::call_site())
+                                }
+                                "left" | "Left" => {
+                                    syn::Ident::new("Left", proc_macro2::Span::call_site())
+                                }
+                                "right" | "Right" => {
+                                    syn::Ident::new("Right", proc_macro2::Span::call_site())
+                                }
+                                "topleft" | "TopLeft" | "top left" => {
+                                    syn::Ident::new("TopLeft", proc_macro2::Span::call_site())
+                                }
+                                "topright" | "TopRight" | "top right" => {
+                                    syn::Ident::new("TopRight", proc_macro2::Span::call_site())
+                                }
+                                "bottomleft" | "BottomLeft" | "bottom left" => {
+                                    syn::Ident::new("BottomLeft", proc_macro2::Span::call_site())
+                                }
+                                "bottomright" | "BottomRight" | "bottom right" => {
+                                    syn::Ident::new("BottomRight", proc_macro2::Span::call_site())
+                                }
+                                "none" | "None" => {
+                                    syn::Ident::new("None", proc_macro2::Span::call_site())
                                 }
                                 &_ => unreachable!(),
                             };

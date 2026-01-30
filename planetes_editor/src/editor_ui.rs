@@ -14,7 +14,6 @@ use bevy_feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiThe
 
 use crate::{
     EditorMode, ReflectPlanetesComponent,
-    atoms::*,
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::{scene_tree::UpdateSceneTree, *},
     prelude::*,
@@ -97,67 +96,75 @@ pub struct MenuBar;
 /// Builds entire Editor UI
 pub fn build_ui(mut commands: Commands) {
     commands.spawn(html! {
-        <div
-            padding="1px"
+    <div
+    padding="1px"
+    flex-grow="0"
+    display="flex"
+    flex-direction="col"
+    width="100%"
+    height="100%"
+    font-size="12"
+    text-color="srgb(178 178 178)">
+        <MenuBar
+            padding="4px"
             flex-grow="0"
             display="flex"
-            flex-direction="col"
+            flex-direction="row"
+            column-gap="8px"
             width="100%"
-            height="100%"
-            font-size="12"
-            text-color="srgb(178 178 178)">
-                <MenuBar
-                    padding="4px"
-                    flex-grow="0"
-                    display="flex"
-                    flex-direction="row"
-                    column-gap="8px"
-                    width="100%"
-                    border-bottom="1px"
-                    border-color="srgb(178 178 178)">
-                    <iter>
-                        {["File", "Edit", "View", "Help"].into_iter().map(|item| {
-                            button::render(item, move |_event: On<Activate>| {
-                                info!("Button Activated: {}", item);
-                            })
-                        })}
-                    </iter>
-                    <div flex-grow="20"></div>
-                </MenuBar>
-                <div
-                    display="flex"
-                    flex-direction="row"
-                    flex-grow="1"
-                    flex-shrink="1"
-                    width="100%"
-                    height="50%">
+            border-bottom="1px"
+            border-color="srgb(178 178 178)">
+            <iter>
+                {["File", "Edit", "View", "Help"].into_iter().map(|item| {
+                    let content = item.to_string();
+                    html! {
+                        <button
+                            variant="normal"
+                            corners="rounded"
+                            onActivate={move |_event: On<Activate>| {
+                                info!("Button Activated: {}", content);
+                            }}>
+                            <span>{item}</span>
+                        </button>
+                    }
+                })}
+            </iter>
+            <div flex-grow="20"></div>
+        </MenuBar>
                     <div
+                        display="flex"
+                        flex-direction="row"
                         flex-grow="1"
                         flex-shrink="1"
-                        width="50%"
-                        height="100%"
-                        justify-content="center"
-                        align-items={AlignItems::Center}
-                        border="1px"
-                        border-color="srgb(178 178 178)"
-                        components={ViewPort}>
+                        width="100%"
+                        height="50%">
+                        <div
+                            flex-grow="1"
+                            flex-shrink="1"
+                            width="50%"
+                            height="100%"
+                            justify-content="center"
+                            align-items={AlignItems::Center}
+                            border="1px"
+                            border-color="srgb(178 178 178)"
+                            components={ViewPort}>
+                        </div>
+                        <div
+                            padding="1px"
+                            display="flex"
+                            flex-direction="col"
+                            flex-grow="0"
+                            flex-shrink="0"
+                            width="40%"
+                            border="1px"
+                            border-color="srgb(178 178 178)">
+                            {scene_tree::view()}
+                            {entity_viewer::view()}
+                        </div>
                     </div>
-                    <div
-                        padding="1px"
-                        display="flex"
-                        flex-direction="col"
-                        flex-grow="0"
-                        flex-shrink="0"
-                        width="40%"
-                        border="1px"
-                        border-color="srgb(178 178 178)">
-                        {scene_tree::view()}
-                        {entity_viewer::view()}
-                    </div>
+                    {bottom_bar()}
                 </div>
-                {bottom_bar()}
-            </div>
-    });
+        });
 }
 
 /// Sets up the camera system for the editor UI.

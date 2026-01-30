@@ -5,7 +5,7 @@ pub use component_ui::*;
 use std::any::TypeId;
 
 use crate::{
-    atoms::{button, check_box, input_field},
+    atoms::{check_box, input_field},
     editor_ui::Capitalize,
     nodes::entity_viewer::{UpdateEntityViewer, Viewing},
     prelude::*,
@@ -129,9 +129,14 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
             <div
                 onClick={handle_remove_component}
                 components={RemoveComponentButton(type_info.type_id())}>
-                {button::render("X Remove", move |_event: On<Activate>| {
-                    info!("Remove button Activated");
-                })}
+                <button
+                    variant="normal"
+                    corners="rounded"
+                    onActivate={|_event: On<Activate>| {
+                        info!("Remove button Activated");
+                    }}>
+                    "X Remove"
+                </button>
             </div>
         </div>
     }

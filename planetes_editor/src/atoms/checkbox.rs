@@ -6,7 +6,6 @@ use bevy::{
     ui::Checked,
 };
 use bevy_feathers::controls::checkbox;
-use bevy_ui_html::html;
 use planetes_input::prelude::InputValue;
 
 /// Represents a checkbox component and current state.
@@ -15,12 +14,12 @@ use planetes_input::prelude::InputValue;
 pub struct Checkbox(pub bool);
 
 /// Renders a checkbox
-pub fn check_box(value: bool) -> impl Bundle {
+pub fn check_box(_value: bool) -> impl Bundle {
     checkbox(Checked, ())
 }
 
 /// Un/Checks checkbox
-pub fn on_checkbox_click(event: On<Pointer<Click>>, mut checkboxes: Query<&mut Checkbox>) {
+pub fn _on_checkbox_click(event: On<Pointer<Click>>, mut checkboxes: Query<&mut Checkbox>) {
     if let Ok(mut checkbox) = checkboxes.get_mut(event.entity) {
         checkbox.0 = !checkbox.0;
     }

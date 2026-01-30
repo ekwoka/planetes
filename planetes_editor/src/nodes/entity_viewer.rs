@@ -292,9 +292,14 @@ pub fn handle_update_entity_viewer(
                 <div
                     display="block"
                 >
-                    {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
-                        commands.trigger(OpenAddComponent { entity: target.0 });
-                    })}
+                    <button
+                       variant="normal"
+                       corners="rounded"
+                       onActivate={|_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
+                           commands.trigger(OpenAddComponent { entity: target.0 });
+                       }}>
+                       "+ Add Component"
+                    </button>
                 </div>
             });
             parent.spawn(html! {
