@@ -126,24 +126,19 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundl
                 };
             }
             </with>
-            <div
-                onClick={handle_remove_component}
-                components={RemoveComponentButton(type_info.type_id())}>
-                <button
-                    variant="normal"
-                    corners="rounded"
-                    onActivate={|_event: On<Activate>| {
-                        info!("Remove button Activated");
-                    }}>
-                    "X Remove"
-                </button>
-            </div>
+            <button
+                variant="normal"
+                corners="rounded"
+                components={RemoveComponentButton(type_info.type_id())}
+                onActivate={handle_remove_component}>
+                "X Remove"
+            </button>
         </div>
     }
 }
 
 pub fn handle_remove_component(
-    event: On<Pointer<Click>>,
+    event: On<Activate>,
     mut commands: Commands,
     buttons: Query<&RemoveComponentButton>,
     editing: Single<&Viewing>,

@@ -2458,5 +2458,37 @@ mod tests {
             let result = html_inner(input);
             assert_eq!(result.to_string(), expected.to_string());
         }
+
+        #[test]
+        fn supports_overrides() {
+            let input = quote! {
+                <div>
+                    <button
+                        variant="normal"
+                        corners="rounded"
+                        components={Testing::new()}>"Hello"</button>
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            ::bevy::feathers::controls::button(
+                                ::bevy::feathers::controls::ButtonProps {
+                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                    ..Default::default()
+                                },
+                                Testing::new(),
+                                (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
+                            )
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
     }
 }

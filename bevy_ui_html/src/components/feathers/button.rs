@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-use crate::{Attribute, ChildNode, Observer, PushSomeTokens};
+use crate::{Attribute, ChildNode, Observer, PushSomeTokens, Value};
 
 #[derive(Clone, Debug)]
 pub struct Button {
@@ -10,7 +10,7 @@ pub struct Button {
 }
 
 impl Button {
-    const KEYS: [&'static str; 2] = ["variant", "corners"];
+    const KEYS: [&'static str; 3] = ["variant", "corners", "components"];
 
     pub fn with_children(self, children: Vec<ChildNode>) -> Self {
         Self {
@@ -46,10 +46,16 @@ impl ToTokens for Button {
             .collect::<Vec<_>>();
         children.push_some(Observer::from(&self.attributes).ok());
         let props = ButtonProps::from(&self.attributes);
+        let components = self
+            .attributes
+            .iter()
+            .find(|attr| attr.key == "components")
+            .and_then(|attr| Value::new(&attr.value).clean_block())
+            .unwrap_or_else(|| quote! { () });
         tokens.extend(quote! {
             ::bevy::feathers::controls::button(
                 #props,
-                (),
+                #components,
                 (
                     #(#children),*
                 )
