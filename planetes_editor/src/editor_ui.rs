@@ -14,6 +14,7 @@ use bevy_feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiThe
 
 use crate::{
     EditorMode, ReflectPlanetesComponent,
+    atoms::{on_checkbox_add, on_checkbox_value_change},
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::{scene_tree::UpdateSceneTree, *},
     prelude::*,
@@ -53,6 +54,8 @@ pub fn plugin(app: &mut App) {
         (setup_camera_system, build_ui).chain().before(load_scene),
     )
     .add_systems(Update, update_viewport)
+    .add_observer(on_checkbox_value_change)
+    .add_observer(on_checkbox_add)
     .add_message::<UpdateSceneTree>();
     #[cfg(feature = "avian")]
     {

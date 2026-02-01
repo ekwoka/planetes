@@ -1,9 +1,7 @@
 //! Provides simple rendering of a [Checkbox] with hover states
 
 use bevy::{
-    input_focus::{InputFocus, tab_navigation::TabIndex},
-    prelude::*,
-    ui::Checked,
+    input_focus::tab_navigation::TabIndex, prelude::*, ui::Checked, ui_widgets::ValueChange,
 };
 use bevy_feathers::controls::checkbox;
 use planetes_input::prelude::InputValue;
@@ -14,53 +12,40 @@ use planetes_input::prelude::InputValue;
 pub struct Checkbox(pub bool);
 
 /// Renders a checkbox
-pub fn check_box(_value: bool) -> impl Bundle {
-    checkbox(Checked, ())
+pub fn check_box(value: bool) -> impl Bundle {
+    checkbox(Checkbox(value), ())
 }
 
-/// Un/Checks checkbox
-pub fn _on_checkbox_click(event: On<Pointer<Click>>, mut checkboxes: Query<&mut Checkbox>) {
-    if let Ok(mut checkbox) = checkboxes.get_mut(event.entity) {
-        checkbox.0 = !checkbox.0;
-    }
-}
-
-/// Updates InputValue from Checkbox state
-pub fn on_checkbox_change(
+pub fn on_checkbox_add(
+    event: On<Add, Checkbox>,
     mut commands: Commands,
-    checkboxes: Query<(Entity, &Checkbox, &Children), Changed<Checkbox>>,
-    mut texts: Query<&mut Text>,
+    checkboxes: Query<(Entity, &Checkbox)>,
 ) {
-    for (entity, checkbox, children) in checkboxes.iter() {
+    if let Ok((entity, checkbox)) = checkboxes.get(event.entity) {
         commands.entity(entity).insert(InputValue::new(&checkbox.0));
-        for child in children.iter() {
-            if let Ok(mut text) = texts.get_mut(child) {
-                text.0 = if checkbox.0 { "Y" } else { "N" }.to_string();
-            }
+        if checkbox.0 {
+            commands.entity(entity).insert(Checked);
+        } else {
+            commands.entity(entity).try_remove::<Checked>();
         }
     }
 }
 
-/// Highlights selected checkbox
-pub fn highlight_selected_checkbox(
+/// Updates InputValue from Checkbox state change
+pub fn on_checkbox_value_change(
+    event: On<ValueChange<bool>>,
     mut commands: Commands,
-    checkboxes: Query<Entity, With<Checkbox>>,
-    focused: Res<InputFocus>,
+    mut checkboxes: Query<(Entity, &mut Checkbox)>,
 ) {
-    if !focused.is_changed() {
-        return;
-    }
-    for checkbox in checkboxes.iter() {
-        if let Some(focused_entity) = focused.0
-            && focused_entity == checkbox
-        {
-            commands
-                .entity(checkbox)
-                .insert(BorderColor::from(Color::srgb_u8(178, 178, 178)));
+    if let Ok((entity, mut checkbox)) = checkboxes.get_mut(event.source) {
+        checkbox.0 = event.value;
+        commands
+            .entity(entity)
+            .insert(InputValue::new(&event.value));
+        if event.value {
+            commands.entity(entity).insert(Checked);
         } else {
-            commands
-                .entity(checkbox)
-                .insert(BorderColor::from(Color::srgb_u8(77, 77, 77)));
+            commands.entity(entity).try_remove::<Checked>();
         }
     }
 }
