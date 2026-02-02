@@ -52,32 +52,55 @@ pub fn handle_open_add_component(
                 row-gap="4px"
                 background-color={Color::BLACK}
                 padding="8px"
-                border-radius="4px">
+                border-radius="4px"
+                max-height="70vh">
                 <div padding-bottom="8px">"Components Here"</div>
-                <iter>
-                    {all_components.into_iter().take(25).map(|info| {
-                        html!{
-                            <div
-                                display="flex"
-                                justify-content="space-between"
-                                column-gap="12px"
-                                onClick={handle_add_component}
-                                components={AddComponentButton(info.type_id())}>
-                                <span>{
-                                    info.type_path_table().ident().unwrap_or("Unknown")
-                                }</span>
-                                <div components={Propagate(TextColor(Color::srgb_u8(178, 178, 178)))}>
+                <div
+                  display="flex"
+                  flex-direction="column"
+                  row-gap="4px"
+                  onScroll={handle_scroll}
+                  overflow={Overflow {
+                      y: OverflowAxis::Scroll,
+                      ..Default::default()
+                  }}
+                  scrollbar-width="12px"
+                  components={ScrollPosition(Vec2::new(0.0, 10.0))}>
+                    <iter>
+                        {all_components.into_iter().map(|info| {
+                            html!{
+                                <div
+                                    display="flex"
+                                    justify-content="space-between"
+                                    column-gap="12px"
+                                    onClick={handle_add_component}
+                                    components={AddComponentButton(info.type_id())}>
                                     <span>{
-                                        info.type_path_table().crate_name().unwrap_or("unknown")
+                                        info.type_path_table().ident().unwrap_or("Unknown")
                                     }</span>
+                                    <div components={Propagate(TextColor(Color::srgb_u8(178, 178, 178)))}>
+                                        <span>{
+                                            info.type_path_table().crate_name().unwrap_or("unknown")
+                                        }</span>
+                                    </div>
                                 </div>
-                            </div>
-                        }
-                    })}
-                </iter>
+                            }
+                        })}
+                    </iter>
+                </div>
             </div>
         </AddComponentModal>
     });
+}
+
+pub fn handle_scroll(
+    event: On<Pointer<Scroll>>,
+    mut scroll_position: Query<(&ComputedNode, &mut ScrollPosition)>,
+) {
+    if let Ok((layout, mut scroll_pos)) = scroll_position.get_mut(event.entity) {
+        scroll_pos.0.y =
+            layout.scroll_position.y * layout.inverse_scale_factor + event.event.y * 10.0;
+    }
 }
 
 pub fn handle_close_add_component(
