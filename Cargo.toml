@@ -18,7 +18,8 @@ bevy = { version = "0.18", features = [
     "serialize",
     # Due to some Bevy bug, we need to enable the UI debug plugin even in non-dev builds,
     # otherwise we only render the view model and the skybox.
-    "bevy_ui_debug"
+    "bevy_ui_debug",
+    "x11"
 ] }
 bevy_enhanced_input = "0.23"
 
