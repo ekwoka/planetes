@@ -1,0 +1,16 @@
+{
+    "name": "planetes",
+    "image": "mcr.microsoft.com/devcontainers/rust:2-1-trixie",
+    "remoteUser": "root",
+    "workspaceFolder": "/root/workspace",
+    "forwardPorts": [
+        8080,
+        "2222:22"
+    ],
+    "postCreateCommand": "apt-get update; apt-get upgrade -y; apt-get install openssh-server pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev libx11-xcb1 libxkbcommon-x11-0 libxcursor1 libxdamage1 libxi6 libxtst6 libxcomposite1 libxss1 libxrandr2 libatk1.0-0 libatk-bridge2.0-0 libgtk-3-0 libnss3 vulkan-validationlayers libvulkan1 vulkan-tools -y; mkdir -p /run/sshd",
+    "postStartCommand": "/usr/sbin/sshd; /usr/bin/bash -ci \"cargo install cargo-run-bin\";",
+    "hostRequirements": {
+        "cpus": 8,
+        "memory": "8gb"
+    }
+}
