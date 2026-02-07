@@ -615,6 +615,8 @@ impl ToTokens for ElementNode {
             "img",
             #[cfg(feature = "feathers")]
             "button",
+            #[cfg(feature = "feathers")]
+            "input",
         ];
         let mut components = Vec::<TokenStream>::new();
         components.push_some(Name::from(&self.attributes).ok());
@@ -633,6 +635,18 @@ impl ToTokens for ElementNode {
                     #button
                 });
                 return;
+            }
+            if self.tag_name.to_string() == "input" {
+                if self.attributes.iter().any(|attr| {
+                    attr.key == "type"
+                        && attr.value.to_token_stream().to_string() == "\"checkbox\"".to_string()
+                }) {
+                    let checkbox = feathers::Checkbox::from(&self.attributes);
+                    tokens.extend(quote! {
+                        #checkbox
+                    });
+                    return;
+                }
             }
         }
         components.push_some(NodeComponent::from(&self.attributes).ok());
@@ -2460,7 +2474,7 @@ mod tests {
         }
 
         #[test]
-        fn supports_overrides() {
+        fn button_supports_overrides() {
             let input = quote! {
                 <div>
                     <button
@@ -2482,6 +2496,48 @@ mod tests {
                                 },
                                 Testing::new(),
                                 (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
+                            )
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn renders_checkbox() {
+            let input = quote! {
+                <div>
+                    <input
+                        type="checkbox"
+                        label="Hello"
+                        onChange={|event: On<ValueChange<bool>>| {
+                            println!("Hello Changed {}", event.value)
+                        }} />
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            ::bevy::feathers::controls::checkbox(
+                                (),
+                                (
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                        let entity = parent.target_entity();
+                                        parent.spawn(
+                                            ::bevy::ecs::observer::Observer::new(
+                                                |event: On< ValueChange<bool> >| {
+                                                    println!("Hello Changed {}", event.value)
+                                                }
+                                            )
+                                            .with_entity(entity)
+                                        );
+                                    })
+                                )
                             )
                         )
                     ))
