@@ -637,15 +637,31 @@ impl ToTokens for ElementNode {
                 return;
             }
             if self.tag_name.to_string() == "input" {
-                if self.attributes.iter().any(|attr| {
-                    attr.key == "type"
-                        && attr.value.to_token_stream().to_string() == "\"checkbox\"".to_string()
-                }) {
-                    let checkbox = feathers::Checkbox::from(&self.attributes);
-                    tokens.extend(quote! {
-                        #checkbox
-                    });
-                    return;
+                match self
+                    .attributes
+                    .iter()
+                    .filter(|attr| attr.key == "type")
+                    .map(|attr| attr.value.to_token_stream().to_string())
+                    .next()
+                {
+                    Some(kind) => match kind.as_str() {
+                        "\"checkbox\"" => {
+                            let checkbox = feathers::Checkbox::from(&self.attributes);
+                            tokens.extend(quote! {
+                                #checkbox
+                            });
+                            return;
+                        }
+                        "\"radio\"" => {
+                            let radio = feathers::Radio::from(&self.attributes);
+                            tokens.extend(quote! {
+                                #radio
+                            });
+                            return;
+                        }
+                        _ => {}
+                    },
+                    None => {}
                 }
             }
         }
@@ -2532,6 +2548,49 @@ mod tests {
                                             ::bevy::ecs::observer::Observer::new(
                                                 |event: On< ValueChange<bool> >| {
                                                     println!("Hello Changed {}", event.value)
+                                                }
+                                            )
+                                            .with_entity(entity)
+                                        );
+                                    })
+                                )
+                            )
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn renders_radio() {
+            let input = quote! {
+                <div>
+                    <input
+                        type="radio"
+                        label="Hello"
+                        onChange={|event: On<ValueChange<bool>>| {
+                            println!("Hello True {}", event.value)
+                        }}
+                        components={TestComponent} />
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            ::bevy::feathers::controls::radio(
+                                TestComponent,
+                                (
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                        let entity = parent.target_entity();
+                                        parent.spawn(
+                                            ::bevy::ecs::observer::Observer::new(
+                                                |event: On< ValueChange<bool> >| {
+                                                    println!("Hello True {}", event.value)
                                                 }
                                             )
                                             .with_entity(entity)
