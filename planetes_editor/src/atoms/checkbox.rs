@@ -3,7 +3,7 @@
 use bevy::{
     input_focus::tab_navigation::TabIndex, prelude::*, ui::Checked, ui_widgets::ValueChange,
 };
-use bevy_feathers::controls::checkbox;
+use bevy_ui_html::html;
 use planetes_input::prelude::InputValue;
 
 /// Represents a checkbox component and current state.
@@ -13,7 +13,9 @@ pub struct Checkbox(pub bool);
 
 /// Renders a checkbox
 pub fn check_box(value: bool) -> impl Bundle {
-    checkbox(Checkbox(value), ())
+    html! {
+        <input type="checkbox" components={Checkbox(value)} />
+    }
 }
 
 pub fn on_checkbox_add(
