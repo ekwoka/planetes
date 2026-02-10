@@ -18,7 +18,8 @@ use bevy::{
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
     reflect::{EnumInfo, OpaqueInfo, StructInfo, TupleStructInfo, TypeInfo},
-    ui_widgets::Activate,
+    ui::Checked,
+    ui_widgets::{Activate, RadioButton, RadioGroup, ValueChange},
 };
 use planetes_input::prelude::*;
 use planetes_scene_state::CanonicalScene;
@@ -377,27 +378,54 @@ fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bund
             width="100%"
             display="flex"
             flex-direction="col"
-            row-gap="4px">
-            <iter>
+            row-gap="4px"
+            components={RadioGroup}
+            onChange={|on: On<ValueChange<Entity>>,
+                mut commands: Commands,
+                children: Query<&Children>,
+                radios: Query<&RadioButton>| {
+                    for button in children.iter_descendants(on.source).filter(|button| radios.contains(*button)) {
+                        if button == on.value {
+                            commands.entity(button).insert(Checked);
+                        } else {
+                            commands.entity(button).try_remove::<Checked>();
+                        }
+                    }
+            }}>
+            <with>
             {
-               variants.into_iter().map(move |variant| {
-                   let name = format!("{}: ", variant.name());
-                   let is_this = enum_data
-                       .variant_name() == variant.name();
-                   html! {
-                       <div
-                          display="flex"
-                          flex-direction="row"
-                          column-gap="4px">
-                          <div flex-grow="1">
-                            <span>{name}</span>
-                          </div>
-                          <span>{format!("{is_this:?}")}</span>
-                       </div>
-                   }
-               })
-           }
-           </iter>
+                for variant in variants.into_iter() {
+                    let name = format!("{}: ", variant.name());
+                    let is_this = enum_data
+                        .variant_name() == variant.name();
+                    if is_this {
+                        parent.spawn(html! {
+                            <div
+                            display="flex"
+                            flex-direction="row"
+                            column-gap="4px">
+                                <div flex-grow="1">
+                                    <span>{name}</span>
+                                </div>
+                                <input type="radio" components={Checked} />
+                            </div>
+                        });
+                    } else {
+                        parent.spawn(html! {
+                            <div
+                            display="flex"
+                            flex-direction="row"
+                            column-gap="4px">
+                                <div flex-grow="1">
+                                    <span>{name}</span>
+                                </div>
+                                <input type="radio" />
+                            </div>
+                        });
+                    }
+                }
+            }
+           </with>
         </div>
     }
 }
