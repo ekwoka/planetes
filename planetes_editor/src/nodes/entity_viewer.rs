@@ -1,6 +1,6 @@
 //! Core Entity Viewer/Editor
 
-use std::iter::once;
+use std::{any::TypeId, iter::once};
 
 use bevy::{
     app::Propagate,
@@ -142,7 +142,7 @@ pub fn update_entity_viewer(
                 </div>
             });
             parent.spawn(html! {
-                <div display="flex" flex-direction="col" row-gap="4px" components={Propagate(TextColor(Color::srgb_u8(120, 120, 120)))}>
+                <div display="flex" flex-direction="col" row-gap="4px" components={Propagate(TextColor(Color::srgb_u8(180, 180, 180)))}>
                    <span>"Required Components:"</span>
                    <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
 
@@ -154,6 +154,9 @@ pub fn update_entity_viewer(
 
 #[derive(Component)]
 pub struct RequiredComponentsUI(pub Entity);
+
+#[derive(Component)]
+pub struct RequiredComponent(pub Entity, pub TypeId);
 
 pub fn update_required_components(
     event: On<Add, RequiredComponentsUI>,
@@ -170,7 +173,7 @@ pub fn update_required_components(
         return;
     };
     let components = world.components();
-    let mut required_components = HashSet::<String>::new();
+    let mut required_components = HashSet::<(String, TypeId)>::new();
     let existing_ids = dyn_entity
         .components
         .iter()
@@ -196,14 +199,55 @@ pub fn update_required_components(
             if existing_ids.contains(&required_component_info.type_id()) {
                 continue;
             }
-            required_components.insert(required_component_info.name().shortname().to_string());
+            required_components.insert((
+                required_component_info.name().shortname().to_string(),
+                required_component_info.type_id().unwrap(),
+            ));
         }
     }
     commands.entity(event.entity).with_children(|parent| {
-        for name in required_components.into_iter() {
-            parent.spawn(Text::new(name));
+        for (name, id) in required_components.into_iter() {
+            parent.spawn(html! {
+                <div
+                    display="flex"
+                    flex-direction="row"
+                    justify-items="space-between"
+                    align-items={AlignItems::Center}
+                    column-gap="2px"
+                    components={RequiredComponent(target, id)}>
+                    <span>{name}</span>
+                    <div flex-grow="100"/>
+                    {button::render("Include", handle_include_required_component)}
+                </div>
+            });
         }
     });
+}
+
+pub fn handle_include_required_component(
+    event: On<Activate>,
+    mut commands: Commands,
+    required_component_info: Query<&RequiredComponent>,
+    child_of: Query<&ChildOf>,
+    registry: Res<AppTypeRegistry>,
+    canonical_scene: Res<CanonicalScene>,
+    mut scenes: ResMut<Assets<DynamicScene>>,
+) {
+    for parent in child_of.iter_ancestors(event.entity) {
+        if let Ok(required_component) = required_component_info.get(parent) {
+            let RequiredComponent(entity, component_id) = required_component;
+            let registry = registry.read();
+            info!("Using Default Component");
+            let component_default = registry
+                .get_type_data::<ReflectDefault>(*component_id)
+                .unwrap();
+            if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, *entity) {
+                entity.components.push(component_default.default());
+            }
+            commands.trigger(UpdateEntityViewer(*entity));
+            break;
+        }
+    }
 }
 
 #[derive(Event)]
