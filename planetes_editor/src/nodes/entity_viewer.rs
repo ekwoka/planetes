@@ -18,6 +18,7 @@ use planetes_scene_state::CanonicalScene;
 
 use crate::{
     atoms::{button, highlight_selected_input, input_field},
+    events::AddComponentToEntity,
     nodes::{accordion, component_editor, component_selector::OpenAddComponent},
     prelude::*,
 };
@@ -229,22 +230,14 @@ pub fn handle_include_required_component(
     mut commands: Commands,
     required_component_info: Query<&RequiredComponent>,
     child_of: Query<&ChildOf>,
-    registry: Res<AppTypeRegistry>,
-    canonical_scene: Res<CanonicalScene>,
-    mut scenes: ResMut<Assets<DynamicScene>>,
 ) {
     for parent in child_of.iter_ancestors(event.entity) {
         if let Ok(required_component) = required_component_info.get(parent) {
             let RequiredComponent(entity, component_id) = required_component;
-            let registry = registry.read();
-            info!("Using Default Component");
-            let component_default = registry
-                .get_type_data::<ReflectDefault>(*component_id)
-                .unwrap();
-            if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, *entity) {
-                entity.components.push(component_default.default());
-            }
-            commands.trigger(UpdateEntityViewer(*entity));
+            commands.trigger(AddComponentToEntity {
+                entity: *entity,
+                component: *component_id,
+            });
             break;
         }
     }

@@ -60,7 +60,6 @@ pub fn actuate_accordion(
     representations: Query<&Represents>,
     editors: Query<Entity, With<EntityEditor>>,
 ) {
-    info!("Click Detected on {:?}", event.entity);
     if containers.contains(event.entity) {
         event.propagate(false);
     } else if let Ok(state) = accordions.get(event.entity) {

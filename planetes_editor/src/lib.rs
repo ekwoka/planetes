@@ -8,6 +8,7 @@
 use bevy::prelude::*;
 mod atoms;
 pub mod editor_ui;
+pub mod events;
 mod infinite_grid;
 pub mod nodes;
 mod sample_data;
