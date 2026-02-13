@@ -31,3 +31,32 @@ pub struct AddComponentToEntity {
     pub entity: Entity,
     pub component: TypeId,
 }
+
+#[derive(Event)]
+pub struct RemoveComponentFromEntity {
+    pub entity: Entity,
+    pub component: TypeId,
+}
+
+pub fn handle_remove_component(
+    event: On<RemoveComponentFromEntity>,
+    mut commands: Commands,
+    canonical_scene: Res<CanonicalScene>,
+    mut scenes: ResMut<Assets<DynamicScene>>,
+) {
+    info!(
+        "Removing component: {:?} to {:?}",
+        event.component, event.entity
+    );
+    if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, event.entity) {
+        entity.components.retain(|component| {
+            component
+                .get_represented_type_info()
+                .map(|info| info.type_id() != event.component)
+                .unwrap_or(true)
+        });
+    } else {
+        error!("Component to remove is not on a valid entity");
+    }
+    commands.trigger(UpdateEntityViewer(event.entity));
+}
