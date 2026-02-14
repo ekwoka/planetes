@@ -267,32 +267,67 @@ impl CanonicalComponentState {
     }
 }
 
-/// A single field-level edit operation representing a change to component data.
-///
-/// Edit operations store both the old and new values, enabling undo/redo
-/// functionality. The `field_path` uses Bevy's reflection path syntax
-/// (e.g., `"translation.x"` or `".0.color"`).
-pub struct EditOp {
+pub enum EditOp {
+    /// A single field-level edit operation representing a change to component data.
+    ///
+    /// Edit operations store both the old and new values, enabling undo/redo
+    /// functionality. The `field_path` uses Bevy's reflection path syntax
+    /// (e.g., `"translation.x"` or `".0.color"`).
+    FieldEdit(FieldEdit),
+    AddComponent(AddComponent),
+    RemoveComponent(RemoveComponent),
+}
+
+pub struct FieldEdit {
     /// The entity being edited.
-    pub entity: Entity,
+    entity: Entity,
     /// The component type being modified.
-    pub component_type: TypeId,
+    component_type: TypeId,
     /// The reflection path to the field being edited.
     /// Uses Bevy's path syntax: `"field_name"`, `".0"` for tuple fields, etc.
-    pub field_path: String,
+    field_path: String,
     /// The value before this edit was applied.
-    pub old_value: Box<dyn PartialReflect>,
+    old_value: Box<dyn PartialReflect>,
     /// The value after this edit is applied.
-    pub new_value: Box<dyn PartialReflect>,
+    new_value: Box<dyn PartialReflect>,
+}
+
+pub struct AddComponent {
+    /// The entity being edited.
+    entity: Entity,
+    /// The component type being modified.
+    component_type: TypeId,
+}
+
+pub struct RemoveComponent {
+    /// The entity being edited.
+    entity: Entity,
+    /// The component type being modified.
+    component_type: TypeId,
 }
 
 impl std::fmt::Debug for EditOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EditOp")
-            .field("entity", &self.entity)
-            .field("component_type", &self.component_type)
-            .field("field_path", &self.field_path)
-            .finish_non_exhaustive()
+        match self {
+            EditOp::FieldEdit(data) => f
+                .debug_struct("EditOp")
+                .field("entity", &data.entity)
+                .field("component_type", &data.component_type)
+                .field("field_path", &data.field_path)
+                .field("old_value", &data.old_value)
+                .field("new_value", &data.new_value)
+                .finish_non_exhaustive(),
+            EditOp::AddComponent(data) => f
+                .debug_struct("EditOp")
+                .field("entity", &data.entity)
+                .field("component_type", &data.component_type)
+                .finish_non_exhaustive(),
+            EditOp::RemoveComponent(data) => f
+                .debug_struct("EditOp")
+                .field("entity", &data.entity)
+                .field("component_type", &data.component_type)
+                .finish_non_exhaustive(),
+        }
     }
 }
 
@@ -461,12 +496,14 @@ fn collect_edit_history(
                     }
                 }
             })
-            .map(|old_value| EditOp {
-                entity: msg.entity,
-                component_type: msg.component_type,
-                field_path: msg.field_path.clone(),
-                old_value,
-                new_value: msg.new_value.to_dynamic(),
+            .map(|old_value| {
+                EditOp::FieldEdit(FieldEdit {
+                    entity: msg.entity,
+                    component_type: msg.component_type,
+                    field_path: msg.field_path.clone(),
+                    old_value,
+                    new_value: msg.new_value.to_dynamic(),
+                })
             })
     }));
 }
@@ -484,38 +521,45 @@ fn handle_undo(
             continue;
         };
 
-        let Some(component_data) =
-            canonical_scene.get_component_mut_by_id(&mut assets, op.entity, op.component_type)
-        else {
-            warn!(
-                "Cannot undo: no canonical data for entity {:?} component {:?}",
-                op.entity, op.component_type
-            );
-            continue;
-        };
+        match op {
+            EditOp::FieldEdit(op) => {
+                let Some(component_data) = canonical_scene.get_component_mut_by_id(
+                    &mut assets,
+                    op.entity,
+                    op.component_type,
+                ) else {
+                    warn!(
+                        "Cannot undo: no canonical data for entity {:?} component {:?}",
+                        op.entity, op.component_type
+                    );
+                    continue;
+                };
 
-        // Apply old value (reverse the edit)
-        let apply_result = if op.field_path.is_empty() {
-            component_data.apply(op.old_value.as_ref());
-            Ok(())
-        } else {
-            op.field_path
-                .as_str()
-                .reflect_element_mut(component_data)
-                .map(|field| field.apply(op.old_value.as_ref()))
-        };
+                // Apply old value (reverse the edit)
+                let apply_result = if op.field_path.is_empty() {
+                    component_data.apply(op.old_value.as_ref());
+                    Ok(())
+                } else {
+                    op.field_path
+                        .as_str()
+                        .reflect_element_mut(component_data)
+                        .map(|field| field.apply(op.old_value.as_ref()))
+                };
 
-        if let Err(e) = apply_result {
-            warn!(
-                "Cannot undo edit to field path '{}': {:?}",
-                op.field_path, e
-            );
-            continue;
+                if let Err(e) = apply_result {
+                    warn!(
+                        "Cannot undo edit to field path '{}': {:?}",
+                        op.field_path, e
+                    );
+                    continue;
+                }
+
+                // Move to redo stack
+                history.push_redo(EditOp::FieldEdit(op));
+                info!("Undo applied");
+            }
+            _ => todo!(),
         }
-
-        // Move to redo stack
-        history.push_redo(op);
-        info!("Undo applied");
     }
 }
 
@@ -532,38 +576,45 @@ fn handle_redo(
             continue;
         };
 
-        let Some(component_data) =
-            canonical_scene.get_component_mut_by_id(&mut assets, op.entity, op.component_type)
-        else {
-            warn!(
-                "Cannot redo: no canonical data for entity {:?} component {:?}",
-                op.entity, op.component_type
-            );
-            continue;
-        };
+        match op {
+            EditOp::FieldEdit(op) => {
+                let Some(component_data) = canonical_scene.get_component_mut_by_id(
+                    &mut assets,
+                    op.entity,
+                    op.component_type,
+                ) else {
+                    warn!(
+                        "Cannot redo: no canonical data for entity {:?} component {:?}",
+                        op.entity, op.component_type
+                    );
+                    continue;
+                };
 
-        // Apply new value (re-apply the edit)
-        let apply_result = if op.field_path.is_empty() {
-            component_data.apply(op.new_value.as_ref());
-            Ok(())
-        } else {
-            op.field_path
-                .as_str()
-                .reflect_element_mut(component_data)
-                .map(|field| field.apply(op.new_value.as_ref()))
-        };
+                // Apply new value (re-apply the edit)
+                let apply_result = if op.field_path.is_empty() {
+                    component_data.apply(op.new_value.as_ref());
+                    Ok(())
+                } else {
+                    op.field_path
+                        .as_str()
+                        .reflect_element_mut(component_data)
+                        .map(|field| field.apply(op.new_value.as_ref()))
+                };
 
-        if let Err(e) = apply_result {
-            warn!(
-                "Cannot redo edit to field path '{}': {:?}",
-                op.field_path, e
-            );
-            continue;
+                if let Err(e) = apply_result {
+                    warn!(
+                        "Cannot redo edit to field path '{}': {:?}",
+                        op.field_path, e
+                    );
+                    continue;
+                }
+
+                // Move back to undo stack
+                history.push_undo(EditOp::FieldEdit(op));
+                info!("Redo applied");
+            }
+            _ => todo!(),
         }
-
-        // Move back to undo stack
-        history.push_undo(op);
-        info!("Redo applied");
     }
 }
 
@@ -859,17 +910,22 @@ mod tests {
             assert!(!history.can_redo());
             assert!(history.undo_stack.len() == 1);
             let edit_op = history.undo_stack.get(0).unwrap();
-            assert_eq!(edit_op.entity, TEST_ENTITY);
-            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
-            assert_eq!(edit_op.field_path, "value".to_string());
-            assert_eq!(
-                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
-                Some(&42.0f32)
-            );
-            assert_eq!(
-                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
-                Some(&1.0f32)
-            );
+            match edit_op {
+                EditOp::FieldEdit(edit_op) => {
+                    assert_eq!(edit_op.entity, TEST_ENTITY);
+                    assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+                    assert_eq!(edit_op.field_path, "value".to_string());
+                    assert_eq!(
+                        edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                        Some(&42.0f32)
+                    );
+                    assert_eq!(
+                        edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                        Some(&1.0f32)
+                    );
+                }
+                _ => panic!("Unexpected edit operation"),
+            }
         }
 
         #[test]
@@ -1061,17 +1117,22 @@ mod tests {
 
             assert!(history.redo_stack.len() == 1);
             let edit_op = history.redo_stack.get(0).unwrap();
-            assert_eq!(edit_op.entity, TEST_ENTITY);
-            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
-            assert_eq!(edit_op.field_path, "value".to_string());
-            assert_eq!(
-                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
-                Some(&42.0f32)
-            );
-            assert_eq!(
-                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
-                Some(&50.0f32)
-            );
+            match edit_op {
+                EditOp::FieldEdit(edit_op) => {
+                    assert_eq!(edit_op.entity, TEST_ENTITY);
+                    assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+                    assert_eq!(edit_op.field_path, "value".to_string());
+                    assert_eq!(
+                        edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                        Some(&42.0f32)
+                    );
+                    assert_eq!(
+                        edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                        Some(&50.0f32)
+                    );
+                }
+                _ => panic!("Unexpected edit operation"),
+            }
         }
 
         #[test]
@@ -1155,17 +1216,22 @@ mod tests {
 
             assert!(history.undo_stack.len() == 1);
             let edit_op = history.undo_stack.get(0).unwrap();
-            assert_eq!(edit_op.entity, TEST_ENTITY);
-            assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
-            assert_eq!(edit_op.field_path, "value".to_string());
-            assert_eq!(
-                edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
-                Some(&42.0f32)
-            );
-            assert_eq!(
-                edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
-                Some(&50.0f32)
-            );
+            match edit_op {
+                EditOp::FieldEdit(edit_op) => {
+                    assert_eq!(edit_op.entity, TEST_ENTITY);
+                    assert_eq!(edit_op.component_type, TypeId::of::<TestComponent>());
+                    assert_eq!(edit_op.field_path, "value".to_string());
+                    assert_eq!(
+                        edit_op.old_value.as_ref().try_downcast_ref::<f32>(),
+                        Some(&42.0f32)
+                    );
+                    assert_eq!(
+                        edit_op.new_value.as_ref().try_downcast_ref::<f32>(),
+                        Some(&50.0f32)
+                    );
+                }
+                _ => panic!("Unexpected edit operation"),
+            }
         }
     }
 }
