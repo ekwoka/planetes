@@ -304,6 +304,8 @@ pub struct RemoveComponent {
     entity: Entity,
     /// The component type being modified.
     component_type: TypeId,
+    /// The full component state at the time of removal, for undo.
+    component_data: Box<dyn PartialReflect>,
 }
 
 impl std::fmt::Debug for EditOp {
@@ -399,20 +401,37 @@ impl Extend<EditOp> for EditHistory {
 
 /// Message to request applying an edit to the canonical scene.
 ///
-/// Send this message when a field value changes in the UI. The system will:
+/// Send this message when a value changes in the UI. The system will:
 /// 1. Capture the old value from canonical state
-/// 2. Apply the new value to canonical state
+/// 2. Apply the change to canonical state
 /// 3. Record the operation in edit history for undo/redo
 #[derive(Message)]
-pub struct ApplyEdit {
-    /// The entity being edited.
-    pub entity: Entity,
-    /// The component type being modified.
-    pub component_type: TypeId,
-    /// The reflection path to the field being edited.
-    pub field_path: String,
-    /// The new value to apply.
-    pub new_value: Box<dyn PartialReflect>,
+pub enum ApplyEdit {
+    /// A field-level edit to an existing component.
+    FieldEdit {
+        /// The entity being edited.
+        entity: Entity,
+        /// The component type being modified.
+        component_type: TypeId,
+        /// The reflection path to the field being edited.
+        field_path: String,
+        /// The new value to apply.
+        new_value: Box<dyn PartialReflect>,
+    },
+    /// Add a default-constructed component to an entity.
+    AddComponent {
+        /// The entity to add the component to.
+        entity: Entity,
+        /// The component type to add.
+        component_type: TypeId,
+    },
+    /// Remove a component from an entity.
+    RemoveComponent {
+        /// The entity to remove the component from.
+        entity: Entity,
+        /// The component type to remove.
+        component_type: TypeId,
+    },
 }
 
 /// Message to request an undo operation.
@@ -430,42 +449,93 @@ fn apply_edit_messages(
     mut messages: MessageReader<ApplyEdit>,
     mut assets: ResMut<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
+    registry: Res<AppTypeRegistry>,
 ) {
     for msg in messages.read() {
-        let Some(component_data) =
-            canonical_scene.get_component_mut_by_id(&mut assets, msg.entity, msg.component_type)
-        else {
-            warn!(
-                "Cannot apply edit: no canonical data for entity {:?} component {:?}",
-                msg.entity, msg.component_type
-            );
-            continue;
-        };
+        match msg {
+            ApplyEdit::FieldEdit {
+                entity,
+                component_type,
+                field_path,
+                new_value,
+            } => {
+                let Some(component_data) =
+                    canonical_scene.get_component_mut_by_id(&mut assets, *entity, *component_type)
+                else {
+                    warn!(
+                        "Cannot apply edit: no canonical data for entity {:?} component {:?}",
+                        entity, component_type
+                    );
+                    continue;
+                };
 
-        // Apply new value
-        let apply_result = if msg.field_path.is_empty() {
-            component_data.apply(msg.new_value.as_ref());
-            Ok(())
-        } else {
-            msg.field_path
-                .as_str()
-                .reflect_element_mut(component_data)
-                .map(|field| field.apply(msg.new_value.as_ref()))
-        };
+                let apply_result = if field_path.is_empty() {
+                    component_data.apply(new_value.as_ref());
+                    Ok(())
+                } else {
+                    field_path
+                        .as_str()
+                        .reflect_element_mut(component_data)
+                        .map(|field| field.apply(new_value.as_ref()))
+                };
 
-        if let Err(e) = apply_result {
-            warn!(
-                "Cannot apply edit to field path '{}': {:?}",
-                msg.field_path, e
-            );
-            continue;
+                if let Err(e) = apply_result {
+                    warn!("Cannot apply edit to field path '{}': {:?}", field_path, e);
+                    continue;
+                }
+
+                info!(
+                    "Applied field edit to {:?}.{} on entity {:?}",
+                    component_type, field_path, entity
+                );
+            }
+            ApplyEdit::AddComponent {
+                entity,
+                component_type,
+            } => {
+                let registry = registry.read();
+                let Some(component_default) =
+                    registry.get_type_data::<ReflectDefault>(*component_type)
+                else {
+                    warn!(
+                        "Cannot add component: no ReflectDefault for {:?}",
+                        component_type
+                    );
+                    continue;
+                };
+
+                let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, *entity) else {
+                    warn!("Cannot add component: no canonical entity {:?}", entity);
+                    continue;
+                };
+
+                entity_data.components.push(component_default.default());
+                info!(
+                    "Added component {:?} to entity {:?}",
+                    component_type, entity
+                );
+            }
+            ApplyEdit::RemoveComponent {
+                entity,
+                component_type,
+            } => {
+                let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, *entity) else {
+                    warn!("Cannot remove component: no canonical entity {:?}", entity);
+                    continue;
+                };
+
+                entity_data.components.retain(|component| {
+                    component
+                        .get_represented_type_info()
+                        .map(|info| info.type_id() != *component_type)
+                        .unwrap_or(true)
+                });
+                info!(
+                    "Removed component {:?} from entity {:?}",
+                    component_type, entity
+                );
+            }
         }
-
-        // Record in history
-        info!(
-            "Applied edit to {:?}.{} on entity {:?}",
-            msg.component_type, msg.field_path, msg.entity
-        );
     }
 }
 
@@ -481,30 +551,56 @@ fn collect_edit_history(
     }
 
     history.extend(messages.read().filter_map(|msg| {
-        canonical_scene
-            .get_component_by_id(&assets, msg.entity, msg.component_type)
-            .and_then(|component_state| {
-                if msg.field_path.is_empty() {
-                    Some(component_state.to_dynamic())
-                } else {
-                    match msg.field_path.as_str().reflect_element(component_state) {
-                        Ok(field) => Some(field.to_dynamic()),
-                        Err(e) => {
-                            warn!("Cannot read field path '{}': {:?}", msg.field_path, e);
-                            None
+        match msg {
+            ApplyEdit::FieldEdit {
+                entity,
+                component_type,
+                field_path,
+                new_value,
+            } => canonical_scene
+                .get_component_by_id(&assets, *entity, *component_type)
+                .and_then(|component_state| {
+                    if field_path.is_empty() {
+                        Some(component_state.to_dynamic())
+                    } else {
+                        match field_path.as_str().reflect_element(component_state) {
+                            Ok(field) => Some(field.to_dynamic()),
+                            Err(e) => {
+                                warn!("Cannot read field path '{}': {:?}", field_path, e);
+                                None
+                            }
                         }
                     }
-                }
-            })
-            .map(|old_value| {
-                EditOp::FieldEdit(FieldEdit {
-                    entity: msg.entity,
-                    component_type: msg.component_type,
-                    field_path: msg.field_path.clone(),
-                    old_value,
-                    new_value: msg.new_value.to_dynamic(),
                 })
-            })
+                .map(|old_value| {
+                    EditOp::FieldEdit(FieldEdit {
+                        entity: *entity,
+                        component_type: *component_type,
+                        field_path: field_path.clone(),
+                        old_value,
+                        new_value: new_value.to_dynamic(),
+                    })
+                }),
+            ApplyEdit::AddComponent {
+                entity,
+                component_type,
+            } => Some(EditOp::AddComponent(AddComponent {
+                entity: *entity,
+                component_type: *component_type,
+            })),
+            ApplyEdit::RemoveComponent {
+                entity,
+                component_type,
+            } => canonical_scene
+                .get_component_by_id(&assets, *entity, *component_type)
+                .map(|component_state| {
+                    EditOp::RemoveComponent(RemoveComponent {
+                        entity: *entity,
+                        component_type: *component_type,
+                        component_data: component_state.to_dynamic(),
+                    })
+                }),
+        }
     }));
 }
 
@@ -554,11 +650,40 @@ fn handle_undo(
                     continue;
                 }
 
-                // Move to redo stack
                 history.push_redo(EditOp::FieldEdit(op));
-                info!("Undo applied");
+                info!("Undo field edit applied");
             }
-            _ => todo!(),
+            EditOp::AddComponent(op) => {
+                // Undo add = remove the component
+                let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, op.entity)
+                else {
+                    warn!("Cannot undo add: no canonical entity {:?}", op.entity);
+                    continue;
+                };
+
+                entity_data.components.retain(|component| {
+                    component
+                        .get_represented_type_info()
+                        .map(|info| info.type_id() != op.component_type)
+                        .unwrap_or(true)
+                });
+
+                history.push_redo(EditOp::AddComponent(op));
+                info!("Undo add component applied");
+            }
+            EditOp::RemoveComponent(op) => {
+                // Undo remove = re-add the component with stored data
+                let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, op.entity)
+                else {
+                    warn!("Cannot undo remove: no canonical entity {:?}", op.entity);
+                    continue;
+                };
+
+                entity_data.components.push(op.component_data.to_dynamic());
+
+                history.push_redo(EditOp::RemoveComponent(op));
+                info!("Undo remove component applied");
+            }
         }
     }
 }
@@ -569,6 +694,7 @@ fn handle_redo(
     mut assets: ResMut<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
     mut history: ResMut<EditHistory>,
+    registry: Res<AppTypeRegistry>,
 ) {
     for _ in messages.read() {
         let Some(op) = history.pop_redo() else {
@@ -609,11 +735,59 @@ fn handle_redo(
                     continue;
                 }
 
-                // Move back to undo stack
                 history.push_undo(EditOp::FieldEdit(op));
-                info!("Redo applied");
+                info!("Redo field edit applied");
             }
-            _ => todo!(),
+            EditOp::AddComponent(op) => {
+                // Redo add = add the component again with default
+                let registry = registry.read();
+                let Some(component_default) =
+                    registry.get_type_data::<ReflectDefault>(op.component_type)
+                else {
+                    warn!(
+                        "Cannot redo add: no ReflectDefault for {:?}",
+                        op.component_type
+                    );
+                    continue;
+                };
+
+                let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, op.entity)
+                else {
+                    warn!("Cannot redo add: no canonical entity {:?}", op.entity);
+                    continue;
+                };
+
+                entity_data.components.push(component_default.default());
+
+                history.push_undo(EditOp::AddComponent(op));
+                info!("Redo add component applied");
+            }
+            EditOp::RemoveComponent(mut op) => {
+                // Redo remove = remove the component again, re-snapshot data
+                let component_snapshot = canonical_scene
+                    .get_component_by_id(&assets, op.entity, op.component_type)
+                    .map(|c| c.to_dynamic());
+
+                let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, op.entity)
+                else {
+                    warn!("Cannot redo remove: no canonical entity {:?}", op.entity);
+                    continue;
+                };
+
+                entity_data.components.retain(|component| {
+                    component
+                        .get_represented_type_info()
+                        .map(|info| info.type_id() != op.component_type)
+                        .unwrap_or(true)
+                });
+
+                if let Some(snapshot) = component_snapshot {
+                    op.component_data = snapshot;
+                }
+
+                history.push_undo(EditOp::RemoveComponent(op));
+                info!("Redo remove component applied");
+            }
         }
     }
 }
@@ -818,7 +992,7 @@ mod tests {
 
         app.update();
 
-        app.world_mut().write_message(ApplyEdit {
+        app.world_mut().write_message(ApplyEdit::FieldEdit {
             entity: TEST_ENTITY,
             component_type: TypeId::of::<TestComponent>(),
             field_path: "value".to_string(),
@@ -851,7 +1025,7 @@ mod tests {
             let mut query = app.world_mut().query::<&TestComponent>();
             let component = query.single(&app.world()).unwrap();
             assert_eq!(component.value, 42.0);
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -897,7 +1071,7 @@ mod tests {
                 assert!(!history.can_undo());
             }
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -932,7 +1106,7 @@ mod tests {
         fn new_edit_clears_redo_stack() {
             let mut app = setup_test_app();
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -953,7 +1127,7 @@ mod tests {
                 assert!(history.can_redo());
             }
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -969,7 +1143,7 @@ mod tests {
         fn clear_history_removes_all() {
             let mut app = setup_test_app();
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1007,7 +1181,7 @@ mod tests {
         fn undo_reverts_to_old_value() {
             let mut app = setup_test_app();
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1030,7 +1204,7 @@ mod tests {
                 assert_eq!(component.value, 50.0);
             }
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1094,7 +1268,7 @@ mod tests {
         fn undo_moves_op_to_redo_stack() {
             let mut app = setup_test_app();
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1139,7 +1313,7 @@ mod tests {
         fn redo_reapplies_value() {
             let mut app = setup_test_app();
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1188,7 +1362,7 @@ mod tests {
         fn redo_moves_op_back_to_undo_stack() {
             let mut app = setup_test_app();
 
-            app.world_mut().write_message(ApplyEdit {
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
                 entity: TEST_ENTITY,
                 component_type: TypeId::of::<TestComponent>(),
                 field_path: "value".to_string(),
@@ -1231,6 +1405,355 @@ mod tests {
                     );
                 }
                 _ => panic!("Unexpected edit operation"),
+            }
+        }
+    }
+
+    mod add_component {
+        use super::*;
+
+        #[test]
+        fn add_component_adds_to_entity() {
+            let mut app = setup_test_app();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<AnotherComponent>())
+                        .is_none()
+                );
+            }
+
+            app.world_mut().write_message(ApplyEdit::AddComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<AnotherComponent>(),
+            });
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<AnotherComponent>())
+                        .is_some()
+                );
+            }
+        }
+
+        #[test]
+        fn add_component_records_history() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::AddComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<AnotherComponent>(),
+            });
+            app.update();
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(history.can_undo());
+            assert_eq!(history.undo_stack.len(), 1);
+            match &history.undo_stack[0] {
+                EditOp::AddComponent(op) => {
+                    assert_eq!(op.entity, TEST_ENTITY);
+                    assert_eq!(op.component_type, TypeId::of::<AnotherComponent>());
+                }
+                _ => panic!("Expected AddComponent edit op"),
+            }
+        }
+
+        #[test]
+        fn undo_add_component_removes_it() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::AddComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<AnotherComponent>(),
+            });
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<AnotherComponent>())
+                        .is_some()
+                );
+            }
+
+            app.world_mut().write_message(Undo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<AnotherComponent>())
+                        .is_none()
+                );
+            }
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(!history.can_undo());
+            assert!(history.can_redo());
+        }
+
+        #[test]
+        fn redo_add_component_re_adds_it() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::AddComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<AnotherComponent>(),
+            });
+            app.update();
+
+            app.world_mut().write_message(Undo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<AnotherComponent>())
+                        .is_none()
+                );
+            }
+
+            app.world_mut().write_message(Redo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<AnotherComponent>())
+                        .is_some()
+                );
+            }
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(history.can_undo());
+            assert!(!history.can_redo());
+        }
+    }
+
+    mod remove_component {
+        use bevy::reflect::ReflectRef;
+
+        use super::*;
+
+        #[test]
+        fn remove_component_removes_from_entity() {
+            let mut app = setup_test_app();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                        .is_some()
+                );
+            }
+
+            app.world_mut().write_message(ApplyEdit::RemoveComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+            });
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                        .is_none()
+                );
+            }
+        }
+
+        #[test]
+        fn remove_component_records_history_with_data() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::RemoveComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+            });
+            app.update();
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(history.can_undo());
+            assert_eq!(history.undo_stack.len(), 1);
+            match &history.undo_stack[0] {
+                EditOp::RemoveComponent(op) => {
+                    assert_eq!(op.entity, TEST_ENTITY);
+                    assert_eq!(op.component_type, TypeId::of::<TestComponent>());
+                    let ReflectRef::Struct(data) = op.component_data.reflect_ref() else {
+                        panic!("Expected struct reflect data");
+                    };
+                    let value = data
+                        .field("value")
+                        .unwrap()
+                        .try_as_reflect()
+                        .unwrap()
+                        .downcast_ref::<f32>();
+                    assert_eq!(value, Some(&42.0f32));
+                }
+                _ => panic!("Expected RemoveComponent edit op"),
+            }
+        }
+
+        #[test]
+        fn undo_remove_component_restores_it() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::RemoveComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+            });
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                        .is_none()
+                );
+            }
+
+            app.world_mut().write_message(Undo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                let component = canonical
+                    .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                    .expect("Component should be restored after undo");
+                let ReflectRef::Struct(data) = component.reflect_ref() else {
+                    panic!("Expected struct reflect data");
+                };
+                let value = data
+                    .field("value")
+                    .unwrap()
+                    .try_as_reflect()
+                    .unwrap()
+                    .downcast_ref::<f32>();
+                assert_eq!(value, Some(&42.0f32));
+            }
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(!history.can_undo());
+            assert!(history.can_redo());
+        }
+
+        #[test]
+        fn redo_remove_component_removes_again() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::RemoveComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+            });
+            app.update();
+
+            app.world_mut().write_message(Undo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                        .is_some()
+                );
+            }
+
+            app.world_mut().write_message(Redo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                        .is_none()
+                );
+            }
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(history.can_undo());
+            assert!(!history.can_redo());
+        }
+
+        #[test]
+        fn undo_remove_then_redo_preserves_snapshot() {
+            let mut app = setup_test_app();
+
+            // Edit the component first so it has non-default values
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "value".to_string(),
+                new_value: Box::new(99.0f32),
+            });
+            app.update();
+
+            // Remove it
+            app.world_mut().write_message(ApplyEdit::RemoveComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+            });
+            app.update();
+
+            // Undo remove — should restore with value=99
+            app.world_mut().write_message(Undo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                let component = canonical
+                    .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                    .expect("Component should be restored");
+                let ReflectRef::Struct(data) = component.reflect_ref() else {
+                    panic!("Expected struct reflect data");
+                };
+                let value = data
+                    .field("value")
+                    .unwrap()
+                    .try_as_reflect()
+                    .unwrap()
+                    .downcast_ref::<f32>();
+                assert_eq!(value, Some(&99.0f32));
+            }
+
+            // Redo remove — should remove again
+            app.world_mut().write_message(Redo);
+            app.update();
+
+            {
+                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let canonical = app.world().resource::<CanonicalScene>();
+                assert!(
+                    canonical
+                        .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
+                        .is_none()
+                );
             }
         }
     }
