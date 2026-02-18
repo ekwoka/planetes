@@ -444,12 +444,20 @@ pub struct Undo;
 #[derive(Message)]
 pub struct Redo;
 
+/// Event emitted when components are added to or removed from an entity.
+///
+/// This is only emitted for structural changes (add/remove component),
+/// not for field-level edits within existing components.
+#[derive(Event)]
+pub struct ComponentsChanged(pub Entity);
+
 /// System that applies edit messages to the canonical scene.
 fn apply_edit_messages(
     mut messages: MessageReader<ApplyEdit>,
     mut assets: ResMut<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
     registry: Res<AppTypeRegistry>,
+    mut commands: Commands,
 ) {
     for msg in messages.read() {
         match msg {
@@ -510,6 +518,7 @@ fn apply_edit_messages(
                 };
 
                 entity_data.components.push(component_default.default());
+                commands.trigger(ComponentsChanged(*entity));
                 info!(
                     "Added component {:?} to entity {:?}",
                     component_type, entity
@@ -530,6 +539,7 @@ fn apply_edit_messages(
                         .map(|info| info.type_id() != *component_type)
                         .unwrap_or(true)
                 });
+                commands.trigger(ComponentsChanged(*entity));
                 info!(
                     "Removed component {:?} from entity {:?}",
                     component_type, entity
@@ -610,6 +620,7 @@ fn handle_undo(
     mut assets: ResMut<Assets<DynamicScene>>,
     canonical_scene: Res<CanonicalScene>,
     mut history: ResMut<EditHistory>,
+    mut commands: Commands,
 ) {
     for _ in messages.read() {
         let Some(op) = history.pop_undo() else {
@@ -668,6 +679,7 @@ fn handle_undo(
                         .unwrap_or(true)
                 });
 
+                commands.trigger(ComponentsChanged(op.entity));
                 history.push_redo(EditOp::AddComponent(op));
                 info!("Undo add component applied");
             }
@@ -681,6 +693,7 @@ fn handle_undo(
 
                 entity_data.components.push(op.component_data.to_dynamic());
 
+                commands.trigger(ComponentsChanged(op.entity));
                 history.push_redo(EditOp::RemoveComponent(op));
                 info!("Undo remove component applied");
             }
@@ -695,6 +708,7 @@ fn handle_redo(
     canonical_scene: Res<CanonicalScene>,
     mut history: ResMut<EditHistory>,
     registry: Res<AppTypeRegistry>,
+    mut commands: Commands,
 ) {
     for _ in messages.read() {
         let Some(op) = history.pop_redo() else {
@@ -759,6 +773,7 @@ fn handle_redo(
 
                 entity_data.components.push(component_default.default());
 
+                commands.trigger(ComponentsChanged(op.entity));
                 history.push_undo(EditOp::AddComponent(op));
                 info!("Redo add component applied");
             }
@@ -785,6 +800,7 @@ fn handle_redo(
                     op.component_data = snapshot;
                 }
 
+                commands.trigger(ComponentsChanged(op.entity));
                 history.push_undo(EditOp::RemoveComponent(op));
                 info!("Redo remove component applied");
             }

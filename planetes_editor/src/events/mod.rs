@@ -1,29 +1,16 @@
 use bevy::prelude::*;
-use planetes_scene_state::CanonicalScene;
+use planetes_scene_state::ApplyEdit;
 use std::any::TypeId;
 
-use crate::nodes::entity_viewer::UpdateEntityViewer;
-
-pub fn handle_add_component(
-    event: On<AddComponentToEntity>,
-    mut commands: Commands,
-    registry: Res<AppTypeRegistry>,
-    canonical_scene: Res<CanonicalScene>,
-    mut scenes: ResMut<Assets<DynamicScene>>,
-) {
+pub fn handle_add_component(event: On<AddComponentToEntity>, mut commands: Commands) {
     info!(
         "Adding component: {:?} to {:?}",
         event.component, event.entity
     );
-    let registry = registry.read();
-    info!("Using Default Component");
-    let component_default = registry
-        .get_type_data::<ReflectDefault>(event.component)
-        .unwrap();
-    if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, event.entity) {
-        entity.components.push(component_default.default());
-    }
-    commands.trigger(UpdateEntityViewer(event.entity));
+    commands.write_message(ApplyEdit::AddComponent {
+        entity: event.entity,
+        component_type: event.component,
+    });
 }
 
 #[derive(Event)]
@@ -38,25 +25,13 @@ pub struct RemoveComponentFromEntity {
     pub component: TypeId,
 }
 
-pub fn handle_remove_component(
-    event: On<RemoveComponentFromEntity>,
-    mut commands: Commands,
-    canonical_scene: Res<CanonicalScene>,
-    mut scenes: ResMut<Assets<DynamicScene>>,
-) {
+pub fn handle_remove_component(event: On<RemoveComponentFromEntity>, mut commands: Commands) {
     info!(
-        "Removing component: {:?} to {:?}",
+        "Removing component: {:?} from {:?}",
         event.component, event.entity
     );
-    if let Some(entity) = canonical_scene.get_entity_mut(&mut scenes, event.entity) {
-        entity.components.retain(|component| {
-            component
-                .get_represented_type_info()
-                .map(|info| info.type_id() != event.component)
-                .unwrap_or(true)
-        });
-    } else {
-        error!("Component to remove is not on a valid entity");
-    }
-    commands.trigger(UpdateEntityViewer(event.entity));
+    commands.write_message(ApplyEdit::RemoveComponent {
+        entity: event.entity,
+        component_type: event.component,
+    });
 }

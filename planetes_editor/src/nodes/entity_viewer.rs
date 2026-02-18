@@ -14,7 +14,7 @@ use bevy::{
     ui_widgets::Activate,
 };
 use planetes_input::prelude::*;
-use planetes_scene_state::CanonicalScene;
+use planetes_scene_state::{CanonicalScene, ComponentsChanged};
 
 use crate::{
     atoms::{button, highlight_selected_input, input_field},
@@ -32,7 +32,7 @@ pub fn plugin(app: &mut App) {
         )
             .chain(),
     )
-    .add_observer(handle_update_entity_viewer)
+    .add_observer(handle_components_changed)
     .add_observer(update_required_components);
 }
 
@@ -243,11 +243,8 @@ pub fn handle_include_required_component(
     }
 }
 
-#[derive(Event)]
-pub struct UpdateEntityViewer(pub Entity);
-
-pub fn handle_update_entity_viewer(
-    event: On<UpdateEntityViewer>,
+pub fn handle_components_changed(
+    event: On<ComponentsChanged>,
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), With<EntityEditor>>,
     scenes: Res<Assets<DynamicScene>>,
@@ -255,7 +252,7 @@ pub fn handle_update_entity_viewer(
     assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
-    if event.0 != target {
+    if event.event().0 != target {
         return;
     }
 
