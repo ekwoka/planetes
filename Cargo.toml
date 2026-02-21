@@ -21,7 +21,7 @@ bevy = { version = "0.18", features = [
     "bevy_ui_debug",
     "x11"
 ] }
-bevy_enhanced_input = "0.23"
+bevy_enhanced_input = "0.24"
 
 # Keep this in sync with Bevy
 rand = "0.9"
