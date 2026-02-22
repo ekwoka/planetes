@@ -72,8 +72,10 @@ pub fn load_scene(
     asset_server: Res<AssetServer>,
     mut canonical: ResMut<CanonicalScene>,
 ) {
-    info!("loading scene");
-    let scene_handle = asset_server.load::<DynamicScene>("test.scn.ron");
+    let current_dir = std::env::current_dir().expect("Current directory should be valid");
+    info!("loading scene in {}", current_dir.display());
+    let scene_handle = asset_server
+        .load_override::<DynamicScene>(format!("{}/assets/test.scn.ron", current_dir.display()));
     let scene_root = commands
         .spawn((
             Name::new("Root"),
