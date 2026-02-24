@@ -2,22 +2,26 @@
 
 use std::{fs::File, io::Write};
 
-use crate::{EditorMode, ReflectPlanetesComponent, nodes::scene_tree::UpdateSceneTree};
+use crate::{
+    EditorMode, ReflectPlanetesComponent, editor_ui::ActiveScene,
+    nodes::scene_tree::UpdateSceneTree,
+};
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate},
     prelude::*,
     tasks::IoTaskPool,
 };
+use bevy_file_dialog::prelude::*;
 use planetes_scene_state::CanonicalScene;
 
 pub fn plugin(app: &mut App) {
     info!("Plugin SCENE");
     app.add_plugins(HierarchyPropagatePlugin::<InScene>::new(Update))
         .register_type_data::<Name, ReflectPlanetesComponent>()
-        .add_systems(OnEnter(EditorMode::Edit), load_scene)
+        .add_systems(OnEnter(EditorMode::Edit), initialize_editor)
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(Update, add_meshes_to_scene)
-        .add_systems(Update, on_load);
+        .add_systems(Update, load_scene);
 }
 
 #[derive(Component)]
@@ -68,52 +72,35 @@ pub fn save_scene(
 }
 
 pub fn load_scene(
+    mut events: MessageReader<DialogFilePicked<ActiveScene>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut canonical: ResMut<CanonicalScene>,
 ) {
-    let current_dir = std::env::current_dir().expect("Current directory should be valid");
-    info!("loading scene in {}", current_dir.display());
-    let scene_handle = asset_server
-        .load_override::<DynamicScene>(format!("{}/assets/test.scn.ron", current_dir.display()));
-    let scene_root = commands
-        .spawn((
-            Name::new("Root"),
-            EditorScene,
-            Transform::default(),
-            Propagate(InScene),
-            DynamicSceneRoot(scene_handle.clone()),
-        ))
-        .id();
-    canonical.insert(scene_handle);
-    commands.write_message(UpdateSceneTree { entity: scene_root });
+    for event in events.read() {
+        let path = event.path.clone();
+        info!("loading scene in {}", path.display());
+        let scene_handle = asset_server.load_override::<DynamicScene>(path);
+        let scene_root = commands
+            .spawn((
+                Name::new("Root"),
+                EditorScene,
+                Transform::default(),
+                Propagate(InScene),
+                DynamicSceneRoot(scene_handle.clone()),
+            ))
+            .id();
+        canonical.insert(scene_handle);
+        commands.write_message(UpdateSceneTree { entity: scene_root });
+    }
 }
 
-pub fn on_load(
-    mut events: MessageReader<AssetEvent<DynamicScene>>,
-    assets: Res<Assets<DynamicScene>>,
-) {
-    for event in events.read() {
-        match event {
-            AssetEvent::Added { id } => {
-                info!("Scene added {id}");
-            }
-            AssetEvent::LoadedWithDependencies { id } => {
-                info!("Scene Loaded {id}");
-                if let Some(scene) = assets.get(*id) {
-                    info!("Scene Available");
-                    info!("With {} Entities", scene.entities.len());
-                    for entity in scene.entities.iter() {
-                        info!("   Entity: {}", entity.entity);
-                        info!("   With {} Components", entity.components.len());
-                    }
-                }
-            }
-            _ => {
-                info!("{event:?}");
-            }
-        }
-    }
+pub fn initialize_editor(mut commands: Commands) {
+    commands
+        .dialog()
+        .set_title("Open Scene")
+        .add_filter("Bevy Scene", &["ron"])
+        .pick_file_path::<ActiveScene>();
 }
 
 fn add_meshes_to_scene(

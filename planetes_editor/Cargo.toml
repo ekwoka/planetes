@@ -13,6 +13,7 @@ planetes_input.workspace = true
 avian3d = { workspace = true, optional = true }
 serde.workspace = true
 bevy_feathers = { version = "0.18.0" }
+bevy_file_dialog = "0.9.1"
 
 [features]
 # feature for avian3d support

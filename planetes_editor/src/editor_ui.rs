@@ -44,6 +44,7 @@ pub fn plugin(app: &mut App) {
         HierarchyPropagatePlugin::<TextColor>::new(Update),
         planetes_input::plugin,
         component_selector::plugin,
+        bevy_file_dialog::FileDialogPlugin::new().with_pick_file::<ActiveScene>(),
     ))
     .insert_resource(UiTheme(create_dark_theme()))
     .init_state::<EditorMode>()
@@ -66,6 +67,8 @@ pub fn plugin(app: &mut App) {
         app.add_systems(OnExit(EditorMode::Edit), resume_physics);
     }
 }
+
+pub struct ActiveScene;
 
 /// Pauses [avian3d] Physics when in Edit Mode
 #[cfg(feature = "avian")]
