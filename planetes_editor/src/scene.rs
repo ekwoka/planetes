@@ -21,7 +21,8 @@ pub fn plugin(app: &mut App) {
         .add_systems(OnEnter(EditorMode::Edit), initialize_editor)
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
         .add_systems(Update, add_meshes_to_scene)
-        .add_systems(Update, load_scene);
+        .add_systems(Update, load_scene)
+        .add_observer(open_file_dialog);
 }
 
 #[derive(Component)]
@@ -95,7 +96,14 @@ pub fn load_scene(
     }
 }
 
+#[derive(Event)]
+pub struct OpenSceneFileDialog;
+
 pub fn initialize_editor(mut commands: Commands) {
+    commands.trigger(OpenSceneFileDialog);
+}
+
+pub fn open_file_dialog(_event: On<OpenSceneFileDialog>, mut commands: Commands) {
     commands
         .dialog()
         .set_title("Open Scene")

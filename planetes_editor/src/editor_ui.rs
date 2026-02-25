@@ -19,7 +19,7 @@ use crate::{
     infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::{scene_tree::UpdateSceneTree, *},
     prelude::*,
-    scene::load_scene,
+    scene::{OpenSceneFileDialog, load_scene},
 };
 
 #[cfg(feature = "avian")]
@@ -123,6 +123,14 @@ pub fn build_ui(mut commands: Commands) {
             width="100%"
             border-bottom="1px"
             border-color="srgb(178 178 178)">
+            <button
+                variant="normal"
+                corners="rounded"
+                onActivate={move |_event: On<Activate>, mut commands: Commands| {
+                    commands.trigger(OpenSceneFileDialog);
+                }}>
+                <span>"Open"</span>
+            </button>
             <iter>
                 {["File", "Edit", "View", "Help"].into_iter().map(|item| {
                     let content = item.to_string();
