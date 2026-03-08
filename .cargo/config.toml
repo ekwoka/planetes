@@ -6,3 +6,6 @@ upgrade-local = ["bin", "cargo-upgrade", "--verbose"]
 watch = ["bin", "cargo-watch"]
 dx = ["bin", "dx", "serve", "--hot-patch"]
 test-docs = ["test", "--workspace", "--doc"]
+
+[build]
+target-dir = "/Volumes/Corsair/cargo-cache/target"
