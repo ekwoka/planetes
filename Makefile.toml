@@ -33,7 +33,7 @@ args = ["nextest", "--workspace"]
 
 [tasks.docs-deps]
 script = '''
-cargo doc --no-deps $({
+cargo doc --no-deps --target-dir /Volumes/Corsair/cargo-cache/target $({
     cargo tree -p bevy --depth 2 --format "{p}" --prefix none
     cargo tree --workspace --depth 1 --format "{p}" --prefix none
   } \
@@ -43,7 +43,7 @@ cargo doc --no-deps $({
 '''
 
 [tasks.docs-own]
-script = "cargo doc --workspace --all-features --no-deps --document-private-items"
+script = "cargo doc --workspace --all-features --no-deps --document-private-items --target-dir /Volumes/Corsair/cargo-cache/target"
 
 [tasks.fmt]
 command = "cargo"
