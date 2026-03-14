@@ -670,6 +670,7 @@ impl ToTokens for ElementNode {
         components.push_some(BorderColor::from(&self.attributes).ok());
         components.push_some(BackgroundColor::from(&self.attributes).ok());
         components.push_some(TextFont::from(&self.attributes).ok());
+        components.push_some(TextColor::from(&self.attributes).ok());
         components.push_some(TextLayout::from(&self.attributes).ok());
         components.push_some(
             Self::get_attr(&self.attributes, "components")
@@ -722,6 +723,7 @@ impl ToTokens for InlineNode {
                 .collect::<Vec<_>>(),
         );
         components.push_some(TextFont::from(&self.attributes).ok());
+        components.push_some(TextColor::from(&self.attributes).ok());
         components.push_some(TextLayout::from(&self.attributes).ok());
         if components.len() == 1 {
             tokens.extend(quote! {
@@ -2342,11 +2344,38 @@ mod tests {
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
+
+            #[test]
+            fn supports_text_color() {
+                let input = quote! {
+                    <div
+                        padding="4px"
+                        text-color="rgb(170 170 170)">
+                        "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
         }
 
         #[cfg(feature = "propagate")]
         mod propagate {
             use super::*;
+
             #[test]
             fn supports_text_font() {
                 let input = quote! {
@@ -2366,6 +2395,32 @@ mod tests {
                             font_size: 10.0,
                             ..Default::default()
                         }),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn supports_text_color() {
+                let input = quote! {
+                    <div
+                        padding="4px"
+                        text-color="rgb(170 170 170)">
+                        "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                         ))

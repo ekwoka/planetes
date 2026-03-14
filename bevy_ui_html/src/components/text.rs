@@ -118,7 +118,7 @@ pub struct TextColor {
 }
 
 impl TextColor {
-    const KEYS: [&'static str; 1] = ["color"];
+    const KEYS: [&'static str; 1] = ["text-color"];
 
     pub fn ok(self) -> Option<Self> {
         if self.attributes.is_empty() {
@@ -146,9 +146,15 @@ impl ToTokens for TextColor {
         let color = Value::new(&self.attributes[0].value);
 
         if let Some(color) = color.parse_as_color() {
-            tokens.extend(quote! {
-                ::bevy::ui::TextColor::all(#color)
-            })
+            if cfg!(feature = "propagate") {
+                tokens.extend(quote! {
+                        ::bevy::app::Propagate(::bevy::text::TextColor(#color))
+                })
+            } else {
+                tokens.extend(quote! {
+                    ::bevy::text::TextColor(#color)
+                })
+            }
         }
     }
 }

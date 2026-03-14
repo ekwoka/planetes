@@ -3,7 +3,6 @@
 use std::{any::TypeId, iter::once};
 
 use bevy::{
-    app::Propagate,
     input::{
         ButtonState,
         keyboard::{Key, KeyboardInput},
@@ -143,7 +142,7 @@ pub fn update_entity_viewer(
                 </div>
             });
             parent.spawn(html! {
-                <div display="flex" flex-direction="col" row-gap="4px" components={Propagate(TextColor(Color::srgb_u8(180, 180, 180)))}>
+                <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(180 180 180)">
                    <span>"Required Components:"</span>
                    <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
 
@@ -332,7 +331,7 @@ pub fn handle_components_changed(
                 </div>
             });
             parent.spawn(html! {
-                <div display="flex" flex-direction="col" row-gap="4px" components={Propagate(TextColor(Color::srgb_u8(120, 120, 120)))}>
+                <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(120 120 120)">
                     <span>"Required Components:"</span>
                     <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
 

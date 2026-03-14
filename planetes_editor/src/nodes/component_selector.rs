@@ -1,6 +1,6 @@
 use std::any::TypeId;
 
-use bevy::{app::Propagate, prelude::*, reflect::TypeInfo};
+use bevy::{prelude::*, reflect::TypeInfo};
 use bevy_ui_html::html;
 
 use crate::{events::AddComponentToEntity, nodes::entity_viewer::Viewing};
@@ -77,7 +77,7 @@ pub fn handle_open_add_component(
                                     <span>{
                                         info.type_path_table().ident().unwrap_or("Unknown")
                                     }</span>
-                                    <div components={Propagate(TextColor(Color::srgb_u8(178, 178, 178)))}>
+                                    <div text-color="srgb(178 178 178)">
                                         <span>{
                                             info.type_path_table().crate_name().unwrap_or("unknown")
                                         }</span>
