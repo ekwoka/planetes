@@ -97,6 +97,10 @@ pub struct CanonicalScene {
 }
 
 impl CanonicalScene {
+    pub fn is_id(&self, id: &AssetId<DynamicScene>) -> bool {
+        id == &self.handle.id()
+    }
+
     pub fn insert(&mut self, handle: Handle<DynamicScene>) {
         self.handle = handle;
     }
