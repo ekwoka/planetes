@@ -2243,6 +2243,41 @@ mod tests {
         }
 
         #[test]
+        fn allows_position_strings() {
+            let input = quote! {
+                <div position="absolute">
+                    <div position="relative"/>
+                    <div position-type="absolute"/>
+                    <div position-type="relative"/>
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        position_type: ::bevy::ui::PositionType::Absolute,
+                        ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Absolute,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative,
+                            ..Default::default()
+                        })
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
         fn allows_flex_direction_strings() {
             let tests = vec![
                 ("row", "Row"),
