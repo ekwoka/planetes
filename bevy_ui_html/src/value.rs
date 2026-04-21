@@ -187,6 +187,30 @@ impl Value {
         known.or_else(|| Some(self.0.to_token_stream()))
     }
 
+    pub fn as_position_type(&self) -> Option<TokenStream> {
+        let known = match self.0.clone() {
+            Expr::Block(_) => self.clean_block(),
+            Expr::Lit(lit) => match lit.lit {
+                Lit::Str(string) => {
+                    let value = string.value();
+                    let name = match value.as_str() {
+                        "absolute" => "Absolute",
+                        "relative" => "Relative",
+                        other => other,
+                    };
+                    let ident = Ident::new(name, self.0.span());
+                    let path: Path = parse_quote_spanned! {
+                    self.0.span() => ::bevy::ui::PositionType::#ident
+                    };
+                    Some(path.to_token_stream())
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        known.or_else(|| Some(self.0.to_token_stream()))
+    }
+
     pub fn clean_block(&self) -> Option<TokenStream> {
         let value = &self.0;
 

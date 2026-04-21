@@ -8,7 +8,7 @@ pub struct NodeComponent {
 }
 
 impl NodeComponent {
-    const KEYS: [&'static str; 46] = [
+    const KEYS: [&'static str; 47] = [
         "padding",
         "padding-top",
         "padding-left",
@@ -37,6 +37,7 @@ impl NodeComponent {
         "row-gap",
         "column-gap",
         "display",
+        "position",
         "position-type",
         "flex-direction",
         "flex-wrap",
@@ -348,9 +349,18 @@ impl ToTokens for NodeComponent {
                 });
             }
 
+            if let Some(position) = Self::get_attr(&self.attributes, "position")
+                .or(Self::get_attr(&self.attributes, "position-type"))
+                .map(Value::new)
+                .and_then(|val| val.as_position_type())
+            {
+                fields.push(quote! {
+                    position_type: #position
+                });
+            }
+
             // Process enum properties
             for prop in [
-                "position-type",
                 "flex-wrap",
                 "align-items",
                 "justify-items",
