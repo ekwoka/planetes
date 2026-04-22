@@ -1540,6 +1540,36 @@ mod tests {
             assert_eq!(result.to_string(), expected.to_string());
         }
 
+        #[test]
+        fn allows_string_colors_on_color_attributes() {
+            let input = quote! {
+                <div
+                   padding="4px"
+                   border-color="srgb(170 170 170)"
+                   text-color="srgb(170 170 170)"
+                   background-color="srgb(170 170 170)">
+                   "Menu"
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        ..Default::default()
+                    },
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
+                    ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
+                    ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
         mod const_colors {
             use super::*;
             #[test]
@@ -2445,7 +2475,7 @@ mod tests {
                 let input = quote! {
                     <div
                         padding="4px"
-                        text-color="rgb(170 170 170)">
+                        text-color="srgb(170 170 170)">
                         "Menu"
                     </div>
                 };
@@ -2455,7 +2485,7 @@ mod tests {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
-                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))),
+                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                         ))

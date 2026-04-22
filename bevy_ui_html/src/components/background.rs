@@ -35,7 +35,7 @@ impl ToTokens for BackgroundColor {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let color = Value::new(&self.attributes[0].value);
 
-        if let Some(color) = color.clean_block() {
+        if let Some(color) = color.parse_as_color() {
             tokens.extend(quote! {
                 ::bevy::ui::BackgroundColor(#color)
             })
