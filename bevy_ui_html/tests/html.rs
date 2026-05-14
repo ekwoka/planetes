@@ -10,6 +10,7 @@ use bevy::{
     prelude::*,
 };
 use bevy_ui_html::html;
+use bevy_ui_html_core::{HtmlComponent, HtmlProps};
 
 #[test]
 fn test_basic_div() {
@@ -74,6 +75,13 @@ fn test_simple_iter() {
 fn test_editor_menu_button() {
     #[derive(Component)]
     struct MenuButton;
+
+    impl HtmlComponent for MenuButton {
+        type Bundle = (MenuButton, Node);
+        fn build(props: HtmlProps) -> (MenuButton, Node) {
+            (MenuButton, props.node)
+        }
+    }
 
     let mut app = App::new();
 

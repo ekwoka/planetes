@@ -606,6 +606,60 @@ impl ElementNode {
             .find(|attr| attr.key == kebab_name)
             .map(|attr| &attr.value)
     }
+
+    // All attribute keys consumed by the standard component builders plus
+    // reserved special keys.  Anything not in this list (and not observer
+    // "on*" attrs) with a string-literal value becomes an `extra_attr`.
+    const KNOWN_KEYS: &'static [&'static str] = &[
+        // NodeComponent (47 keys, see node.rs)
+        "padding", "padding-top", "padding-left", "padding-bottom", "padding-right",
+        "margin", "margin-top", "margin-left", "margin-bottom", "margin-right",
+        "border", "border-top", "border-left", "border-bottom", "border-right",
+        "top", "left", "bottom", "right",
+        "width", "height", "min-width", "min-height", "max-width", "max-height",
+        "row-gap", "column-gap",
+        "display", "position", "position-type",
+        "flex-direction", "flex-wrap",
+        "align-items", "justify-items", "align-self", "justify-self",
+        "align-content", "justify-content",
+        "box-sizing", "grid-auto-flow",
+        "flex-grow", "flex-shrink", "scrollbar-width",
+        "aspect-ratio", "overflow", "overflow-clip-margin",
+        "border-radius",
+        // Other builders
+        "src",
+        "border-color",
+        "background-color",
+        "font-size",
+        "justify",
+        "linebreak",
+        "text-color",
+        "name",
+        "components",
+    ];
+
+    fn extra_attrs(attributes: &[Attribute]) -> Vec<TokenStream> {
+        attributes
+            .iter()
+            .filter(|attr| {
+                !Self::KNOWN_KEYS.contains(&attr.key.as_str())
+                    && !attr.key.starts_with("on")
+            })
+            .filter_map(|attr| {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit_str),
+                    ..
+                }) = &attr.value
+                {
+                    let key = syn::LitStr::new(&attr.key, attr.span);
+                    let val = syn::LitStr::new(&lit_str.value(), lit_str.span());
+                    Some(quote! { (#key, #val) })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 impl ToTokens for ElementNode {
@@ -620,11 +674,19 @@ impl ToTokens for ElementNode {
         ];
         let mut components = Vec::<TokenStream>::new();
         components.push_some(Name::from(&self.attributes).ok());
-        if !tag_names.contains(&self.tag_name.to_string().as_str()) {
+        let is_custom = !tag_names.contains(&self.tag_name.to_string().as_str());
+        if is_custom {
             let tag_name = &self.tag_name;
+            let node = NodeComponent::from(&self.attributes);
+            let extra = Self::extra_attrs(&self.attributes);
             components.push(quote! {
-                #tag_name
-            })
+                <#tag_name as ::bevy_ui_html_core::HtmlComponent>::build(
+                    ::bevy_ui_html_core::HtmlProps {
+                        node: #node,
+                        extra_attrs: &[#(#extra),*],
+                    }
+                )
+            });
         }
         #[cfg(feature = "feathers")]
         {
@@ -665,7 +727,9 @@ impl ToTokens for ElementNode {
                 }
             }
         }
-        components.push_some(NodeComponent::from(&self.attributes).ok());
+        if !is_custom {
+            components.push_some(NodeComponent::from(&self.attributes).ok());
+        }
         components.push_some(Image::from(&self.attributes).ok());
         components.push_some(BorderColor::from(&self.attributes).ok());
         components.push_some(BackgroundColor::from(&self.attributes).ok());
@@ -866,6 +930,35 @@ fn html_inner(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     html_inner(input.into()).into()
+}
+
+/// Derive macro that implements [`bevy_ui_html_core::HtmlComponent`] for a
+/// type as a simple marker: the type itself plus the parsed `Node` are
+/// returned as the bundle, and `extra_attrs` are ignored.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Component, HtmlComponent)]
+/// struct MenuButton;
+///
+/// // html! { <MenuButton padding="8px">"Click"</MenuButton> }
+/// // spawns an entity with MenuButton + Node { padding: px(8.0).all() } + Children
+/// ```
+#[proc_macro_derive(HtmlComponent)]
+pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
+    let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+    quote! {
+        impl #impl_generics ::bevy_ui_html_core::HtmlComponent for #name #ty_generics #where_clause {
+            type Bundle = (#name #ty_generics, ::bevy::ui::Node);
+            fn build(props: ::bevy_ui_html_core::HtmlProps) -> Self::Bundle {
+                (#name, props.node)
+            }
+        }
+    }
+    .into()
 }
 
 #[cfg(test)]
@@ -1340,12 +1433,16 @@ mod tests {
         };
         let expected = quote! {
             (
-                MenuButton,
-                ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
-                    ..Default::default()
-                },
+                <MenuButton as ::bevy_ui_html_core::HtmlComponent>::build(
+                    ::bevy_ui_html_core::HtmlProps {
+                        node: ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                            ..Default::default()
+                        },
+                        extra_attrs: &[],
+                    }
+                ),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                 ))
@@ -1354,6 +1451,111 @@ mod tests {
 
         let result = html_inner(input);
         assert_eq!(result.to_string(), expected.to_string());
+    }
+
+    mod html_component {
+        use super::*;
+
+        #[test]
+        fn self_closing_custom_tag_no_tuple() {
+            let input = quote! {
+                <MyComponent />
+            };
+            let expected = quote! {
+                <MyComponent as ::bevy_ui_html_core::HtmlComponent>::build(
+                    ::bevy_ui_html_core::HtmlProps {
+                        node: ::bevy::ui::Node::default(),
+                        extra_attrs: &[],
+                    }
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn extra_string_attrs_forwarded_to_extra_attrs() {
+            let input = quote! {
+                <MyComponent padding="4px" variant="primary" />
+            };
+            let expected = quote! {
+                <MyComponent as ::bevy_ui_html_core::HtmlComponent>::build(
+                    ::bevy_ui_html_core::HtmlProps {
+                        node: ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        extra_attrs: &[("variant", "primary")],
+                    }
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn multiple_extra_attrs_all_forwarded() {
+            let input = quote! {
+                <MyComponent variant="primary" size="large" disabled="true" />
+            };
+            let expected = quote! {
+                <MyComponent as ::bevy_ui_html_core::HtmlComponent>::build(
+                    ::bevy_ui_html_core::HtmlProps {
+                        node: ::bevy::ui::Node::default(),
+                        extra_attrs: &[("variant", "primary"), ("size", "large"), ("disabled", "true")],
+                    }
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn standard_component_attrs_still_added_to_tuple() {
+            let input = quote! {
+                <MyButton padding="4px" background-color="black" variant="primary">
+                    "text"
+                </MyButton>
+            };
+            let expected = quote! {
+                (
+                    <MyButton as ::bevy_ui_html_core::HtmlComponent>::build(
+                        ::bevy_ui_html_core::HtmlProps {
+                            node: ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            extra_attrs: &[("variant", "primary")],
+                        }
+                    ),
+                    ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn rust_expression_extra_attrs_not_in_extra_attrs() {
+            // Rust-expression values on unknown attrs are silently dropped from extra_attrs
+            // since they can't be represented as &'static str
+            let input = quote! {
+                <MyComponent variant={some_var} />
+            };
+            let expected = quote! {
+                <MyComponent as ::bevy_ui_html_core::HtmlComponent>::build(
+                    ::bevy_ui_html_core::HtmlProps {
+                        node: ::bevy::ui::Node::default(),
+                        extra_attrs: &[],
+                    }
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
     }
 
     #[test]

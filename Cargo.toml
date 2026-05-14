@@ -1,5 +1,5 @@
 [workspace]
-members = ["avian_bullet_trajectory", "bevy_ui_html", "derelict", "planetes_editor", "planetes_input", "planetes_scene_state"]
+members = ["avian_bullet_trajectory", "bevy_ui_html", "bevy_ui_html_core", "derelict", "planetes_editor", "planetes_input", "planetes_scene_state"]
 
 [workspace.package]
 authors = ["Eric Kwoka <43540491+ekwoka@users.noreply.github.com>"]
@@ -10,6 +10,7 @@ rust-version = "1.92"
 # Local Packages
 avian_bullet_trajectory = { path = "avian_bullet_trajectory" }
 bevy_ui_html = { path = "bevy_ui_html", features = ["propagate", "feathers"] }
+bevy_ui_html_core = { path = "bevy_ui_html_core" }
 planetes_scene_state = { path = "planetes_scene_state" }
 planetes_editor = { path = "planetes_editor" }
 planetes_input = { path = "planetes_input" }

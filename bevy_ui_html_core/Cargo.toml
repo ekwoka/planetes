@@ -1,0 +1,12 @@
+[package]
+name = "bevy_ui_html_core"
+version = "0.0.1"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_ui"] }
+
+[lints]
+workspace = true
