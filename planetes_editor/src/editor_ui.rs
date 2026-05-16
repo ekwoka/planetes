@@ -11,6 +11,7 @@ use bevy::{
     ui_widgets::Activate,
 };
 use bevy_feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme};
+use bevy_ui_html::HtmlComponent;
 
 use crate::{
     EditorMode, ReflectPlanetesComponent,
@@ -99,7 +100,7 @@ pub struct UiView;
 pub struct ViewPort;
 
 /// Marker component for the MenuBar UI
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct MenuBar;
 
 /// Builds entire Editor UI

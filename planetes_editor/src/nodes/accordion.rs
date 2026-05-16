@@ -4,6 +4,7 @@ use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
     prelude::*,
 };
+use bevy_ui_html::HtmlComponent;
 
 use crate::{
     nodes::{
@@ -144,8 +145,8 @@ impl AccordionState {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct AccordionContainer;
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct AccordionIcon;

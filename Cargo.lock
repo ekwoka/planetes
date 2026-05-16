@@ -1710,6 +1710,13 @@ name = "bevy_ui_html"
 version = "0.0.1"
 dependencies = [
  "bevy",
+ "bevy_ui_html_macro",
+]
+
+[[package]]
+name = "bevy_ui_html_macro"
+version = "0.0.1"
+dependencies = [
  "proc-macro2",
  "quote",
  "rstml",

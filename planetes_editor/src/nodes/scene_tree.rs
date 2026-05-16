@@ -8,6 +8,7 @@ use crate::{
     prelude::*,
 };
 use bevy::{platform::collections::HashMap, prelude::*};
+use bevy_ui_html::HtmlComponent;
 use planetes_scene_state::{CanonicalScene, ReflectHiddenComponent};
 
 pub fn plugin(app: &mut App) {
@@ -15,10 +16,10 @@ pub fn plugin(app: &mut App) {
         .add_observer(select_entity);
 }
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct SceneTreeView;
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct SceneTreeBranch;
 
 pub fn view() -> impl Bundle {

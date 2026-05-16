@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
 use bevy::{prelude::*, reflect::TypeInfo};
-use bevy_ui_html::html;
+use bevy_ui_html::{HtmlComponent, html};
 
 use crate::{events::AddComponentToEntity, nodes::entity_viewer::Viewing};
 
@@ -20,7 +20,7 @@ pub struct CloseAddComponent;
 #[derive(Component)]
 pub struct AddComponentButton(pub TypeId);
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct AddComponentModal;
 
 pub fn handle_open_add_component(
