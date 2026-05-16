@@ -612,19 +612,52 @@ impl ElementNode {
     // "on*" attrs) with a string-literal value becomes an `extra_attr`.
     const KNOWN_KEYS: &'static [&'static str] = &[
         // NodeComponent (47 keys, see node.rs)
-        "padding", "padding-top", "padding-left", "padding-bottom", "padding-right",
-        "margin", "margin-top", "margin-left", "margin-bottom", "margin-right",
-        "border", "border-top", "border-left", "border-bottom", "border-right",
-        "top", "left", "bottom", "right",
-        "width", "height", "min-width", "min-height", "max-width", "max-height",
-        "row-gap", "column-gap",
-        "display", "position", "position-type",
-        "flex-direction", "flex-wrap",
-        "align-items", "justify-items", "align-self", "justify-self",
-        "align-content", "justify-content",
-        "box-sizing", "grid-auto-flow",
-        "flex-grow", "flex-shrink", "scrollbar-width",
-        "aspect-ratio", "overflow", "overflow-clip-margin",
+        "padding",
+        "padding-top",
+        "padding-left",
+        "padding-bottom",
+        "padding-right",
+        "margin",
+        "margin-top",
+        "margin-left",
+        "margin-bottom",
+        "margin-right",
+        "border",
+        "border-top",
+        "border-left",
+        "border-bottom",
+        "border-right",
+        "top",
+        "left",
+        "bottom",
+        "right",
+        "width",
+        "height",
+        "min-width",
+        "min-height",
+        "max-width",
+        "max-height",
+        "row-gap",
+        "column-gap",
+        "display",
+        "position",
+        "position-type",
+        "flex-direction",
+        "flex-wrap",
+        "align-items",
+        "justify-items",
+        "align-self",
+        "justify-self",
+        "align-content",
+        "justify-content",
+        "box-sizing",
+        "grid-auto-flow",
+        "flex-grow",
+        "flex-shrink",
+        "scrollbar-width",
+        "aspect-ratio",
+        "overflow",
+        "overflow-clip-margin",
         "border-radius",
         // Other builders
         "src",
@@ -642,8 +675,7 @@ impl ElementNode {
         attributes
             .iter()
             .filter(|attr| {
-                !Self::KNOWN_KEYS.contains(&attr.key.as_str())
-                    && !attr.key.starts_with("on")
+                !Self::KNOWN_KEYS.contains(&attr.key.as_str()) && !attr.key.starts_with("on")
             })
             .filter_map(|attr| {
                 if let syn::Expr::Lit(syn::ExprLit {
