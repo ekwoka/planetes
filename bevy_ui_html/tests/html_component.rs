@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-use bevy_ui_html::html;
-use bevy_ui_html_core::{HtmlComponent, HtmlProps};
+use bevy_ui_html::{HtmlComponent, HtmlProps, html};
 
 // ── Manual HtmlComponent impls ─────────────────────────────────────────────
 
@@ -46,7 +45,7 @@ impl HtmlComponent for OverrideButton {
 
 // ── Marker derive ──────────────────────────────────────────────────────────
 
-#[derive(Component, bevy_ui_html::HtmlComponent)]
+#[derive(Component, HtmlComponent)]
 struct DerivedMarker;
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -56,7 +55,13 @@ struct DerivedMarker;
 #[test]
 fn custom_impl_spawns_with_correct_node() {
     let bundle = html! { <MyMarker padding="8px" /> };
-    assert_eq!(bundle.1, Node { padding: px(8.0).all(), ..default() });
+    assert_eq!(
+        bundle.1,
+        Node {
+            padding: px(8.0).all(),
+            ..default()
+        }
+    );
 }
 
 /// The HtmlComponent impl can read extra (non-standard) string attributes.
@@ -78,7 +83,13 @@ fn extra_attrs_absent_key_falls_back() {
 fn build_can_override_node_values() {
     // padding="4px" attribute is parsed but the impl overrides it to 16px
     let bundle = html! { <OverrideButton padding="4px" /> };
-    assert_eq!(bundle.1, Node { padding: px(16.0).all(), ..default() });
+    assert_eq!(
+        bundle.1,
+        Node {
+            padding: px(16.0).all(),
+            ..default()
+        }
+    );
 }
 
 /// Standard attribute components (BackgroundColor, etc.) are still added to

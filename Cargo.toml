@@ -1,5 +1,5 @@
 [workspace]
-members = ["avian_bullet_trajectory", "bevy_ui_html", "bevy_ui_html_core", "derelict", "planetes_editor", "planetes_input", "planetes_scene_state"]
+members = ["avian_bullet_trajectory", "bevy_ui_html", "bevy_ui_html_macro", "derelict", "planetes_editor", "planetes_input", "planetes_scene_state"]
 
 [workspace.package]
 authors = ["Eric Kwoka <43540491+ekwoka@users.noreply.github.com>"]
@@ -10,7 +10,7 @@ rust-version = "1.92"
 # Local Packages
 avian_bullet_trajectory = { path = "avian_bullet_trajectory" }
 bevy_ui_html = { path = "bevy_ui_html", features = ["propagate", "feathers"] }
-bevy_ui_html_core = { path = "bevy_ui_html_core" }
+bevy_ui_html_macro = { path = "bevy_ui_html_macro" }
 planetes_scene_state = { path = "planetes_scene_state" }
 planetes_editor = { path = "planetes_editor" }
 planetes_input = { path = "planetes_input" }
@@ -68,11 +68,11 @@ unwrap_used = "warn"
 uninlined_format_args = "warn"
 
 [workspace.metadata.bin]
-cargo-edit = { version = "0.13.9", bins = ["cargo-rm", "cargo-upgrade"], locked = true }
+cargo-edit = { version = "0.13.10", bins = ["cargo-rm", "cargo-upgrade"], locked = true }
 cargo-make = { version = "0.37.24", locked = false }
-cargo-nextest = { version = "0.9.132", locked = true }
+cargo-nextest = { version = "0.9.135", locked = true }
 cargo-watch = { version = "8.5.3", locked = true }
-dioxus-cli = { version = "0.7.5", git = "https://github.com/DioxusLabs/dioxus/", bins = ["dx"], locked = true }
+dioxus-cli = { version = "0.7.9", git = "https://github.com/DioxusLabs/dioxus/", bins = ["dx"], locked = true }
 
 [package]
 name = "planetes_sandbox"

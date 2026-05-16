@@ -9,8 +9,7 @@ use bevy::{
     picking::pointer::Location,
     prelude::*,
 };
-use bevy_ui_html::html;
-use bevy_ui_html_core::{HtmlComponent, HtmlProps};
+use bevy_ui_html::{HtmlComponent, HtmlProps, html};
 
 #[test]
 fn test_basic_div() {

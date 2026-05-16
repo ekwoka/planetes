@@ -12,6 +12,7 @@ use bevy::{
     prelude::*,
     ui_widgets::Activate,
 };
+use bevy_ui_html::HtmlComponent;
 use planetes_input::prelude::*;
 use planetes_scene_state::{CanonicalScene, ComponentsChanged};
 
@@ -371,10 +372,10 @@ fn update_name(
     }
 }
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct EntityViewer;
 
-#[derive(Component)]
+#[derive(Component, HtmlComponent)]
 pub struct EntityEditor;
 
 #[derive(Component)]
