@@ -711,12 +711,39 @@ impl ToTokens for ElementNode {
             let tag_name = &self.tag_name;
             let node = NodeComponent::from(&self.attributes);
             let extra = Self::extra_attrs(&self.attributes);
+
+            let background_color = match BackgroundColor::from(&self.attributes).ok() {
+                Some(bc) => quote! { #bc },
+                None => quote! { ::bevy::ui::BackgroundColor::default() },
+            };
+            let border_color = match BorderColor::from(&self.attributes).ok() {
+                Some(bc) => quote! { #bc },
+                None => quote! { ::bevy::ui::BorderColor::default() },
+            };
+            let text_font = match TextFont::from(&self.attributes).ok() {
+                Some(tf) => tf.plain_tokens(),
+                None => quote! { ::bevy::text::TextFont::default() },
+            };
+            let text_color = match TextColor::from(&self.attributes).ok() {
+                Some(tc) => tc.plain_tokens(),
+                None => quote! { ::bevy::text::TextColor::default() },
+            };
+            let text_layout = match TextLayout::from(&self.attributes).ok() {
+                Some(tl) => quote! { #tl },
+                None => quote! { ::bevy::text::TextLayout::default() },
+            };
+
             components.push(quote! {
                 <#tag_name as ::bevy_ui_html::HtmlComponent>::build(
-                    ::bevy_ui_html::HtmlProps {
+                    ::bevy_ui_html::HtmlBundle {
                         node: #node,
-                        extra_attrs: &[#(#extra),*],
-                    }
+                        background_color: #background_color,
+                        border_color: #border_color,
+                        text_font: #text_font,
+                        text_color: #text_color,
+                        text_layout: #text_layout,
+                    },
+                    &[#(#extra),*]
                 )
             });
         }
@@ -761,13 +788,13 @@ impl ToTokens for ElementNode {
         }
         if !is_custom {
             components.push_some(NodeComponent::from(&self.attributes).ok());
+            components.push_some(Image::from(&self.attributes).ok());
+            components.push_some(BorderColor::from(&self.attributes).ok());
+            components.push_some(BackgroundColor::from(&self.attributes).ok());
+            components.push_some(TextFont::from(&self.attributes).ok());
+            components.push_some(TextColor::from(&self.attributes).ok());
+            components.push_some(TextLayout::from(&self.attributes).ok());
         }
-        components.push_some(Image::from(&self.attributes).ok());
-        components.push_some(BorderColor::from(&self.attributes).ok());
-        components.push_some(BackgroundColor::from(&self.attributes).ok());
-        components.push_some(TextFont::from(&self.attributes).ok());
-        components.push_some(TextColor::from(&self.attributes).ok());
-        components.push_some(TextLayout::from(&self.attributes).ok());
         components.push_some(
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_block()),
@@ -984,9 +1011,11 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     quote! {
         impl #impl_generics ::bevy_ui_html::HtmlComponent for #name #ty_generics #where_clause {
-            type Bundle = (#name #ty_generics, ::bevy::ui::Node);
-            fn build(props: ::bevy_ui_html::HtmlProps) -> Self::Bundle {
-                (#name, props.node)
+            fn build(props: ::bevy_ui_html::HtmlBundle, _: &[(&'static str, &'static str)]) -> impl ::bevy::ecs::bundle::Bundle {
+                let ::bevy_ui_html::HtmlBundle {
+                    node, background_color, border_color, text_font, text_color, text_layout
+                } = props;
+                (#name, node, background_color, border_color, text_font, text_color, text_layout)
             }
         }
     }
@@ -1466,14 +1495,19 @@ mod tests {
         let expected = quote! {
             (
                 <MenuButton as ::bevy_ui_html::HtmlComponent>::build(
-                    ::bevy_ui_html::HtmlProps {
+                    ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
                             border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                             ..Default::default()
                         },
-                        extra_attrs: &[],
-                    }
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[]
                 ),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
@@ -1495,10 +1529,15 @@ mod tests {
             };
             let expected = quote! {
                 <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
-                    ::bevy_ui_html::HtmlProps {
+                    ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node::default(),
-                        extra_attrs: &[],
-                    }
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[]
                 )
             };
             let result = html_inner(input);
@@ -1506,19 +1545,24 @@ mod tests {
         }
 
         #[test]
-        fn extra_string_attrs_forwarded_to_extra_attrs() {
+        fn extra_string_attrs_forwarded_to_additional_attributes() {
             let input = quote! {
                 <MyComponent padding="4px" variant="primary" />
             };
             let expected = quote! {
                 <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
-                    ::bevy_ui_html::HtmlProps {
+                    ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
-                        extra_attrs: &[("variant", "primary")],
-                    }
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[("variant", "primary")]
                 )
             };
             let result = html_inner(input);
@@ -1532,10 +1576,15 @@ mod tests {
             };
             let expected = quote! {
                 <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
-                    ::bevy_ui_html::HtmlProps {
+                    ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node::default(),
-                        extra_attrs: &[("variant", "primary"), ("size", "large"), ("disabled", "true")],
-                    }
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
                 )
             };
             let result = html_inner(input);
@@ -1543,7 +1592,7 @@ mod tests {
         }
 
         #[test]
-        fn standard_component_attrs_still_added_to_tuple() {
+        fn standard_component_attrs_passed_inside_html_bundle() {
             let input = quote! {
                 <MyButton padding="4px" background-color="black" variant="primary">
                     "text"
@@ -1552,15 +1601,19 @@ mod tests {
             let expected = quote! {
                 (
                     <MyButton as ::bevy_ui_html::HtmlComponent>::build(
-                        ::bevy_ui_html::HtmlProps {
+                        ::bevy_ui_html::HtmlBundle {
                             node: ::bevy::ui::Node {
                                 padding: ::bevy::ui::px(4.0).all(),
                                 ..Default::default()
                             },
-                            extra_attrs: &[("variant", "primary")],
-                        }
+                            background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[("variant", "primary")]
                     ),
-                    ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
                     ))
@@ -1571,18 +1624,23 @@ mod tests {
         }
 
         #[test]
-        fn rust_expression_extra_attrs_not_in_extra_attrs() {
-            // Rust-expression values on unknown attrs are silently dropped from extra_attrs
+        fn rust_expression_extra_attrs_not_in_additional_attributes() {
+            // Rust-expression values on unknown attrs are silently dropped from additional_attributes
             // since they can't be represented as &'static str
             let input = quote! {
                 <MyComponent variant={some_var} />
             };
             let expected = quote! {
                 <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
-                    ::bevy_ui_html::HtmlProps {
+                    ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node::default(),
-                        extra_attrs: &[],
-                    }
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[]
                 )
             };
             let result = html_inner(input);

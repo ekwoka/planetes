@@ -1,17 +1,23 @@
 use bevy::prelude::*;
 pub use bevy_ui_html_macro::{HtmlComponent, html};
 
-/// All parsed UI properties passed to [`HtmlComponent::build`].
+/// A struct grouping all UI properties parsed from the `html!` macro attributes.
 ///
-/// `node` contains every layout/styling attribute recognised by the `html!`
-/// macro (padding, margin, width, border-radius, …).  Any attribute whose key
-/// is not recognised by a standard builder and whose value is a plain string
-/// literal is collected into `extra_attrs` so the implementation can act on
-/// bespoke, component-specific data.
-pub struct HtmlProps {
+/// `node` carries every layout/styling attribute (padding, margin, width, …).
+/// The remaining fields hold the parsed value when the corresponding CSS-like
+/// attribute is present, or the component's `Default` when it is absent.
+///
+/// Any attribute whose key is not recognised by a standard builder and whose
+/// value is a plain string literal is passed separately as `additional_attributes`
+/// to [`HtmlComponent::build`].
+#[derive(Bundle)]
+pub struct HtmlBundle {
     pub node: Node,
-    /// Unknown string-literal attributes, in source order.
-    pub extra_attrs: &'static [(&'static str, &'static str)],
+    pub background_color: BackgroundColor,
+    pub border_color: BorderColor,
+    pub text_font: TextFont,
+    pub text_color: TextColor,
+    pub text_layout: TextLayout,
 }
 
 /// Trait for types that can be used as custom tags in the `html!` macro.
@@ -23,30 +29,27 @@ pub struct HtmlProps {
 /// struct PrimaryButton { variant: &'static str }
 ///
 /// impl HtmlComponent for PrimaryButton {
-///     type Bundle = (PrimaryButton, Node, BackgroundColor);
-///
-///     fn build(props: HtmlProps) -> Self::Bundle {
-///         let variant = props.extra_attrs.iter()
+///     fn build(props: HtmlBundle, additional_attributes: &[(&str, &str)]) -> impl Bundle {
+///         let variant = additional_attributes.iter()
 ///             .find(|(k, _)| *k == "variant")
 ///             .map(|(_, v)| *v)
 ///             .unwrap_or("default");
-///         let color = if variant == "danger" { Color::RED } else { Color::BLUE };
-///         (PrimaryButton { variant }, props.node, BackgroundColor(color))
+///         let HtmlBundle { node, background_color, .. } = props;
+///         (PrimaryButton { variant }, node, background_color)
 ///     }
 /// }
 ///
 /// // html! { <PrimaryButton variant="danger" padding="8px">"Click"</PrimaryButton> }
-/// // expands to:
-/// // (PrimaryButton::build(HtmlProps { node: Node { padding: px(8.0).all(), ... }, extra_attrs: &[("variant", "danger")] }), children)
 /// ```
 pub trait HtmlComponent {
-    type Bundle: Bundle;
-    fn build(props: HtmlProps) -> Self::Bundle;
+    fn build(
+        props: HtmlBundle,
+        additional_attributes: &[(&'static str, &'static str)],
+    ) -> impl Bundle;
 }
 
 impl HtmlComponent for Button {
-    type Bundle = (Button, Node);
-    fn build(props: HtmlProps) -> Self::Bundle {
-        (Button, props.node)
+    fn build(props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+        (Button, props)
     }
 }

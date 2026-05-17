@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_ui_html::{HtmlComponent, HtmlProps, html};
+use bevy_ui_html::{HtmlBundle, HtmlComponent, html};
 
 // ── Manual HtmlComponent impls ─────────────────────────────────────────────
 
@@ -7,9 +7,8 @@ use bevy_ui_html::{HtmlComponent, HtmlProps, html};
 struct MyMarker;
 
 impl HtmlComponent for MyMarker {
-    type Bundle = (MyMarker, Node);
-    fn build(props: HtmlProps) -> (MyMarker, Node) {
-        (MyMarker, props.node)
+    fn build(props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+        (MyMarker, props)
     }
 }
 
@@ -19,15 +18,16 @@ struct ThemedButton {
 }
 
 impl HtmlComponent for ThemedButton {
-    type Bundle = (ThemedButton, Node);
-    fn build(props: HtmlProps) -> (ThemedButton, Node) {
-        let variant = props
-            .extra_attrs
+    fn build(
+        props: HtmlBundle,
+        additional_attributes: &[(&'static str, &'static str)],
+    ) -> impl Bundle {
+        let variant = additional_attributes
             .iter()
             .find(|(k, _)| *k == "variant")
             .map(|(_, v)| *v)
             .unwrap_or("default");
-        (ThemedButton { variant }, props.node)
+        (ThemedButton { variant }, props)
     }
 }
 
@@ -35,11 +35,10 @@ impl HtmlComponent for ThemedButton {
 struct OverrideButton;
 
 impl HtmlComponent for OverrideButton {
-    type Bundle = (OverrideButton, Node);
-    fn build(mut props: HtmlProps) -> (OverrideButton, Node) {
+    fn build(mut props: HtmlBundle, _: &[(&str, &str)]) -> impl Bundle {
         // Always enforce 16px padding regardless of what the attribute says
         props.node.padding = px(16.0).all();
-        (OverrideButton, props.node)
+        (OverrideButton, props)
     }
 }
 
@@ -54,9 +53,18 @@ struct DerivedMarker;
 /// parsed Node.
 #[test]
 fn custom_impl_spawns_with_correct_node() {
-    let bundle = html! { <MyMarker padding="8px" /> };
+    let mut app = App::new();
+    let root = app
+        .world_mut()
+        .spawn(html! { <MyMarker padding="8px" /> })
+        .id();
+    let node = app
+        .world_mut()
+        .query_filtered::<&Node, With<MyMarker>>()
+        .get(app.world(), root)
+        .unwrap();
     assert_eq!(
-        bundle.1,
+        *node,
         Node {
             padding: px(8.0).all(),
             ..default()
@@ -67,24 +75,48 @@ fn custom_impl_spawns_with_correct_node() {
 /// The HtmlComponent impl can read extra (non-standard) string attributes.
 #[test]
 fn extra_attrs_accessible_in_build() {
-    let bundle = html! { <ThemedButton variant="primary" /> };
-    assert_eq!(bundle.0.variant, "primary");
+    let mut app = App::new();
+    let root = app
+        .world_mut()
+        .spawn(html! { <ThemedButton variant="primary" /> })
+        .id();
+    let button = app
+        .world_mut()
+        .query::<&ThemedButton>()
+        .get(app.world(), root)
+        .unwrap();
+    assert_eq!(button.variant, "primary");
 }
 
 /// Extra attrs default to "default" when the key is absent.
 #[test]
 fn extra_attrs_absent_key_falls_back() {
-    let bundle = html! { <ThemedButton /> };
-    assert_eq!(bundle.0.variant, "default");
+    let mut app = App::new();
+    let root = app.world_mut().spawn(html! { <ThemedButton /> }).id();
+    let button = app
+        .world_mut()
+        .query::<&ThemedButton>()
+        .get(app.world(), root)
+        .unwrap();
+    assert_eq!(button.variant, "default");
 }
 
 /// The build method can override the node values the macro parsed from attrs.
 #[test]
 fn build_can_override_node_values() {
     // padding="4px" attribute is parsed but the impl overrides it to 16px
-    let bundle = html! { <OverrideButton padding="4px" /> };
+    let mut app = App::new();
+    let root = app
+        .world_mut()
+        .spawn(html! { <OverrideButton padding="4px" /> })
+        .id();
+    let node = app
+        .world_mut()
+        .query_filtered::<&Node, With<OverrideButton>>()
+        .get(app.world(), root)
+        .unwrap();
     assert_eq!(
-        bundle.1,
+        *node,
         Node {
             padding: px(16.0).all(),
             ..default()
@@ -92,8 +124,8 @@ fn build_can_override_node_values() {
     );
 }
 
-/// Standard attribute components (BackgroundColor, etc.) are still added to
-/// the entity tuple alongside the build result.
+/// Standard attribute components (BackgroundColor, etc.) are passed inside
+/// HtmlBundle and end up on the entity via the build() return value.
 #[test]
 fn standard_attrs_still_spawn_as_extra_components() {
     let mut app = App::new();

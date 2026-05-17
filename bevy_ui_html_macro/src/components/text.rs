@@ -32,6 +32,29 @@ impl From<&Vec<Attribute>> for TextFont {
     }
 }
 
+impl TextFont {
+    /// Returns tokens for the plain `::bevy::text::TextFont { … }` struct,
+    /// without any `Propagate` wrapping. Used when populating `HtmlBundle`
+    /// for custom component `build()` calls.
+    pub fn plain_tokens(&self) -> TokenStream {
+        let fields = self
+            .attributes
+            .iter()
+            .filter_map(|attr| match attr.key.as_str() {
+                "font-size" => Value::new(&attr.value).parse_as_float().map(|value| {
+                    quote! { font_size: #value }
+                }),
+                _ => None,
+            });
+        quote! {
+            ::bevy::text::TextFont {
+                #(#fields,)*
+                ..Default::default()
+            }
+        }
+    }
+}
+
 impl ToTokens for TextFont {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let fields = self
@@ -137,6 +160,20 @@ impl From<&Vec<Attribute>> for TextColor {
                 .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
                 .cloned()
                 .collect(),
+        }
+    }
+}
+
+impl TextColor {
+    /// Returns tokens for the plain `::bevy::text::TextColor(…)` value,
+    /// without any `Propagate` wrapping. Used when populating `HtmlBundle`
+    /// for custom component `build()` calls.
+    pub fn plain_tokens(&self) -> TokenStream {
+        let color = Value::new(&self.attributes[0].value);
+        if let Some(color) = color.parse_as_color() {
+            quote! { ::bevy::text::TextColor(#color) }
+        } else {
+            quote! { ::bevy::text::TextColor::default() }
         }
     }
 }
