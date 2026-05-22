@@ -7,18 +7,19 @@ use bevy_ui_html::{HtmlBundle, HtmlComponent, html};
 struct MyMarker;
 
 impl HtmlComponent for MyMarker {
-    fn build(props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
-        (MyMarker, props)
+    fn build(self, props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+        (self, props)
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Default)]
 struct ThemedButton {
     variant: &'static str,
 }
 
 impl HtmlComponent for ThemedButton {
     fn build(
+        self,
         props: HtmlBundle,
         additional_attributes: &[(&'static str, &'static str)],
     ) -> impl Bundle {
@@ -35,10 +36,10 @@ impl HtmlComponent for ThemedButton {
 struct OverrideButton;
 
 impl HtmlComponent for OverrideButton {
-    fn build(mut props: HtmlBundle, _: &[(&str, &str)]) -> impl Bundle {
+    fn build(self, mut props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
         // Always enforce 16px padding regardless of what the attribute says
         props.node.padding = px(16.0).all();
-        (OverrideButton, props)
+        (self, props)
     }
 }
 
@@ -78,7 +79,7 @@ fn extra_attrs_accessible_in_build() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <ThemedButton variant="primary" /> })
+        .spawn(html! { <{ThemedButton::default()} variant="primary"/> })
         .id();
     let button = app
         .world_mut()
@@ -92,7 +93,10 @@ fn extra_attrs_accessible_in_build() {
 #[test]
 fn extra_attrs_absent_key_falls_back() {
     let mut app = App::new();
-    let root = app.world_mut().spawn(html! { <ThemedButton /> }).id();
+    let root = app
+        .world_mut()
+        .spawn(html! { <{ThemedButton::default()} /> })
+        .id();
     let button = app
         .world_mut()
         .query::<&ThemedButton>()

@@ -22,6 +22,9 @@ pub struct HtmlBundle {
 
 /// Trait for types that can be used as custom tags in the `html!` macro.
 ///
+/// The implementor is the tag expression itself — unit structs, enum unit
+/// variants, and tuple-struct instances all work as `self`.
+///
 /// # Example
 ///
 /// ```ignore
@@ -29,7 +32,7 @@ pub struct HtmlBundle {
 /// struct PrimaryButton { variant: &'static str }
 ///
 /// impl HtmlComponent for PrimaryButton {
-///     fn build(props: HtmlBundle, additional_attributes: &[(&str, &str)]) -> impl Bundle {
+///     fn build(self, props: HtmlBundle, additional_attributes: &[(&str, &str)]) -> impl Bundle {
 ///         let variant = additional_attributes.iter()
 ///             .find(|(k, _)| *k == "variant")
 ///             .map(|(_, v)| *v)
@@ -39,17 +42,18 @@ pub struct HtmlBundle {
 ///     }
 /// }
 ///
-/// // html! { <PrimaryButton variant="danger" padding="8px">"Click"</PrimaryButton> }
+/// // html! { <{PrimaryButton::default()} variant="danger" padding="8px">"Click"</...> }
 /// ```
 pub trait HtmlComponent {
     fn build(
+        self,
         props: HtmlBundle,
         additional_attributes: &[(&'static str, &'static str)],
     ) -> impl Bundle;
 }
 
 impl HtmlComponent for Button {
-    fn build(props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
-        (Button, props)
+    fn build(self, props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+        (self, props)
     }
 }

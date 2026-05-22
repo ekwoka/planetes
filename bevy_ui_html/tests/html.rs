@@ -76,8 +76,8 @@ fn test_editor_menu_button() {
     struct MenuButton;
 
     impl HtmlComponent for MenuButton {
-        fn build(props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
-            (MenuButton, props.node)
+        fn build(self, props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+            (self, props.node)
         }
     }
 

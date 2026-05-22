@@ -694,6 +694,20 @@ impl ElementNode {
     }
 }
 
+/// Emit a `NodeName` as a value expression, stripping the outer braces from a
+/// single-statement block so that `{ expr }` becomes `expr`.  This prevents
+/// the `unused_braces` lint when the result is used as a function argument.
+/// Multi-statement blocks and non-block names are emitted as-is.
+fn tag_name_as_expr(name: &NodeName) -> TokenStream {
+    if let NodeName::Block(block) = name
+        && block.stmts.len() == 1
+    {
+        block.stmts[0].to_token_stream()
+    } else {
+        name.to_token_stream()
+    }
+}
+
 impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let tag_names = vec![
@@ -709,6 +723,7 @@ impl ToTokens for ElementNode {
         let is_custom = !tag_names.contains(&self.tag_name.to_string().as_str());
         if is_custom {
             let tag_name = &self.tag_name;
+            let tag_expr = tag_name_as_expr(tag_name);
             let node = NodeComponent::from(&self.attributes);
             let extra = Self::extra_attrs(&self.attributes);
 
@@ -734,7 +749,8 @@ impl ToTokens for ElementNode {
             };
 
             components.push(quote! {
-                <#tag_name as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    #tag_expr,
                     ::bevy_ui_html::HtmlBundle {
                         node: #node,
                         background_color: #background_color,
@@ -1011,11 +1027,11 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     quote! {
         impl #impl_generics ::bevy_ui_html::HtmlComponent for #name #ty_generics #where_clause {
-            fn build(props: ::bevy_ui_html::HtmlBundle, _: &[(&'static str, &'static str)]) -> impl ::bevy::ecs::bundle::Bundle {
+            fn build(self, props: ::bevy_ui_html::HtmlBundle, _: &[(&'static str, &'static str)]) -> impl ::bevy::ecs::bundle::Bundle {
                 let ::bevy_ui_html::HtmlBundle {
                     node, background_color, border_color, text_font, text_color, text_layout
                 } = props;
-                (#name, node, background_color, border_color, text_font, text_color, text_layout)
+                (self, node, background_color, border_color, text_font, text_color, text_layout)
             }
         }
     }
@@ -1494,7 +1510,8 @@ mod tests {
         };
         let expected = quote! {
             (
-                <MenuButton as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MenuButton,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
@@ -1528,7 +1545,8 @@ mod tests {
                 <MyComponent />
             };
             let expected = quote! {
-                <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node::default(),
                         background_color: ::bevy::ui::BackgroundColor::default(),
@@ -1550,7 +1568,8 @@ mod tests {
                 <MyComponent padding="4px" variant="primary" />
             };
             let expected = quote! {
-                <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
@@ -1575,7 +1594,8 @@ mod tests {
                 <MyComponent variant="primary" size="large" disabled="true" />
             };
             let expected = quote! {
-                <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node::default(),
                         background_color: ::bevy::ui::BackgroundColor::default(),
@@ -1600,7 +1620,8 @@ mod tests {
             };
             let expected = quote! {
                 (
-                    <MyButton as ::bevy_ui_html::HtmlComponent>::build(
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyButton,
                         ::bevy_ui_html::HtmlBundle {
                             node: ::bevy::ui::Node {
                                 padding: ::bevy::ui::px(4.0).all(),
@@ -1631,7 +1652,8 @@ mod tests {
                 <MyComponent variant={some_var} />
             };
             let expected = quote! {
-                <MyComponent as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node::default(),
                         background_color: ::bevy::ui::BackgroundColor::default(),
