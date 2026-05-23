@@ -7,7 +7,7 @@ use bevy_ui_html::{HtmlBundle, HtmlComponent, html};
 struct MyMarker;
 
 impl HtmlComponent for MyMarker {
-    fn build(self, props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+    fn build(self, props: HtmlBundle, _: &'static [(&'static str, &'static str)]) -> impl Bundle {
         (self, props)
     }
 }
@@ -36,7 +36,11 @@ impl HtmlComponent for ThemedButton {
 struct OverrideButton;
 
 impl HtmlComponent for OverrideButton {
-    fn build(self, mut props: HtmlBundle, _: &[(&'static str, &'static str)]) -> impl Bundle {
+    fn build(
+        self,
+        mut props: HtmlBundle,
+        _: &'static [(&'static str, &'static str)],
+    ) -> impl Bundle {
         // Always enforce 16px padding regardless of what the attribute says
         props.node.padding = px(16.0).all();
         (self, props)
@@ -173,6 +177,56 @@ fn children_still_spawn_correctly() {
 
     let texts: Vec<&Text> = text_query.iter_many(app.world(), children).collect();
     assert_eq!(texts, vec![&Text::new("Hello")]);
+}
+
+/// A closure with the build signature works as a custom tag.
+#[test]
+fn closure_as_html_component() {
+    let mut app = App::new();
+    let root = app
+        .world_mut()
+        .spawn(html! {
+            <{|props: HtmlBundle, _attrs: &[_]| (MyMarker, props)} padding="8px" />
+        })
+        .id();
+    let node = app
+        .world_mut()
+        .query_filtered::<&Node, With<MyMarker>>()
+        .get(app.world(), root)
+        .unwrap();
+    assert_eq!(
+        *node,
+        Node {
+            padding: px(8.0).all(),
+            ..default()
+        }
+    );
+}
+
+/// A named fn with `-> impl Bundle` works as a custom tag without block braces.
+#[test]
+fn fn_item_as_html_component() {
+    fn make_marker(props: HtmlBundle, _: &'static [(&'static str, &'static str)]) -> impl Bundle {
+        (MyMarker, props)
+    }
+
+    let mut app = App::new();
+    let root = app
+        .world_mut()
+        .spawn(html! { <make_marker padding="6px" /> })
+        .id();
+    let node = app
+        .world_mut()
+        .query_filtered::<&Node, With<MyMarker>>()
+        .get(app.world(), root)
+        .unwrap();
+    assert_eq!(
+        *node,
+        Node {
+            padding: px(6.0).all(),
+            ..default()
+        }
+    );
 }
 
 /// A type with #[derive(HtmlComponent)] acts as a marker component and passes

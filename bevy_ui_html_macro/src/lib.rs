@@ -1027,7 +1027,7 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     quote! {
         impl #impl_generics ::bevy_ui_html::HtmlComponent for #name #ty_generics #where_clause {
-            fn build(self, props: ::bevy_ui_html::HtmlBundle, _: &[(&'static str, &'static str)]) -> impl ::bevy::ecs::bundle::Bundle {
+            fn build(self, props: ::bevy_ui_html::HtmlBundle, _: &'static [(&'static str, &'static str)]) -> impl ::bevy::ecs::bundle::Bundle {
                 let ::bevy_ui_html::HtmlBundle {
                     node, background_color, border_color, text_font, text_color, text_layout
                 } = props;
