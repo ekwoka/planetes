@@ -20,6 +20,9 @@ pub struct HtmlBundle {
     pub text_layout: TextLayout,
 }
 
+/// Type Alias for the unclaimed HtmlAttributes to simplify trait
+pub type HtmlAttributes = &'static [(&'static str, &'static str)];
+
 /// Trait for types that can be used as custom tags in the `html!` macro.
 ///
 /// The implementor is the tag expression itself — unit structs, enum unit
@@ -32,7 +35,7 @@ pub struct HtmlBundle {
 /// struct PrimaryButton { variant: &'static str }
 ///
 /// impl HtmlComponent for PrimaryButton {
-///     fn build(self, props: HtmlBundle, additional_attributes: &'static [(&'static str, &'static str)]) -> impl Bundle {
+///     fn build(self, props: HtmlBundle, additional_attributes: HtmlAttributes) -> impl Bundle {
 ///         let variant = additional_attributes.iter()
 ///             .find(|(k, _)| *k == "variant")
 ///             .map(|(_, v)| *v)
@@ -45,29 +48,21 @@ pub struct HtmlBundle {
 /// // html! { <{PrimaryButton::default()} variant="danger" padding="8px">"Click"</...> }
 /// ```
 pub trait HtmlComponent {
-    fn build(
-        self,
-        props: HtmlBundle,
-        additional_attributes: &'static [(&'static str, &'static str)],
-    ) -> impl Bundle;
+    fn build(self, props: HtmlBundle, additional_attributes: HtmlAttributes) -> impl Bundle;
 }
 
 impl HtmlComponent for Button {
-    fn build(self, props: HtmlBundle, _: &'static [(&'static str, &'static str)]) -> impl Bundle {
+    fn build(self, props: HtmlBundle, _: HtmlAttributes) -> impl Bundle {
         (self, props)
     }
 }
 
 impl<F, B> HtmlComponent for F
 where
-    F: FnOnce(HtmlBundle, &'static [(&'static str, &'static str)]) -> B,
+    F: FnOnce(HtmlBundle, HtmlAttributes) -> B,
     B: Bundle,
 {
-    fn build(
-        self,
-        props: HtmlBundle,
-        additional_attributes: &'static [(&'static str, &'static str)],
-    ) -> impl Bundle {
+    fn build(self, props: HtmlBundle, additional_attributes: HtmlAttributes) -> impl Bundle {
         self(props, additional_attributes)
     }
 }

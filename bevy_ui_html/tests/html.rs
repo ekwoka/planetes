@@ -9,7 +9,7 @@ use bevy::{
     picking::pointer::Location,
     prelude::*,
 };
-use bevy_ui_html::{HtmlBundle, HtmlComponent, html};
+use bevy_ui_html::{HtmlAttributes, HtmlBundle, HtmlComponent, html};
 
 #[test]
 fn test_basic_div() {
@@ -76,11 +76,7 @@ fn test_editor_menu_button() {
     struct MenuButton;
 
     impl HtmlComponent for MenuButton {
-        fn build(
-            self,
-            props: HtmlBundle,
-            _: &'static [(&'static str, &'static str)],
-        ) -> impl Bundle {
+        fn build(self, props: HtmlBundle, _: HtmlAttributes) -> impl Bundle {
             (self, props.node)
         }
     }
