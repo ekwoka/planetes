@@ -35,7 +35,7 @@ pub fn highlight_selected_input(
         return;
     }
     for (input, child_of) in inputs.iter() {
-        if let Some(focused_entity) = focused.0
+        if let Some(focused_entity) = focused.get()
             && focused_entity == input
         {
             commands

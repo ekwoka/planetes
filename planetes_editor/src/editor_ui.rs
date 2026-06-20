@@ -17,10 +17,9 @@ use crate::{
     EditorMode, ReflectPlanetesComponent,
     atoms::{on_checkbox_add, on_checkbox_value_change},
     events::{handle_add_component, handle_remove_component},
-    infinite_grid::{InfiniteGrid, InfiniteGridPlugin, InfiniteGridSettings},
     nodes::{scene_tree::UpdateSceneTree, *},
     prelude::*,
-    scene::{OpenSceneFileDialog, load_scene},
+    scene::OpenSceneFileDialog,
 };
 
 #[cfg(feature = "avian")]
@@ -34,7 +33,6 @@ pub fn plugin(app: &mut App) {
     embedded_asset!(app, "assets/filled_triangle.png");
 
     app.add_plugins((
-        InfiniteGridPlugin,
         FeathersPlugins,
         crate::canonical::plugin,
         crate::scene::plugin,
@@ -45,7 +43,6 @@ pub fn plugin(app: &mut App) {
         HierarchyPropagatePlugin::<TextColor>::new(Update),
         planetes_input::plugin,
         component_selector::plugin,
-        bevy_file_dialog::FileDialogPlugin::new().with_pick_file::<ActiveScene>(),
     ))
     .insert_resource(UiTheme(create_dark_theme()))
     .init_state::<EditorMode>()
@@ -54,7 +51,7 @@ pub fn plugin(app: &mut App) {
     .register_type_data::<Children, ReflectPlanetesComponent>()
     .add_systems(
         OnEnter(EditorMode::Edit),
-        (setup_camera_system, build_ui).chain().before(load_scene),
+        (setup_camera_system, build_ui).chain(),
     )
     .add_systems(Update, update_viewport)
     .add_observer(on_checkbox_value_change)
@@ -197,17 +194,6 @@ pub fn setup_camera_system(mut commands: Commands) {
             ..default()
         },
         IsDefaultUiCamera,
-    ));
-
-    commands.spawn((
-        InfiniteGrid,
-        InfiniteGridSettings {
-            x_axis_color: Color::WHITE,
-            z_axis_color: Color::WHITE,
-            major_line_color: Color::WHITE,
-            minor_line_color: Color::WHITE,
-            ..default()
-        },
     ));
 }
 

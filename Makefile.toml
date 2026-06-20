@@ -34,7 +34,7 @@ args = ["nextest", "--workspace"]
 [tasks.docs-deps]
 script = '''
 cargo doc --no-deps --target-dir /Volumes/Corsair/cargo-cache/target $({
-    cargo tree -p bevy --depth 2 --format "{p}" --prefix none
+    cargo tree -p bevy --depth 3 --format "{p}" --prefix none
     cargo tree --workspace --depth 1 --format "{p}" --prefix none
   } \
   | sed -E 's/^[^A-Za-z0-9_-]*//' \

@@ -47,7 +47,7 @@ impl ToTokens for Radio {
             .and_then(|attr| Value::new(&attr.value).clean_block())
             .unwrap_or_else(|| quote! { () });
         tokens.extend(quote! {
-            ::bevy::feathers::controls::radio(
+            ::bevy::feathers::controls::radio_bundle(
                 #components,
                 (
                     #(#children),*

@@ -173,27 +173,31 @@ fn allows_listeners() {
 
     app.update();
 
-    app.world_mut().commands().trigger(Pointer {
-        entity: root,
-        pointer_id: bevy::picking::backend::prelude::PointerId::Mouse,
-        event: Click {
-            button: PointerButton::Primary,
-            hit: bevy::picking::backend::HitData {
-                camera: root,
-                depth: 0.0,
-                position: None,
-                normal: None,
+    app.world_mut()
+        .commands()
+        .trigger(Pointer::new_without_propagate(
+            bevy::picking::backend::prelude::PointerId::Mouse,
+            Location {
+                target: NormalizedRenderTarget::None {
+                    width: 0,
+                    height: 0,
+                },
+                position: Vec2::ZERO,
             },
-            duration: Duration::from_millis(100),
-        },
-        pointer_location: Location {
-            target: NormalizedRenderTarget::None {
-                width: 0,
-                height: 0,
+            Click {
+                button: PointerButton::Primary,
+                hit: bevy::picking::backend::HitData {
+                    camera: root,
+                    depth: 0.0,
+                    position: None,
+                    normal: None,
+                    extra: None,
+                },
+                duration: Duration::from_millis(100),
+                count: 1,
             },
-            position: Vec2::ZERO,
-        },
-    });
+            root,
+        ));
 
     app.update();
 
@@ -234,27 +238,31 @@ fn allows_listeners_no_macro() {
 
     app.update();
 
-    app.world_mut().commands().trigger(Pointer {
-        entity: root,
-        pointer_id: bevy::picking::backend::prelude::PointerId::Mouse,
-        event: Click {
-            button: PointerButton::Primary,
-            hit: bevy::picking::backend::HitData {
-                camera: root,
-                depth: 0.0,
-                position: None,
-                normal: None,
+    app.world_mut()
+        .commands()
+        .trigger(Pointer::new_without_propagate(
+            bevy::picking::backend::prelude::PointerId::Mouse,
+            Location {
+                target: NormalizedRenderTarget::None {
+                    width: 0,
+                    height: 0,
+                },
+                position: Vec2::ZERO,
             },
-            duration: Duration::from_millis(100),
-        },
-        pointer_location: Location {
-            target: NormalizedRenderTarget::None {
-                width: 0,
-                height: 0,
+            Click {
+                button: PointerButton::Primary,
+                hit: bevy::picking::backend::HitData {
+                    camera: root,
+                    depth: 0.0,
+                    position: None,
+                    normal: None,
+                    extra: None,
+                },
+                count: 1,
+                duration: Duration::from_millis(100),
             },
-            position: Vec2::ZERO,
-        },
-    });
+            root,
+        ));
 
     app.update();
 

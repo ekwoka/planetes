@@ -18,7 +18,7 @@ use bevy::{
     ecs::component::ComponentId,
     prelude::*,
     reflect::{PartialReflect, ReflectPath},
-    scene::DynamicEntity,
+    world_serialization::DynamicEntity,
 };
 
 /// Reflectable Trait to mark Components as being available to the Editor
@@ -93,25 +93,25 @@ pub fn plugin(app: &mut App) {
 pub struct CanonicalScene {
     /// Maps entities to their canonical component data.
     /// Inner map: TypeId -> Reflected component data
-    handle: Handle<DynamicScene>,
+    handle: Handle<DynamicWorld>,
 }
 
 impl CanonicalScene {
-    pub fn is_id(&self, id: &AssetId<DynamicScene>) -> bool {
+    pub fn is_id(&self, id: &AssetId<DynamicWorld>) -> bool {
         id == &self.handle.id()
     }
 
-    pub fn insert(&mut self, handle: Handle<DynamicScene>) {
+    pub fn insert(&mut self, handle: Handle<DynamicWorld>) {
         self.handle = handle;
     }
 
-    pub fn get_scene<'a>(&self, assets: &'a Assets<DynamicScene>) -> Option<&'a DynamicScene> {
+    pub fn get_scene<'a>(&self, assets: &'a Assets<DynamicWorld>) -> Option<&'a DynamicWorld> {
         assets.get(&self.handle)
     }
 
     pub fn get_entity<'a>(
         &self,
-        assets: &'a Assets<DynamicScene>,
+        assets: &'a Assets<DynamicWorld>,
         entity: Entity,
     ) -> Option<&'a DynamicEntity> {
         assets
@@ -121,17 +121,21 @@ impl CanonicalScene {
 
     pub fn get_entity_mut<'a>(
         &self,
-        assets: &'a mut Assets<DynamicScene>,
+        assets: &'a mut Assets<DynamicWorld>,
         entity: Entity,
     ) -> Option<&'a mut DynamicEntity> {
-        assets
-            .get_mut(&self.handle)
-            .and_then(|scene| scene.entities.iter_mut().find(|e| e.entity == entity))
+        assets.get_mut(&self.handle).and_then(|scene| {
+            scene
+                .into_inner()
+                .entities
+                .iter_mut()
+                .find(|e| e.entity == entity)
+        })
     }
 
     pub fn get_component_by_id<'a>(
         &self,
-        assets: &'a Assets<DynamicScene>,
+        assets: &'a Assets<DynamicWorld>,
         entity: Entity,
         type_id: TypeId,
     ) -> Option<&'a dyn PartialReflect> {
@@ -151,7 +155,7 @@ impl CanonicalScene {
 
     pub fn get_component<'a, T: Component + FromReflect + 'static>(
         &self,
-        assets: &'a Assets<DynamicScene>,
+        assets: &'a Assets<DynamicWorld>,
         entity: Entity,
     ) -> Option<&'a T> {
         assets
@@ -172,13 +176,19 @@ impl CanonicalScene {
     /// Returns mutable access to the canonical data for a specific component.
     pub fn get_component_mut_by_id<'a>(
         &self,
-        assets: &'a mut Assets<DynamicScene>,
+        assets: &'a mut Assets<DynamicWorld>,
         entity: Entity,
         type_id: TypeId,
     ) -> Option<&'a mut dyn PartialReflect> {
         assets
             .get_mut(&self.handle)
-            .and_then(|scene| scene.entities.iter_mut().find(|e| e.entity == entity))
+            .and_then(|scene| {
+                scene
+                    .into_inner()
+                    .entities
+                    .iter_mut()
+                    .find(|e| e.entity == entity)
+            })
             .and_then(|entity| {
                 entity.components.iter_mut().find(|c| {
                     c.as_ref()
@@ -192,12 +202,18 @@ impl CanonicalScene {
 
     pub fn get_component_mut<'a, T: Component + FromReflect + 'static>(
         &self,
-        assets: &'a mut Assets<DynamicScene>,
+        assets: &'a mut Assets<DynamicWorld>,
         entity: Entity,
     ) -> Option<&'a mut T> {
         assets
             .get_mut(&self.handle)
-            .and_then(|scene| scene.entities.iter_mut().find(|e| e.entity == entity))
+            .and_then(|scene| {
+                scene
+                    .into_inner()
+                    .entities
+                    .iter_mut()
+                    .find(|e| e.entity == entity)
+            })
             .and_then(|entity| {
                 entity.components.iter_mut().find(|c| {
                     c.as_ref()
@@ -211,7 +227,7 @@ impl CanonicalScene {
     }
     pub fn get_root_entities<'a>(
         &self,
-        assets: &'a Assets<DynamicScene>,
+        assets: &'a Assets<DynamicWorld>,
     ) -> Vec<&'a DynamicEntity> {
         assets
             .get(&self.handle)
@@ -458,7 +474,7 @@ pub struct ComponentsChanged(pub Entity);
 /// System that applies edit messages to the canonical scene.
 fn apply_edit_messages(
     mut messages: MessageReader<ApplyEdit>,
-    mut assets: ResMut<Assets<DynamicScene>>,
+    mut assets: ResMut<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
     registry: Res<AppTypeRegistry>,
     mut commands: Commands,
@@ -557,7 +573,7 @@ fn apply_edit_messages(
 fn collect_edit_history(
     mut messages: MessageReader<ApplyEdit>,
     mut history: ResMut<EditHistory>,
-    assets: Res<Assets<DynamicScene>>,
+    assets: Res<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
 ) {
     if messages.is_empty() {
@@ -621,7 +637,7 @@ fn collect_edit_history(
 /// System that handles undo requests.
 fn handle_undo(
     mut messages: MessageReader<Undo>,
-    mut assets: ResMut<Assets<DynamicScene>>,
+    mut assets: ResMut<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
     mut history: ResMut<EditHistory>,
     mut commands: Commands,
@@ -708,7 +724,7 @@ fn handle_undo(
 /// System that handles redo requests.
 fn handle_redo(
     mut messages: MessageReader<Redo>,
-    mut assets: ResMut<Assets<DynamicScene>>,
+    mut assets: ResMut<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
     mut history: ResMut<EditHistory>,
     registry: Res<AppTypeRegistry>,
@@ -816,8 +832,9 @@ fn handle_redo(
 mod tests {
     use super::*;
     use bevy::{
-        reflect::{DynamicList, DynamicTupleStruct, Reflect},
+        reflect::{Reflect, list::DynamicList, tuple_struct::DynamicTupleStruct},
         scene::ScenePlugin,
+        world_serialization::WorldSerializationPlugin,
     };
 
     #[derive(Component, Reflect, Default, Clone, Debug, PartialEq)]
@@ -837,18 +854,21 @@ mod tests {
     const TEST_ENTITY_CHILD: Entity = Entity::from_bits(4294967161);
 
     fn setup_test_app() -> App {
-        use bevy::scene::DynamicEntity;
+        use bevy::world_serialization::DynamicEntity;
         let mut app = App::new();
         app.add_plugins((
             MinimalPlugins,
             AssetPlugin::default(),
             ScenePlugin::default(),
+            WorldSerializationPlugin::default(),
             plugin,
         ));
 
+        app.init_asset::<DynamicWorld>();
+
         app.world_mut()
             .resource_scope(|world, server: Mut<AssetServer>| {
-                let scene = DynamicScene {
+                let scene = DynamicWorld {
                     entities: vec![
                         DynamicEntity {
                             entity: TEST_ENTITY,
@@ -885,7 +905,7 @@ mod tests {
                 world.resource_scope(|_world, mut canonical: Mut<CanonicalScene>| {
                     canonical.insert(handle.clone());
                 });
-                world.spawn(DynamicSceneRoot(handle));
+                world.spawn(DynamicWorldRoot(handle));
             });
         app.world_mut().flush();
         for _ in 0..16 {
@@ -904,7 +924,7 @@ mod tests {
         fn get_scene() {
             let app = setup_test_app();
 
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -919,7 +939,7 @@ mod tests {
         fn get_entity() {
             let app = setup_test_app();
 
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -936,7 +956,7 @@ mod tests {
         fn get_component() {
             let app = setup_test_app();
 
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -976,7 +996,7 @@ mod tests {
         fn get_root_entities() {
             let app = setup_test_app();
 
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -996,7 +1016,7 @@ mod tests {
         let mut app = setup_test_app();
 
         {
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -1022,7 +1042,7 @@ mod tests {
         app.update();
 
         {
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -1058,7 +1078,7 @@ mod tests {
         }
 
         {
-            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+            let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                 panic!("Failed to get Server");
             };
 
@@ -1210,7 +1230,7 @@ mod tests {
             app.update();
 
             {
-                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                     panic!("Failed to get Server");
                 };
 
@@ -1233,7 +1253,7 @@ mod tests {
             app.update();
 
             {
-                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                     panic!("Failed to get Server");
                 };
 
@@ -1251,7 +1271,7 @@ mod tests {
             app.update();
 
             {
-                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                     panic!("Failed to get Server");
                 };
 
@@ -1269,7 +1289,7 @@ mod tests {
             app.update();
 
             {
-                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                     panic!("Failed to get Server");
                 };
 
@@ -1345,7 +1365,7 @@ mod tests {
             app.update();
 
             {
-                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                     panic!("Failed to get Server");
                 };
 
@@ -1363,7 +1383,7 @@ mod tests {
             app.update();
 
             {
-                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicScene>>() else {
+                let Some(assets) = app.world().get_resource_ref::<Assets<DynamicWorld>>() else {
                     panic!("Failed to get Server");
                 };
 
@@ -1437,7 +1457,7 @@ mod tests {
             let mut app = setup_test_app();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1453,7 +1473,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1496,7 +1516,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1509,7 +1529,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1537,7 +1557,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1550,7 +1570,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1575,7 +1595,7 @@ mod tests {
             let mut app = setup_test_app();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1591,7 +1611,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1644,7 +1664,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1657,7 +1677,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 let component = canonical
                     .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
@@ -1693,7 +1713,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1706,7 +1726,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical
@@ -1745,7 +1765,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 let component = canonical
                     .get_component_by_id(&assets, TEST_ENTITY, TypeId::of::<TestComponent>())
@@ -1767,7 +1787,7 @@ mod tests {
             app.update();
 
             {
-                let assets = app.world().resource::<Assets<DynamicScene>>();
+                let assets = app.world().resource::<Assets<DynamicWorld>>();
                 let canonical = app.world().resource::<CanonicalScene>();
                 assert!(
                     canonical

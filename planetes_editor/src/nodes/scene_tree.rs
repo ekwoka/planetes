@@ -45,10 +45,10 @@ pub struct UpdateSceneTree {
 
 pub fn update_tree(
     mut commands: Commands,
-    mut messages: MessageReader<AssetEvent<DynamicScene>>,
+    mut messages: MessageReader<AssetEvent<DynamicWorld>>,
     scene_tree_view: Single<Entity, With<SceneTreeView>>,
     canonical_scene: Res<CanonicalScene>,
-    scenes: Res<Assets<DynamicScene>>,
+    scenes: Res<Assets<DynamicWorld>>,
     asset_server: Res<AssetServer>,
 ) {
     for message in messages.read() {

@@ -53,7 +53,7 @@ impl ToTokens for Button {
             .and_then(|attr| Value::new(&attr.value).clean_block())
             .unwrap_or_else(|| quote! { () });
         tokens.extend(quote! {
-            ::bevy::feathers::controls::button(
+            ::bevy::feathers::controls::button_bundle(
                 #props,
                 #components,
                 (
@@ -88,7 +88,7 @@ impl From<&Vec<Attribute>> for ButtonProps {
 impl ToTokens for ButtonProps {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.attributes.is_empty() {
-            tokens.extend(quote! { ::bevy::feathers::controls::ButtonProps::default() })
+            tokens.extend(quote! { ::bevy::feathers::controls::ButtonBundleProps::default() })
         } else {
             let fields = self
                 .attributes
@@ -168,7 +168,7 @@ impl ToTokens for ButtonProps {
                 .collect::<Vec<_>>();
 
             tokens.extend(quote! {
-                ::bevy::feathers::controls::ButtonProps {
+                ::bevy::feathers::controls::ButtonBundleProps {
                     #(#fields,)*
                     ..Default::default()
                 }

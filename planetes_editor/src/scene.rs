@@ -2,17 +2,10 @@
 
 use std::{fs::File, io::Write};
 
-use crate::{
-    EditorMode, ReflectPlanetesComponent, editor_ui::ActiveScene,
-    nodes::scene_tree::UpdateSceneTree,
-};
-use bevy::{
-    app::{HierarchyPropagatePlugin, Propagate},
-    prelude::*,
-    tasks::IoTaskPool,
-};
-use bevy_file_dialog::prelude::*;
-use planetes_scene_state::CanonicalScene;
+use crate::{EditorMode, ReflectPlanetesComponent};
+use bevy::{app::HierarchyPropagatePlugin, prelude::*, tasks::IoTaskPool};
+// use bevy_file_dialog::prelude::*;
+// use planetes_scene_state::CanonicalScene;
 
 pub fn plugin(app: &mut App) {
     info!("Plugin SCENE");
@@ -20,9 +13,9 @@ pub fn plugin(app: &mut App) {
         .register_type_data::<Name, ReflectPlanetesComponent>()
         .add_systems(OnEnter(EditorMode::Edit), initialize_editor)
         .add_systems(OnEnter(EditorMode::Edit), save_scene)
-        .add_systems(Update, add_meshes_to_scene)
-        .add_systems(Update, load_scene)
-        .add_observer(open_file_dialog);
+        .add_systems(Update, add_meshes_to_scene);
+    // app.add_systems(Update, load_scene);
+    // app.add_observer(open_file_dialog);
 }
 
 #[derive(Component)]
@@ -43,14 +36,14 @@ pub fn save_scene(
     }
     let registry = registry.clone();
     let registry = registry.read();
-    let filter = SceneFilter::Allowlist(
+    let filter = WorldFilter::Allowlist(
         registry
             .iter_with_data::<ReflectPlanetesComponent>()
             .map(|(registration, _)| registration.type_id())
             .collect(),
     );
 
-    let scene = DynamicSceneBuilder::from_world(world)
+    let scene = DynamicWorldBuilder::from_world(world, &registry)
         .with_component_filter(filter)
         .extract_entities(in_scene.iter())
         .remove_empty_entities()
@@ -72,29 +65,29 @@ pub fn save_scene(
     }
 }
 
-pub fn load_scene(
-    mut events: MessageReader<DialogFilePicked<ActiveScene>>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut canonical: ResMut<CanonicalScene>,
-) {
-    for event in events.read() {
-        let path = event.path.clone();
-        info!("loading scene in {}", path.display());
-        let scene_handle = asset_server.load_override::<DynamicScene>(path);
-        let scene_root = commands
-            .spawn((
-                Name::new("Root"),
-                EditorScene,
-                Transform::default(),
-                Propagate(InScene),
-                DynamicSceneRoot(scene_handle.clone()),
-            ))
-            .id();
-        canonical.insert(scene_handle);
-        commands.write_message(UpdateSceneTree { entity: scene_root });
-    }
-}
+// pub fn load_scene(
+//     mut events: MessageReader<DialogFilePicked<ActiveScene>>,
+//     mut commands: Commands,
+//     asset_server: Res<AssetServer>,
+//     mut canonical: ResMut<CanonicalScene>,
+// ) {
+//     for event in events.read() {
+//         let path = event.path.clone();
+//         info!("loading scene in {}", path.display());
+//         let scene_handle = asset_server.load_override::<DynamicWorld>(path);
+//         let scene_root = commands
+//             .spawn((
+//                 Name::new("Root"),
+//                 EditorScene,
+//                 Transform::default(),
+//                 Propagate(InScene),
+//                 DynamicWorldRoot(scene_handle.clone()),
+//             ))
+//             .id();
+//         canonical.insert(scene_handle);
+//         commands.write_message(UpdateSceneTree { entity: scene_root });
+//     }
+// }
 
 #[derive(Event)]
 pub struct OpenSceneFileDialog;
@@ -103,13 +96,13 @@ pub fn initialize_editor(mut commands: Commands) {
     commands.trigger(OpenSceneFileDialog);
 }
 
-pub fn open_file_dialog(_event: On<OpenSceneFileDialog>, mut commands: Commands) {
-    commands
-        .dialog()
-        .set_title("Open Scene")
-        .add_filter("Bevy Scene", &["ron"])
-        .pick_file_path::<ActiveScene>();
-}
+// pub fn open_file_dialog(_event: On<OpenSceneFileDialog>, mut commands: Commands) {
+//     commands
+//         .dialog()
+//         .set_title("Open Scene")
+//         .add_filter("Bevy Scene", &["ron"])
+//         .pick_file_path::<ActiveScene>();
+// }
 
 fn add_meshes_to_scene(
     mut commands: Commands,

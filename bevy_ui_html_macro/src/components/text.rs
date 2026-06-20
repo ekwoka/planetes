@@ -42,7 +42,7 @@ impl TextFont {
             .iter()
             .filter_map(|attr| match attr.key.as_str() {
                 "font-size" => Value::new(&attr.value).parse_as_float().map(|value| {
-                    quote! { font_size: #value }
+                    quote! { font_size: ::bevy::text::FontSize::Px(#value) }
                 }),
                 _ => None,
             });
@@ -63,7 +63,7 @@ impl ToTokens for TextFont {
             .filter_map(|attr| match attr.key.as_str() {
                 "font-size" => Value::new(&attr.value).parse_as_float().map(|value| {
                     quote! {
-                        font_size: #value
+                        font_size: ::bevy::text::FontSize::Px(#value)
                     }
                 }),
                 _ => None,

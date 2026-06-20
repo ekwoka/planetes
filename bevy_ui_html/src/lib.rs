@@ -342,7 +342,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! bevy_ui_html = { version = "0.0.1", features = ["propagate"] }
+//! bevy_ui_html = { version = "0.0.2", features = ["propagate"] }
 //! ```
 //!
 //! ## Generated Output

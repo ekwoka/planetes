@@ -134,7 +134,7 @@ mod input_field {
     use bevy::ecs::system::RunSystemOnce;
     use bevy::input::ButtonState;
     use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
-    use bevy::input_focus::IsFocused;
+    use bevy::input_focus::{InputFocusPlugin, IsFocused};
     use bevy::{
         input_focus::{InputDispatchPlugin, InputFocus, IsFocusedHelper},
         window::PrimaryWindow,
@@ -157,6 +157,8 @@ mod input_field {
         ($app: ident, $key: ident, $text: tt) => {
             $app.update();
             $app.world_mut().write_message(key_event!($key, $text));
+            $app.update();
+            $app.world_mut().flush();
             $app.update();
         };
     }
@@ -235,6 +237,7 @@ mod input_field {
         app.add_plugins((
             input_field_plugin::<String>,
             bevy::input::InputPlugin,
+            InputFocusPlugin,
             InputDispatchPlugin,
             editable_text_plugin,
         ));
@@ -244,7 +247,8 @@ mod input_field {
             .world_mut()
             .spawn(InputField::<String>::new("1".to_string()))
             .id();
-        app.world_mut().insert_resource(InputFocus(Some(input)));
+        app.world_mut()
+            .insert_resource(InputFocus::from_entity(input));
 
         app.update();
 
@@ -293,7 +297,8 @@ mod input_field {
         app.world_mut().spawn((Window::default(), PrimaryWindow));
 
         let input = app.world_mut().spawn(InputField::<f32>::new(1.0)).id();
-        app.world_mut().insert_resource(InputFocus(Some(input)));
+        app.world_mut()
+            .insert_resource(InputFocus::from_entity(input));
 
         app.update();
 
@@ -414,7 +419,7 @@ pub fn on_text_change(mut changed_texts: Query<(&EditableText, &mut Text), Chang
 #[cfg(test)]
 mod editable_text {
     use bevy::{
-        input_focus::{InputDispatchPlugin, InputFocus, IsFocusedHelper},
+        input_focus::{InputDispatchPlugin, InputFocus, InputFocusPlugin, IsFocusedHelper},
         window::PrimaryWindow,
     };
 
@@ -437,6 +442,8 @@ mod editable_text {
         ($app: ident, $key: ident, $text: tt) => {
             $app.update();
             $app.world_mut().write_message(key_event!($key, $text));
+            $app.update();
+            $app.world_mut().flush();
             $app.update();
         };
     }
@@ -468,6 +475,7 @@ mod editable_text {
         let mut texts = app.world_mut().query::<&Text>();
         app.add_plugins((
             bevy::input::InputPlugin,
+            InputFocusPlugin,
             InputDispatchPlugin,
             editable_text_plugin,
         ));
@@ -480,7 +488,8 @@ mod editable_text {
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("H".into()));
 
-        app.world_mut().insert_resource(InputFocus(Some(input)));
+        app.world_mut()
+            .insert_resource(InputFocus::from_entity(input));
 
         app.update();
 
@@ -509,6 +518,7 @@ mod editable_text {
         let mut texts = app.world_mut().query::<&Text>();
         app.add_plugins((
             bevy::input::InputPlugin,
+            InputFocusPlugin,
             InputDispatchPlugin,
             editable_text_plugin,
         ));
@@ -521,7 +531,8 @@ mod editable_text {
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("H".into()));
 
-        app.world_mut().insert_resource(InputFocus(Some(input)));
+        app.world_mut()
+            .insert_resource(InputFocus::from_entity(input));
 
         app.update();
 
@@ -558,6 +569,7 @@ mod editable_text {
         let mut texts = app.world_mut().query::<&Text>();
         app.add_plugins((
             bevy::input::InputPlugin,
+            InputFocusPlugin,
             InputDispatchPlugin,
             editable_text_plugin,
             input_field_plugin::<u32>,
@@ -571,7 +583,8 @@ mod editable_text {
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("10".into()));
 
-        app.world_mut().insert_resource(InputFocus(Some(input)));
+        app.world_mut()
+            .insert_resource(InputFocus::from_entity(input));
 
         app.update();
 
@@ -603,6 +616,7 @@ mod editable_text {
         let mut texts = app.world_mut().query::<&Text>();
         app.add_plugins((
             bevy::input::InputPlugin,
+            InputFocusPlugin,
             InputDispatchPlugin,
             editable_text_plugin,
         ));
@@ -615,7 +629,8 @@ mod editable_text {
         let text = texts.get(app.world(), input).map(|text| text.0.clone());
         assert_eq!(text, Ok("Hi".into()));
 
-        app.world_mut().insert_resource(InputFocus(Some(input)));
+        app.world_mut()
+            .insert_resource(InputFocus::from_entity(input));
 
         app.update();
 

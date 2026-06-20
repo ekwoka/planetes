@@ -69,7 +69,7 @@ pub fn update_entity_viewer(
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
     canonical_scene: Res<CanonicalScene>,
-    scenes: Res<Assets<DynamicScene>>,
+    scenes: Res<Assets<DynamicWorld>>,
     assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
@@ -164,7 +164,7 @@ pub fn update_required_components(
     query: Query<&RequiredComponentsUI>,
     world: &World,
     canonical: Res<CanonicalScene>,
-    scenes: Res<Assets<DynamicScene>>,
+    scenes: Res<Assets<DynamicWorld>>,
     mut commands: Commands,
 ) {
     let Ok(&RequiredComponentsUI(target)) = query.get(event.entity) else {
@@ -247,7 +247,7 @@ pub fn handle_components_changed(
     event: On<ComponentsChanged>,
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), With<EntityEditor>>,
-    scenes: Res<Assets<DynamicScene>>,
+    scenes: Res<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
     assets: Res<AssetServer>,
 ) {
@@ -355,7 +355,7 @@ fn update_name(
         return;
     }
     info!("Typed in name input: {:?}", focused);
-    if let Some(focused) = focused.0.inspect(|_| {
+    if let Some(focused) = focused.get().inspect(|_| {
         info!("Focused Input Exists");
     }) && let Ok(field) = inputs.get(focused).inspect_err(|_| {
         info!("Failed to get field");

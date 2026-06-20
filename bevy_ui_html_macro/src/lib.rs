@@ -2337,7 +2337,7 @@ mod tests {
                             ..Default::default()
                         },
                         ::bevy::text::TextFont {
-                            font_size: 10.0,
+                            font_size: ::bevy::text::FontSize::Px(10.0),
                             ..Default::default()
                         },
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -2397,7 +2397,7 @@ mod tests {
                             ..Default::default()
                         },
                         ::bevy::app::Propagate(::bevy::text::TextFont {
-                            font_size: 10.0,
+                            font_size: ::bevy::text::FontSize::Px(10.0),
                             ..Default::default()
                         }),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -2485,8 +2485,8 @@ mod tests {
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button(
-                                ::bevy::feathers::controls::ButtonProps {
+                            ::bevy::feathers::controls::button_bundle(
+                                ::bevy::feathers::controls::ButtonBundleProps {
                                     variant: ::bevy::feathers::controls::ButtonVariant::Normal,
                                     corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
                                     ..Default::default()
@@ -2519,8 +2519,8 @@ mod tests {
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button(
-                                ::bevy::feathers::controls::ButtonProps {
+                            ::bevy::feathers::controls::button_bundle(
+                                ::bevy::feathers::controls::ButtonBundleProps {
                                     variant: ::bevy::feathers::controls::ButtonVariant::Primary,
                                     corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
                                     ..Default::default()
@@ -2564,8 +2564,8 @@ mod tests {
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button(
-                                ::bevy::feathers::controls::ButtonProps {
+                            ::bevy::feathers::controls::button_bundle(
+                                ::bevy::feathers::controls::ButtonBundleProps {
                                     variant: ::bevy::feathers::controls::ButtonVariant::Normal,
                                     corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
                                     ..Default::default()
@@ -2598,7 +2598,7 @@ mod tests {
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::checkbox(
+                            ::bevy::feathers::controls::checkbox_bundle(
                                 (),
                                 (
                                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
@@ -2641,7 +2641,7 @@ mod tests {
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::radio(
+                            ::bevy::feathers::controls::radio_bundle(
                                 TestComponent,
                                 (
                                     ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),

@@ -47,7 +47,7 @@ impl ToTokens for Checkbox {
             .and_then(|attr| Value::new(&attr.value).clean_block())
             .unwrap_or_else(|| quote! { () });
         tokens.extend(quote! {
-            ::bevy::feathers::controls::checkbox(
+            ::bevy::feathers::controls::checkbox_bundle(
                 #components,
                 (
                     #(#children),*

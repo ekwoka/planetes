@@ -18,7 +18,9 @@ use bevy::{
     },
     input_focus::{FocusedInput, InputFocus},
     prelude::*,
-    reflect::{EnumInfo, OpaqueInfo, StructInfo, TupleStructInfo, TypeInfo},
+    reflect::{
+        OpaqueInfo, TypeInfo, enums::EnumInfo, structs::StructInfo, tuple_struct::TupleStructInfo,
+    },
     ui::Checked,
     ui_widgets::{Activate, RadioButton, RadioGroup, ValueChange},
 };
@@ -34,7 +36,7 @@ pub fn update_component_editor(
     mut commands: Commands,
     target: Single<&Viewing>,
     editors: Query<(Entity, &ComponentEditor), Changed<ComponentEditor>>,
-    scenes: Res<Assets<DynamicScene>>,
+    scenes: Res<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
     registry: Res<AppTypeRegistry>,
 ) {
@@ -163,13 +165,13 @@ fn handle_commit(
     path_segments: Query<&Path>,
     ancestors: Query<&ChildOf>,
     focused: Res<InputFocus>,
-    mut scenes: ResMut<Assets<DynamicScene>>,
+    mut scenes: ResMut<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
 ) {
     if event.input.logical_key != Key::Enter || event.input.state != ButtonState::Pressed {
         return;
     }
-    let Some(focused_entity) = focused.0 else {
+    let Some(focused_entity) = focused.get() else {
         warn!("No focused entity");
         return;
     };
@@ -460,7 +462,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         .zip(reflect_struct.iter_fields())
         .map(|(field, value)| {
             let type_info = field.clone().type_info();
-            let value = value.to_dynamic();
+            let value = value.1.to_dynamic();
             let input = type_info.and_then(|type_info| match type_info {
                 TypeInfo::Opaque(info) => Some(info),
                 _ => None,
