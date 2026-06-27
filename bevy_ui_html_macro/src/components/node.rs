@@ -236,7 +236,10 @@ impl From<&Vec<Attribute>> for NodeComponent {
 impl ToTokens for NodeComponent {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.attributes.is_empty() {
-            tokens.extend(quote! { ::bevy::ui::Node::default() })
+            #[cfg(feature = "bsn")]
+            tokens.extend(quote! { bevy::ui::Node });
+            #[cfg(not(feature = "bsn"))]
+            tokens.extend(quote! { ::bevy::ui::Node::default() });
         } else {
             let mut fields = Vec::new();
 
@@ -420,6 +423,13 @@ impl ToTokens for NodeComponent {
                     overflow_clip_margin: #value
                 });
             }
+            #[cfg(feature = "bsn")]
+            tokens.extend(quote! {
+                bevy::ui::Node {
+                    #(#fields,)*
+                }
+            });
+            #[cfg(not(feature = "bsn"))]
             tokens.extend(quote! {
                 ::bevy::ui::Node {
                     #(#fields,)*

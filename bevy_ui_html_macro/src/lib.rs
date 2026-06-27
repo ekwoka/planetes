@@ -174,6 +174,11 @@ impl ToTokens for ChildNode {
                 ::bevy::ecs::spawn::SpawnWith(#node)
             }),
             _ => {
+                #[cfg(feature = "bsn")]
+                tokens.extend(quote! {
+                    (#node)
+                });
+                #[cfg(not(feature = "bsn"))]
                 tokens.extend(quote! {
                     ::bevy::ecs::spawn::Spawn(#node)
                 });
@@ -185,6 +190,11 @@ impl ToTokens for ChildNode {
 impl ToTokens for TextNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let value = &self.value;
+        #[cfg(feature = "bsn")]
+        tokens.extend(quote! {
+            bevy::ui::widget::Text(#value)
+        });
+        #[cfg(not(feature = "bsn"))]
         tokens.extend(quote! {
             ::bevy::ui::widget::Text::new(#value)
         });
@@ -448,12 +458,24 @@ impl ToTokens for ElementNode {
             .collect::<Vec<_>>();
         children.push_some(Observer::from(&self.attributes).ok());
         if !children.is_empty() {
+            #[cfg(feature = "bsn")]
+            components.push(quote! {
+                Children[
+                    #(#children),*
+                ]
+            });
+            #[cfg(not(feature = "bsn"))]
             components.push(quote! {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     #(#children),*
                 ))
             });
         }
+        #[cfg(feature = "bsn")]
+        tokens.extend(quote! {
+            #(#components)*
+        });
+        #[cfg(not(feature = "bsn"))]
         match components.len() {
             1 => {
                 tokens.extend(quote! {
@@ -537,6 +559,13 @@ fn html_inner(input: TokenStream) -> TokenStream {
             html_node.to_tokens(&mut output);
         }
     }
+
+    #[cfg(feature = "bsn")]
+    let output = quote! {
+            ::bevy::scene::bsn! {
+                #output
+            }
+    };
 
     output
 }
@@ -668,799 +697,421 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
 mod tests {
     use super::*;
 
-    #[test]
-    fn single_div_with_text() {
-        let input = quote! {
-            <div>"Hello"</div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn single_div_with_no_children() {
-        let input = quote! {
-            <div/>
-        };
-        let expected = quote! {
-            ::bevy::ui::Node::default()
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn div_with_div_children() {
-        let input = quote! {
-            <div>
-                <div>"Hello"</div>
-                <div>"World"</div>
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(
-                        (
-                            ::bevy::ui::Node::default(),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                            ))
-                        )
-                    ),
-                    ::bevy::ecs::spawn::Spawn(
-                        (
-                            ::bevy::ui::Node::default(),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
-                            ))
-                        )
-                    )
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_span_children() {
-        let input = quote! {
-            <div>
-                <span>"Hello"</span>
-                <span>"World"</span>
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn single_div_with_attributes() {
-        let input = quote! {
-            <div
-              padding="10px"
-              padding-bottom="20%"
-              margin-top="5vw"
-              margin-left="10vh"
-              margin-bottom="15vmin"
-              margin-right="20vmax"
-              >
-              "Hello"
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node {
-                  padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
-                  margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)),
-                  ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn single_div_with_rust_attributes() {
-        let input = quote! {
-            <div
-              padding={px(10.0)}
-              padding-bottom={percent(20.0)}
-              margin-top={vw(5.0)}
-              margin-left={vh(10.0)}
-              margin-bottom={vmin(15.0)}
-              margin-right={vmax(20.0)}
-              >
-              "Hello"
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node {
-                  padding: px(10.0).all().with_bottom(percent(20.0)),
-                  margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)),
-                  ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_sizing_and_positioning() {
-        let input = quote! {
-            <div
-              width="100px"
-              height="50px"
-              min-width="10px"
-              max-width="200px"
-              left="5px"
-              top="10px"
-              >
-              "Test"
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node {
-                  left: ::bevy::ui::px(5.0),
-                  top: ::bevy::ui::px(10.0),
-                  width: ::bevy::ui::px(100.0),
-                  height: ::bevy::ui::px(50.0),
-                  min_width: ::bevy::ui::px(10.0),
-                  max_width: ::bevy::ui::px(200.0),
-                  ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Test"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_flexbox_attributes() {
-        let input = quote! {
-            <div
-              display={Display::Flex}
-              flex-direction={FlexDirection::Column}
-              flex-grow={1.0}
-              flex-shrink={0.5}
-              align-items={AlignItems::Center}
-              justify-content={JustifyContent::SpaceBetween}
-              >
-              "Flex"
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node {
-                  display: Display::Flex,
-                  flex_direction: FlexDirection::Column,
-                  justify_content: JustifyContent::SpaceBetween,
-                  align_items: AlignItems::Center,
-                  flex_grow: 1.0,
-                  flex_shrink: 0.5,
-                  ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Flex"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_border_and_gaps() {
-        let input = quote! {
-            <div
-              border="2px"
-              border-top="5px"
-              row-gap="10px"
-              column-gap="15px"
-              >
-              "Borders"
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node {
-                  border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
-                  row_gap: ::bevy::ui::px(10.0),
-                  column_gap: ::bevy::ui::px(15.0),
-                  ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Borders"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_aspect_ratio_and_position_type() {
-        let input = quote! {
-            <div
-              aspect-ratio="1.77"
-              position-type={PositionType::Absolute}
-              width="100%"
-              >
-              "Aspect"
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node {
-                  width: ::bevy::ui::percent(100.0),
-                  position_type: PositionType::Absolute,
-                  aspect_ratio: Some(1.77),
-                  ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Aspect"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn single_div_with_block_content() {
-        let input = quote! {
-            <div>{Text::new("Hello")}</div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(Text::new("Hello"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_complex_block_expression() {
-        let input = quote! {
-            <div>{if show { Text::new("Visible") } else { Text::new("Hidden") }}</div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(if show { Text::new("Visible") } else { Text::new("Hidden") })
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_nested_macro_call() {
-        // This demonstrates that blocks can contain macro calls (like nested html! calls)
-        let inner = html_inner(quote! { <span>"Nested"</span> });
-        let input = quote! {
-            <div>{#inner}</div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Nested"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn div_with_mixed_text_and_blocks() {
-        let input = quote! {
-            <div>
-                "Static text"
-                {dynamic_content}
-                {MyComponent::new()}
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Static text")),
-                    ::bevy::ecs::spawn::Spawn(dynamic_content),
-                    ::bevy::ecs::spawn::Spawn(MyComponent::new())
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn supports_iter_element() {
-        let input = quote! {
-            <div>
-               <iter>
-                   {
-                        items.map(|item| {
-                            html! {
-                                <div>{item.name}</div>
-                            }
-                        })
-                    }
-               </iter>
-            </div>
-        };
-        let output = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::SpawnIter(
-                        items.map(|item| {
-                            html! {
-                                <div>{item.name}</div>
-                            }
-                        })
-                    )
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
-    }
-
-    #[test]
-    fn supports_border_radius() {
-        let input = quote! {
-            <div
-               padding="4px"
-               border-radius="2px">
-               "Menu"
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
-                    ..Default::default()
-                },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn supports_border_color() {
-        let input = quote! {
-            <div
-               padding="4px"
-               border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
-               "Menu"
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    ..Default::default()
-                },
-                ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn supports_background_color() {
-        let input = quote! {
-            <div
-               padding="4px"
-               background-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
-               "Menu"
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    ..Default::default()
-                },
-                ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7)),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn supports_unit_struct_elements() {
-        let input = quote! {
-            <MenuButton
-               padding="4px"
-               border-radius="2px">
-               "Menu"
-            </MenuButton>
-        };
-        let expected = quote! {
-            (
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MenuButton,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
-                            ..Default::default()
-                        },
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[]
-                ),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    mod html_component {
+    #[cfg(not(feature = "bsn"))]
+    mod legacy {
         use super::*;
+        #[test]
+        fn single_div_with_text() {
+            let input = quote! {
+                <div>"Hello"</div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
 
         #[test]
-        fn self_closing_custom_tag_no_tuple() {
+        fn single_div_with_no_children() {
             let input = quote! {
-                <MyComponent />
+                <div/>
             };
             let expected = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node::default(),
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[]
-                )
+                ::bevy::ui::Node::default()
             };
             let result = html_inner(input);
             assert_eq!(result.to_string(), expected.to_string());
         }
 
         #[test]
-        fn extra_string_attrs_forwarded_to_additional_attributes() {
+        fn div_with_div_children() {
             let input = quote! {
-                <MyComponent padding="4px" variant="primary" />
+                <div>
+                    <div>"Hello"</div>
+                    <div>"World"</div>
+                </div>
             };
-            let expected = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
-                        },
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[("variant", "primary")]
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            (
+                                ::bevy::ui::Node::default(),
+                                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                                ))
+                            )
+                        ),
+                        ::bevy::ecs::spawn::Spawn(
+                            (
+                                ::bevy::ui::Node::default(),
+                                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
+                                ))
+                            )
+                        )
+                    ))
                 )
             };
             let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_eq!(result.to_string(), output.to_string());
         }
 
         #[test]
-        fn multiple_extra_attrs_all_forwarded() {
+        fn div_with_span_children() {
             let input = quote! {
-                <MyComponent variant="primary" size="large" disabled="true" />
+                <div>
+                    <span>"Hello"</span>
+                    <span>"World"</span>
+                </div>
             };
-            let expected = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node::default(),
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
+                    ))
                 )
             };
             let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_eq!(result.to_string(), output.to_string());
         }
 
         #[test]
-        fn standard_component_attrs_passed_inside_html_bundle() {
+        fn single_div_with_attributes() {
             let input = quote! {
-                <MyButton padding="4px" background-color="black" variant="primary">
-                    "text"
-                </MyButton>
+                <div
+                padding="10px"
+                padding-bottom="20%"
+                margin-top="5vw"
+                margin-left="10vh"
+                margin-bottom="15vmin"
+                margin-right="20vmax"
+                >
+                "Hello"
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node {
+                    padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
+                    margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)),
+                    ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn single_div_with_rust_attributes() {
+            let input = quote! {
+                <div
+                padding={px(10.0)}
+                padding-bottom={percent(20.0)}
+                margin-top={vw(5.0)}
+                margin-left={vh(10.0)}
+                margin-bottom={vmin(15.0)}
+                margin-right={vmax(20.0)}
+                >
+                "Hello"
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node {
+                    padding: px(10.0).all().with_bottom(percent(20.0)),
+                    margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)),
+                    ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_sizing_and_positioning() {
+            let input = quote! {
+                <div
+                width="100px"
+                height="50px"
+                min-width="10px"
+                max-width="200px"
+                left="5px"
+                top="10px"
+                >
+                "Test"
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node {
+                    left: ::bevy::ui::px(5.0),
+                    top: ::bevy::ui::px(10.0),
+                    width: ::bevy::ui::px(100.0),
+                    height: ::bevy::ui::px(50.0),
+                    min_width: ::bevy::ui::px(10.0),
+                    max_width: ::bevy::ui::px(200.0),
+                    ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Test"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_flexbox_attributes() {
+            let input = quote! {
+                <div
+                display={Display::Flex}
+                flex-direction={FlexDirection::Column}
+                flex-grow={1.0}
+                flex-shrink={0.5}
+                align-items={AlignItems::Center}
+                justify-content={JustifyContent::SpaceBetween}
+                >
+                "Flex"
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    flex_grow: 1.0,
+                    flex_shrink: 0.5,
+                    ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Flex"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_border_and_gaps() {
+            let input = quote! {
+                <div
+                border="2px"
+                border-top="5px"
+                row-gap="10px"
+                column-gap="15px"
+                >
+                "Borders"
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node {
+                    border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
+                    row_gap: ::bevy::ui::px(10.0),
+                    column_gap: ::bevy::ui::px(15.0),
+                    ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Borders"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_aspect_ratio_and_position_type() {
+            let input = quote! {
+                <div
+                aspect-ratio="1.77"
+                position-type={PositionType::Absolute}
+                width="100%"
+                >
+                "Aspect"
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node {
+                    width: ::bevy::ui::percent(100.0),
+                    position_type: PositionType::Absolute,
+                    aspect_ratio: Some(1.77),
+                    ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Aspect"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn single_div_with_block_content() {
+            let input = quote! {
+                <div>{Text::new("Hello")}</div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(Text::new("Hello"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_complex_block_expression() {
+            let input = quote! {
+                <div>{if show { Text::new("Visible") } else { Text::new("Hidden") }}</div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(if show { Text::new("Visible") } else { Text::new("Hidden") })
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_nested_macro_call() {
+            // This demonstrates that blocks can contain macro calls (like nested html! calls)
+            let inner = html_inner(quote! { <span>"Nested"</span> });
+            let input = quote! {
+                <div>{#inner}</div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Nested"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_mixed_text_and_blocks() {
+            let input = quote! {
+                <div>
+                    "Static text"
+                    {dynamic_content}
+                    {MyComponent::new()}
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Static text")),
+                        ::bevy::ecs::spawn::Spawn(dynamic_content),
+                        ::bevy::ecs::spawn::Spawn(MyComponent::new())
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn supports_iter_element() {
+            let input = quote! {
+                <div>
+                <iter>
+                    {
+                            items.map(|item| {
+                                html! {
+                                    <div>{item.name}</div>
+                                }
+                            })
+                        }
+                </iter>
+                </div>
+            };
+            let output = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::SpawnIter(
+                            items.map(|item| {
+                                html! {
+                                    <div>{item.name}</div>
+                                }
+                            })
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn supports_border_radius() {
+            let input = quote! {
+                <div
+                padding="4px"
+                border-radius="2px">
+                "Menu"
+                </div>
             };
             let expected = quote! {
                 (
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
-                        MyButton,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
-                                ..Default::default()
-                            },
-                            background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
-                        },
-                        &[("variant", "primary")]
-                    ),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn rust_expression_extra_attrs_not_in_additional_attributes() {
-            // Rust-expression values on unknown attrs are silently dropped from additional_attributes
-            // since they can't be represented as &'static str
-            let input = quote! {
-                <MyComponent variant={some_var} />
-            };
-            let expected = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node::default(),
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
+                    ::bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all(),
+                        border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                        ..Default::default()
                     },
-                    &[]
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
                 )
             };
+
             let result = html_inner(input);
             assert_eq!(result.to_string(), expected.to_string());
         }
-    }
-
-    #[test]
-    fn only_removes_bracket_on_single_statement_block() {
-        let input = quote! {
-            <div>
-               <div>
-               {Text::new("Menu")}
-               </div>
-               <div>
-               {
-                   let thing = Text::new("Thing");
-                   thing
-               }
-               </div>
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn((
-                        ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(Text::new("Menu"))
-                        ))
-                    )),
-                    ::bevy::ecs::spawn::Spawn((
-                        ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn({
-                                let thing = Text::new("Thing");
-                                thing
-                            })
-                        ))
-                    ))
-                ))
-            )
-        };
-
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn auto_wrap_inline_block_children() {
-        let input = quote! {
-            <div>
-                <span>{"Hello"}</span>
-                <span>{let thing = true; if thing { "World" } else { "Mom" }}</span>
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn supports_spawning_with_children() {
-        let input = quote! {
-            <div>
-                <with>
-                    {
-                        if true {
-                            parent.spawn(html! { <div>"Hello World"</div>});
-                        } else {
-                            parent.spawn(html! { <div>"Hello Mom"</div>});
-                        }
-                    }
-                </with>
-            </div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                        if true {
-                            parent.spawn(html! { <div>"Hello World"</div>});
-                        } else {
-                            parent.spawn(html! { <div>"Hello Mom"</div>});
-                        }
-                    })
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn support_arbitrary_component_additions() {
-        let input = quote! {
-            <div
-            components={(
-                Checkable,
-                Checked
-            )}>"Hello"</div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                (Checkable, Checked),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn supports_name() {
-        let input = quote! {
-            <div name="hello">"World"</div>
-        };
-        let expected = quote! {
-            (
-                ::bevy::ecs::name::Name::new("hello"),
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    #[test]
-    fn supports_img_tags() {
-        let input = quote! {
-            <img src={asset_server
-                .load("embedded://planetes_editor/assets/filled_triangle.png")} />
-        };
-        let expected = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                ::bevy::ui::widget::ImageNode::new(
-                    asset_server
-                        .load("embedded://planetes_editor/assets/filled_triangle.png")
-                )
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
-    }
-
-    mod colors {
-        use super::*;
 
         #[test]
-        fn allows_direct_colors() {
+        fn supports_border_color() {
             let input = quote! {
                 <div
-                   padding="4px"
-                   border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
-                   "Menu"
+                padding="4px"
+                border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                "Menu"
                 </div>
             };
             let expected = quote! {
@@ -1481,14 +1132,12 @@ mod tests {
         }
 
         #[test]
-        fn allows_string_colors_on_color_attributes() {
+        fn supports_background_color() {
             let input = quote! {
                 <div
-                   padding="4px"
-                   border-color="srgb(170 170 170)"
-                   text-color="srgb(170 170 170)"
-                   background-color="srgb(170 170 170)">
-                   "Menu"
+                padding="4px"
+                background-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                "Menu"
                 </div>
             };
             let expected = quote! {
@@ -1497,9 +1146,7 @@ mod tests {
                         padding: ::bevy::ui::px(4.0).all(),
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                    ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                    ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
+                    ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7)),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                         ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                     ))
@@ -1510,802 +1157,265 @@ mod tests {
             assert_eq!(result.to_string(), expected.to_string());
         }
 
-        mod const_colors {
+        #[test]
+        fn supports_unit_struct_elements() {
+            let input = quote! {
+                <MenuButton
+                padding="4px"
+                border-radius="2px">
+                "Menu"
+                </MenuButton>
+            };
+            let expected = quote! {
+                (
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MenuButton,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                                ..Default::default()
+                            },
+                            background_color: ::bevy::ui::BackgroundColor::default(),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[]
+                    ),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        mod html_component {
             use super::*;
+
             #[test]
-            fn allows_const_black() {
+            fn self_closing_custom_tag_no_tuple() {
                 let input = quote! {
-                    <div
-                    padding="4px"
-                    border-color="black">
-                    "Menu"
-                    </div>
+                    <MyComponent />
                 };
                 let expected = quote! {
-                    (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyComponent,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node::default(),
+                            background_color: ::bevy::ui::BackgroundColor::default(),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                        ))
+                        &[]
                     )
                 };
-
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
 
             #[test]
-            fn allows_const_white() {
+            fn extra_string_attrs_forwarded_to_additional_attributes() {
                 let input = quote! {
-                    <div
-                    padding="4px"
-                    border-color="white">
-                    "Menu"
-                    </div>
+                    <MyComponent padding="4px" variant="primary" />
                 };
                 let expected = quote! {
-                    (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyComponent,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            background_color: ::bevy::ui::BackgroundColor::default(),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                        ))
+                        &[("variant", "primary")]
                     )
                 };
-
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
 
             #[test]
-            fn allows_const_none() {
+            fn multiple_extra_attrs_all_forwarded() {
                 let input = quote! {
-                    <div
-                    padding="4px"
-                    border-color="none">
-                    "Menu"
-                    </div>
+                    <MyComponent variant="primary" size="large" disabled="true" />
+                };
+                let expected = quote! {
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyComponent,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node::default(),
+                            background_color: ::bevy::ui::BackgroundColor::default(),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn standard_component_attrs_passed_inside_html_bundle() {
+                let input = quote! {
+                    <MyButton padding="4px" background-color="black" variant="primary">
+                        "text"
+                    </MyButton>
                 };
                 let expected = quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
-                        },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE),
+                        <_ as ::bevy_ui_html::HtmlComponent>::build(
+                            MyButton,
+                            ::bevy_ui_html::HtmlBundle {
+                                node: ::bevy::ui::Node {
+                                    padding: ::bevy::ui::px(4.0).all(),
+                                    ..Default::default()
+                                },
+                                background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
+                                border_color: ::bevy::ui::BorderColor::default(),
+                                text_font: ::bevy::text::TextFont::default(),
+                                text_color: ::bevy::text::TextColor::default(),
+                                text_layout: ::bevy::text::TextLayout::default(),
+                            },
+                            &[("variant", "primary")]
+                        ),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
                         ))
                     )
                 };
-
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
-        }
 
-        #[test]
-        fn allows_string_rgb_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="rgb(170 170 170)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_rgba_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="rgba(170 170 170 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_srgb_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="srgb(178.5 178.5 178.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_srgbu8_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="srgb(170 170 170)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_srgba_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="srgba(178.5 178.5 178.5 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_srgbau8_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="srgba(170 170 170 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_hsl_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="hsl(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_hsla_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="hsla(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_hsv_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="hsv(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_hsva_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="hsva(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_hwb_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="hwb(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_hwba_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="hwba(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_lab_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="lab(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_laba_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="laba(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_lch_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="lch(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_lcha_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="lcha(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_oklab_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="oklab(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_oklaba_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="oklaba(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_oklch_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="oklch(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_oklcha_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="oklcha(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_xyz_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="xyz(170 0.7 0.7)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_string_xyza_colors() {
-            let input = quote! {
-                <div
-                   padding="4px"
-                   border-color="xyza(170 0.7 0.7 / 0.5)">
-                   "Menu"
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
-                        ..Default::default()
-                    },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                    ))
-                )
-            };
-
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-    }
-
-    mod nodes {
-        use super::*;
-
-        #[test]
-        fn allows_display_strings() {
-            let input = quote! {
-                <div display={Display::Flex}>
-                    <div display="none"/>
-                    <div display="hidden"/>
-                    <div display="flex"/>
-                    <div display="grid"/>
-                    <div display="block"/>
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        display: Display::Flex,
-                        ..Default::default()
-                    },
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::None,
-                            ..Default::default()
-                        }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::None,
-                            ..Default::default()
-                        }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::Flex,
-                            ..Default::default()
-                        }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::Grid,
-                            ..Default::default()
-                        }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::Block,
-                            ..Default::default()
-                        })
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_position_strings() {
-            let input = quote! {
-                <div position="absolute">
-                    <div position="relative"/>
-                    <div position-type="absolute"/>
-                    <div position-type="relative"/>
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node {
-                        position_type: ::bevy::ui::PositionType::Absolute,
-                        ..Default::default()
-                    },
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative,
-                            ..Default::default()
-                        }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Absolute,
-                            ..Default::default()
-                        }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative,
-                            ..Default::default()
-                        })
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn allows_flex_direction_strings() {
-            let tests = vec![
-                ("row", "Row"),
-                ("column", "Column"),
-                ("col", "Column"),
-                ("row-reverse", "RowReverse"),
-                ("column-reverse", "ColumnReverse"),
-                ("col-reverse", "ColumnReverse"),
-                ("Invalid", "Invalid"),
-            ];
-            for (input, expected) in tests {
+            #[test]
+            fn rust_expression_extra_attrs_not_in_additional_attributes() {
+                // Rust-expression values on unknown attrs are silently dropped from additional_attributes
+                // since they can't be represented as &'static str
                 let input = quote! {
-                    <div flex-direction=#input/>
+                    <MyComponent variant={some_var} />
                 };
-                let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
                 let expected = quote! {
-                    ::bevy::ui::Node {
-                        flex_direction: ::bevy::ui::FlexDirection::#ident,
-                        ..Default::default()
-                    }
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyComponent,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node::default(),
+                            background_color: ::bevy::ui::BackgroundColor::default(),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[]
+                    )
                 };
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
         }
-    }
-
-    mod children {
-        use super::*;
 
         #[test]
-        fn adds_observers() {
+        fn only_removes_bracket_on_single_statement_block() {
             let input = quote! {
-                <div onClick={|_event: On<Pointer<Click>>,
-                    mut commands: Commands,
-                    text: Single<Entity, With<Text>>| {
-                        commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                    }}>
-                    "Hello, World!"
+                <div>
+                <div>
+                {Text::new("Menu")}
+                </div>
+                <div>
+                {
+                    let thing = Text::new("Thing");
+                    thing
+                }
+                </div>
                 </div>
             };
             let expected = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
-                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                            let entity = parent.target_entity();
-                            parent.spawn(
-                                ::bevy::ecs::observer::Observer::new(
-                                    |_event: On<Pointer<Click> >,
-                                     mut commands: Commands,
-                                     text: Single<Entity, With<Text> >| {
-                                        commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                                    }
-                                )
-                                .with_entity(entity)
-                            );
+                        ::bevy::ecs::spawn::Spawn((
+                            ::bevy::ui::Node::default(),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(Text::new("Menu"))
+                            ))
+                        )),
+                        ::bevy::ecs::spawn::Spawn((
+                            ::bevy::ui::Node::default(),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn({
+                                    let thing = Text::new("Thing");
+                                    thing
+                                })
+                            ))
+                        ))
+                    ))
+                )
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn auto_wrap_inline_block_children() {
+            let input = quote! {
+                <div>
+                    <span>{"Hello"}</span>
+                    <span>{let thing = true; if thing { "World" } else { "Mom" }}</span>
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn supports_spawning_with_children() {
+            let input = quote! {
+                <div>
+                    <with>
+                        {
+                            if true {
+                                parent.spawn(html! { <div>"Hello World"</div>});
+                            } else {
+                                parent.spawn(html! { <div>"Hello Mom"</div>});
+                            }
+                        }
+                    </with>
+                </div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                            if true {
+                                parent.spawn(html! { <div>"Hello World"</div>});
+                            } else {
+                                parent.spawn(html! { <div>"Hello Mom"</div>});
+                            }
                         })
                     ))
                 )
@@ -2313,81 +1423,76 @@ mod tests {
             let result = html_inner(input);
             assert_eq!(result.to_string(), expected.to_string());
         }
-    }
 
-    mod text_components {
-        use super::*;
-
-        #[cfg(not(feature = "propagate"))]
-        mod no_propagate {
-            use super::*;
-            #[test]
-            fn supports_text_font() {
-                let input = quote! {
-                    <div
-                        padding="4px"
-                        font-size="10">
-                        "Menu"
-                    </div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
-                        },
-                        ::bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0),
-                            ..Default::default()
-                        },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                        ))
-                    )
-                };
-
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn supports_text_color() {
-                let input = quote! {
-                    <div
-                        padding="4px"
-                        text-color="rgb(170 170 170)">
-                        "Menu"
-                    </div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
-                        },
-                        ::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                        ))
-                    )
-                };
-
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+        #[test]
+        fn support_arbitrary_component_additions() {
+            let input = quote! {
+                <div
+                components={(
+                    Checkable,
+                    Checked
+                )}>"Hello"</div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    (Checkable, Checked),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
         }
 
-        #[cfg(feature = "propagate")]
-        mod propagate {
+        #[test]
+        fn supports_name() {
+            let input = quote! {
+                <div name="hello">"World"</div>
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ecs::name::Name::new("hello"),
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn supports_img_tags() {
+            let input = quote! {
+                <img src={asset_server
+                    .load("embedded://planetes_editor/assets/filled_triangle.png")} />
+            };
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    ::bevy::ui::widget::ImageNode::new(
+                        asset_server
+                            .load("embedded://planetes_editor/assets/filled_triangle.png")
+                    )
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        mod colors {
             use super::*;
 
             #[test]
-            fn supports_text_font() {
+            fn allows_direct_colors() {
                 let input = quote! {
                     <div
-                        padding="4px"
-                        font-size="10">
-                            "Menu"
+                    padding="4px"
+                    border-color={Color::linear_rgb(0.7, 0.7, 0.7)}>
+                    "Menu"
                     </div>
                 };
                 let expected = quote! {
@@ -2396,10 +1501,7 @@ mod tests {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
-                        ::bevy::app::Propagate(::bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0),
-                            ..Default::default()
-                        }),
+                        ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
                         ))
@@ -2411,12 +1513,14 @@ mod tests {
             }
 
             #[test]
-            fn supports_text_color() {
+            fn allows_string_colors_on_color_attributes() {
                 let input = quote! {
                     <div
-                        padding="4px"
-                        text-color="srgb(170 170 170)">
-                        "Menu"
+                    padding="4px"
+                    border-color="srgb(170 170 170)"
+                    text-color="srgb(170 170 170)"
+                    background-color="srgb(170 170 170)">
+                    "Menu"
                     </div>
                 };
                 let expected = quote! {
@@ -2425,6 +1529,8 @@ mod tests {
                             padding: ::bevy::ui::px(4.0).all(),
                             ..Default::default()
                         },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
+                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
                         ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
                         <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                             ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
@@ -2435,235 +1541,1183 @@ mod tests {
                 let result = html_inner(input);
                 assert_eq!(result.to_string(), expected.to_string());
             }
+
+            mod const_colors {
+                use super::*;
+                #[test]
+                fn allows_const_black() {
+                    let input = quote! {
+                        <div
+                        padding="4px"
+                        border-color="black">
+                        "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
+                        )
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+
+                #[test]
+                fn allows_const_white() {
+                    let input = quote! {
+                        <div
+                        padding="4px"
+                        border-color="white">
+                        "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
+                        )
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+
+                #[test]
+                fn allows_const_none() {
+                    let input = quote! {
+                        <div
+                        padding="4px"
+                        border-color="none">
+                        "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
+                        )
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+            }
+
+            #[test]
+            fn allows_string_rgb_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="rgb(170 170 170)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_rgba_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="rgba(170 170 170 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_srgb_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="srgb(178.5 178.5 178.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_srgbu8_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="srgb(170 170 170)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_srgba_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="srgba(178.5 178.5 178.5 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_srgbau8_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="srgba(170 170 170 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_hsl_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="hsl(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_hsla_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="hsla(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_hsv_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="hsv(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_hsva_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="hsva(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_hwb_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="hwb(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_hwba_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="hwba(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_lab_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="lab(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_laba_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="laba(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_lch_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="lch(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_lcha_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="lcha(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_oklab_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="oklab(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_oklaba_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="oklaba(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_oklch_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="oklch(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_oklcha_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="oklcha(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_xyz_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="xyz(170 0.7 0.7)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_string_xyza_colors() {
+                let input = quote! {
+                    <div
+                    padding="4px"
+                    border-color="xyza(170 0.7 0.7 / 0.5)">
+                    "Menu"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                };
+
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
         }
 
-        #[test]
-        fn supports_text_layout() {
-            let input = quote! {
-                <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node::default(),
-                    ::bevy::text::TextLayout {
-                        justify: Justify::Left,
-                        ..Default::default()
-                    },
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            (
-                                ::bevy::ui::widget::Text::new("Hello"),
-                                ::bevy::text::TextLayout {
-                                    linebreak: LineBreak::NoWrap,
-                                    ..Default::default()
-                                }
-                            )
+        mod nodes {
+            use super::*;
+
+            #[test]
+            fn allows_display_strings() {
+                let input = quote! {
+                    <div display={Display::Flex}>
+                        <div display="none"/>
+                        <div display="hidden"/>
+                        <div display="flex"/>
+                        <div display="grid"/>
+                        <div display="block"/>
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            display: Display::Flex,
+                            ..Default::default()
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                display: ::bevy::ui::Display::None,
+                                ..Default::default()
+                            }),
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                display: ::bevy::ui::Display::None,
+                                ..Default::default()
+                            }),
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                display: ::bevy::ui::Display::Flex,
+                                ..Default::default()
+                            }),
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                display: ::bevy::ui::Display::Grid,
+                                ..Default::default()
+                            }),
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                display: ::bevy::ui::Display::Block,
+                                ..Default::default()
+                            })
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_position_strings() {
+                let input = quote! {
+                    <div position="absolute">
+                        <div position="relative"/>
+                        <div position-type="absolute"/>
+                        <div position-type="relative"/>
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Absolute,
+                            ..Default::default()
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                position_type: ::bevy::ui::PositionType::Relative,
+                                ..Default::default()
+                            }),
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                position_type: ::bevy::ui::PositionType::Absolute,
+                                ..Default::default()
+                            }),
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                                position_type: ::bevy::ui::PositionType::Relative,
+                                ..Default::default()
+                            })
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn allows_flex_direction_strings() {
+                let tests = vec![
+                    ("row", "Row"),
+                    ("column", "Column"),
+                    ("col", "Column"),
+                    ("row-reverse", "RowReverse"),
+                    ("column-reverse", "ColumnReverse"),
+                    ("col-reverse", "ColumnReverse"),
+                    ("Invalid", "Invalid"),
+                ];
+                for (input, expected) in tests {
+                    let input = quote! {
+                        <div flex-direction=#input/>
+                    };
+                    let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
+                    let expected = quote! {
+                        ::bevy::ui::Node {
+                            flex_direction: ::bevy::ui::FlexDirection::#ident,
+                            ..Default::default()
+                        }
+                    };
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+            }
+        }
+
+        mod children {
+            use super::*;
+
+            #[test]
+            fn adds_observers() {
+                let input = quote! {
+                    <div onClick={|_event: On<Pointer<Click>>,
+                        mut commands: Commands,
+                        text: Single<Entity, With<Text>>| {
+                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                        }}>
+                        "Hello, World!"
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
+                            ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                let entity = parent.target_entity();
+                                parent.spawn(
+                                    ::bevy::ecs::observer::Observer::new(
+                                        |_event: On<Pointer<Click> >,
+                                        mut commands: Commands,
+                                        text: Single<Entity, With<Text> >| {
+                                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                                        }
+                                    )
+                                    .with_entity(entity)
+                                );
+                            })
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
+
+        mod text_components {
+            use super::*;
+
+            #[cfg(not(feature = "propagate"))]
+            mod no_propagate {
+                use super::*;
+                #[test]
+                fn supports_text_font() {
+                    let input = quote! {
+                        <div
+                            padding="4px"
+                            font-size="10">
+                            "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::text::TextFont {
+                                font_size: ::bevy::text::FontSize::Px(10.0),
+                                ..Default::default()
+                            },
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
                         )
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+
+                #[test]
+                fn supports_text_color() {
+                    let input = quote! {
+                        <div
+                            padding="4px"
+                            text-color="rgb(170 170 170)">
+                            "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
+                        )
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+            }
+
+            #[cfg(feature = "propagate")]
+            mod propagate {
+                use super::*;
+
+                #[test]
+                fn supports_text_font() {
+                    let input = quote! {
+                        <div
+                            padding="4px"
+                            font-size="10">
+                                "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::app::Propagate(::bevy::text::TextFont {
+                                font_size: ::bevy::text::FontSize::Px(10.0),
+                                ..Default::default()
+                            }),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
+                        )
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+
+                #[test]
+                fn supports_text_color() {
+                    let input = quote! {
+                        <div
+                            padding="4px"
+                            text-color="srgb(170 170 170)">
+                            "Menu"
+                        </div>
+                    };
+                    let expected = quote! {
+                        (
+                            ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
+                            },
+                            ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
+                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                            ))
+                        )
+                    };
+
+                    let result = html_inner(input);
+                    assert_eq!(result.to_string(), expected.to_string());
+                }
+            }
+
+            #[test]
+            fn supports_text_layout() {
+                let input = quote! {
+                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        ::bevy::text::TextLayout {
+                            justify: Justify::Left,
+                            ..Default::default()
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                (
+                                    ::bevy::ui::widget::Text::new("Hello"),
+                                    ::bevy::text::TextLayout {
+                                        linebreak: LineBreak::NoWrap,
+                                        ..Default::default()
+                                    }
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
+
+        #[cfg(feature = "feathers")]
+        mod feathers_elements {
+            use super::*;
+
+            #[test]
+            fn renders_button() {
+                let input = quote! {
+                    <div>
+                        <button
+                            variant="normal"
+                            corners="rounded">"Hello"</button>
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                ::bevy::feathers::controls::button_bundle(
+                                    ::bevy::feathers::controls::ButtonBundleProps {
+                                        variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                        corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                        ..Default::default()
+                                    },
+                                    (),
+                                    (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn spawns_observer() {
+                let input = quote! {
+                    <div>
+                        <button
+                            variant="primary"
+                            corners="top left"
+                            onActivate={|event: On<Activate>| { info!("{:?}",event.entity); }}>
+                            "Hello"
+                        </button>
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                ::bevy::feathers::controls::button_bundle(
+                                    ::bevy::feathers::controls::ButtonBundleProps {
+                                        variant: ::bevy::feathers::controls::ButtonVariant::Primary,
+                                        corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                                        ..Default::default()
+                                    },
+                                    (),
+                                    (
+                                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                            let entity = parent.target_entity();
+                                            parent.spawn(
+                                                ::bevy::ecs::observer::Observer::new(
+                                                    |event: On<Activate>| {
+                                                        info!("{:?}",event.entity);
+                                                    }
+                                                )
+                                                .with_entity(entity)
+                                            );
+                                        })
+                                    )
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn button_supports_overrides() {
+                let input = quote! {
+                    <div>
+                        <button
+                            variant="normal"
+                            corners="rounded"
+                            components={Testing::new()}>"Hello"</button>
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                ::bevy::feathers::controls::button_bundle(
+                                    ::bevy::feathers::controls::ButtonBundleProps {
+                                        variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                        corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                        ..Default::default()
+                                    },
+                                    Testing::new(),
+                                    (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn renders_checkbox() {
+                let input = quote! {
+                    <div>
+                        <input
+                            type="checkbox"
+                            label="Hello"
+                            onChange={|event: On<ValueChange<bool>>| {
+                                println!("Hello Changed {}", event.value)
+                            }} />
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                ::bevy::feathers::controls::checkbox_bundle(
+                                    (),
+                                    (
+                                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                            let entity = parent.target_entity();
+                                            parent.spawn(
+                                                ::bevy::ecs::observer::Observer::new(
+                                                    |event: On< ValueChange<bool> >| {
+                                                        println!("Hello Changed {}", event.value)
+                                                    }
+                                                )
+                                                .with_entity(entity)
+                                            );
+                                        })
+                                    )
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn renders_radio() {
+                let input = quote! {
+                    <div>
+                        <input
+                            type="radio"
+                            label="Hello"
+                            onChange={|event: On<ValueChange<bool>>| {
+                                println!("Hello True {}", event.value)
+                            }}
+                            components={TestComponent} />
+                    </div>
+                };
+                let expected = quote! {
+                    (
+                        ::bevy::ui::Node::default(),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(
+                                ::bevy::feathers::controls::radio_bundle(
+                                    TestComponent,
+                                    (
+                                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                            let entity = parent.target_entity();
+                                            parent.spawn(
+                                                ::bevy::ecs::observer::Observer::new(
+                                                    |event: On< ValueChange<bool> >| {
+                                                        println!("Hello True {}", event.value)
+                                                    }
+                                                )
+                                                .with_entity(entity)
+                                            );
+                                        })
+                                    )
+                                )
+                            )
+                        ))
+                    )
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
         }
     }
 
-    #[cfg(feature = "feathers")]
-    mod feathers_elements {
+    #[cfg(feature = "bsn")]
+    mod bsn {
         use super::*;
-
         #[test]
-        fn renders_button() {
+        fn single_div_with_text() {
             let input = quote! {
-                <div>
-                    <button
-                        variant="normal"
-                        corners="rounded">"Hello"</button>
-                </div>
+                <div>"Hello"</div>
             };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button_bundle(
-                                ::bevy::feathers::controls::ButtonBundleProps {
-                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-                                    ..Default::default()
-                                },
-                                (),
-                                (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
-                            )
-                        )
-                    ))
-                )
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (bevy::ui::widget::Text("Hello"))
+                    ]
+                }
             };
             let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn spawns_observer() {
-            let input = quote! {
-                <div>
-                    <button
-                        variant="primary"
-                        corners="top left"
-                        onActivate={|event: On<Activate>| { info!("{:?}",event.entity); }}>
-                        "Hello"
-                    </button>
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button_bundle(
-                                ::bevy::feathers::controls::ButtonBundleProps {
-                                    variant: ::bevy::feathers::controls::ButtonVariant::Primary,
-                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
-                                    ..Default::default()
-                                },
-                                (),
-                                (
-                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                        let entity = parent.target_entity();
-                                        parent.spawn(
-                                            ::bevy::ecs::observer::Observer::new(
-                                                |event: On<Activate>| {
-                                                    info!("{:?}",event.entity);
-                                                }
-                                            )
-                                            .with_entity(entity)
-                                        );
-                                    })
-                                )
-                            )
-                        )
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn button_supports_overrides() {
-            let input = quote! {
-                <div>
-                    <button
-                        variant="normal"
-                        corners="rounded"
-                        components={Testing::new()}>"Hello"</button>
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button_bundle(
-                                ::bevy::feathers::controls::ButtonBundleProps {
-                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-                                    ..Default::default()
-                                },
-                                Testing::new(),
-                                (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
-                            )
-                        )
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn renders_checkbox() {
-            let input = quote! {
-                <div>
-                    <input
-                        type="checkbox"
-                        label="Hello"
-                        onChange={|event: On<ValueChange<bool>>| {
-                            println!("Hello Changed {}", event.value)
-                        }} />
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::checkbox_bundle(
-                                (),
-                                (
-                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                        let entity = parent.target_entity();
-                                        parent.spawn(
-                                            ::bevy::ecs::observer::Observer::new(
-                                                |event: On< ValueChange<bool> >| {
-                                                    println!("Hello Changed {}", event.value)
-                                                }
-                                            )
-                                            .with_entity(entity)
-                                        );
-                                    })
-                                )
-                            )
-                        )
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
-        }
-
-        #[test]
-        fn renders_radio() {
-            let input = quote! {
-                <div>
-                    <input
-                        type="radio"
-                        label="Hello"
-                        onChange={|event: On<ValueChange<bool>>| {
-                            println!("Hello True {}", event.value)
-                        }}
-                        components={TestComponent} />
-                </div>
-            };
-            let expected = quote! {
-                (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::radio_bundle(
-                                TestComponent,
-                                (
-                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                        let entity = parent.target_entity();
-                                        parent.spawn(
-                                            ::bevy::ecs::observer::Observer::new(
-                                                |event: On< ValueChange<bool> >| {
-                                                    println!("Hello True {}", event.value)
-                                                }
-                                            )
-                                            .with_entity(entity)
-                                        );
-                                    })
-                                )
-                            )
-                        )
-                    ))
-                )
-            };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_eq!(result.to_string(), output.to_string());
         }
     }
 }

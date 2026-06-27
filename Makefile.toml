@@ -27,9 +27,15 @@ args = ["check", "--workspace"]
 command = "cargo"
 args = ["clippy", "--allow-dirty", "--fix"]
 
+[tasks.test-all]
+run_task = { name = ["nextest", "test-bsn"], parallel = false }
 [tasks.nextest]
 command = "cargo"
 args = ["nextest", "--workspace"]
+
+[tasks.test-bsn]
+command = "cargo"
+args = ["nextest", "-p", "bevy_ui_html_macro","--features","bsn"]
 
 [tasks.docs-deps]
 script = '''
@@ -43,14 +49,14 @@ cargo doc --no-deps --target-dir /Volumes/Corsair/cargo-cache/target $({
 '''
 
 [tasks.docs-own]
-script = "cargo doc --workspace --all-features --no-deps --document-private-items --target-dir /Volumes/Corsair/cargo-cache/target"
+script = "cargo doc --workspace --no-deps --document-private-items --target-dir /Volumes/Corsair/cargo-cache/target"
 
 [tasks.fmt]
 command = "cargo"
 args = ["fmt", "--all"]
 
 [tasks.test-build]
-run_task = { name = ["nextest", "build"], parallel = false }
+run_task = { name = ["test-all", "build"], parallel = false }
 
 [tasks.do-docs]
 run_task = { name = ["docs-deps", "docs-own"], parallel = false }
