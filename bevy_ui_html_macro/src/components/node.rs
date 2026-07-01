@@ -426,7 +426,7 @@ impl ToTokens for NodeComponent {
             #[cfg(feature = "bsn")]
             tokens.extend(quote! {
                 bevy::ui::Node {
-                    #(#fields,)*
+                    #(#fields),*
                 }
             });
             #[cfg(not(feature = "bsn"))]

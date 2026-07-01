@@ -2719,5 +2719,95 @@ mod tests {
             let result = html_inner(input);
             assert_eq!(result.to_string(), output.to_string());
         }
+
+        #[test]
+        fn single_div_with_no_children() {
+            let input = quote! {
+                <div/>
+            };
+            let expected = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn div_with_div_children() {
+            let input = quote! {
+                <div>
+                    <div>"Hello"</div>
+                    <div>"World"</div>
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (
+                            bevy::ui::Node
+                            Children[(bevy::ui::widget::Text("Hello"))]
+                        ),
+                        (
+                            bevy::ui::Node
+                            Children[(bevy::ui::widget::Text("World"))]
+                        )
+                    ]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_span_children() {
+            let input = quote! {
+                <div>
+                    <span>"Hello"</span>
+                    <span>"World"</span>
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (bevy::ui::widget::Text("Hello")),(bevy::ui::widget::Text("World"))
+                    ]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn single_div_with_attributes() {
+            let input = quote! {
+                <div
+                padding="10px"
+                padding-bottom="20%"
+                margin-top="5vw"
+                margin-left="10vh"
+                margin-bottom="15vmin"
+                margin-right="20vmax"
+                >
+                "Hello"
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
+                        margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0))
+                    }
+                    Children[(
+                        bevy::ui::widget::Text("Hello")
+                    )]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
     }
 }
