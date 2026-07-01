@@ -35,7 +35,7 @@ args = ["nextest", "--workspace"]
 
 [tasks.test-bsn]
 command = "cargo"
-args = ["nextest", "-p", "bevy_ui_html_macro","--features","bsn"]
+args = ["nextest", "-p", "bevy_ui_html_macro","--features","bsn,propagate"]
 
 [tasks.docs-deps]
 script = '''
