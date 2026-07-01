@@ -2809,5 +2809,128 @@ mod tests {
             let result = html_inner(input);
             assert_eq!(result.to_string(), output.to_string());
         }
+
+        #[test]
+        fn single_div_with_rust_attributes() {
+            let input = quote! {
+                <div
+                padding={px(10.0)}
+                padding-bottom={percent(20.0)}
+                margin-top={vw(5.0)}
+                margin-left={vh(10.0)}
+                margin-bottom={vmin(15.0)}
+                margin-right={vmax(20.0)}
+                >
+                "Hello"
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: px(10.0).all().with_bottom(percent(20.0)),
+                        margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0))
+                    }
+                    Children[(
+                        bevy::ui::widget::Text("Hello")
+                    )]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_sizing_and_positioning() {
+            let input = quote! {
+                <div
+                width="100px"
+                height="50px"
+                min-width="10px"
+                max-width="200px"
+                left="5px"
+                top="10px"
+                >
+                "Test"
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        left: ::bevy::ui::px(5.0),
+                        top: ::bevy::ui::px(10.0),
+                        width: ::bevy::ui::px(100.0),
+                        height: ::bevy::ui::px(50.0),
+                        min_width: ::bevy::ui::px(10.0),
+                        max_width: ::bevy::ui::px(200.0)
+                    }
+                    Children[(
+                        bevy::ui::widget::Text("Test")
+                    )]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_flexbox_attributes() {
+            let input = quote! {
+                <div
+                display={Display::Flex}
+                flex-direction={FlexDirection::Column}
+                flex-grow={1.0}
+                flex-shrink={0.5}
+                align-items={AlignItems::Center}
+                justify-content={JustifyContent::SpaceBetween}
+                >
+                "Flex"
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Column,
+                        justify_content: JustifyContent::SpaceBetween,
+                        align_items: AlignItems::Center,
+                        flex_grow: 1.0,
+                        flex_shrink: 0.5
+                    }
+                    Children[(
+                        bevy::ui::widget::Text("Flex")
+                    )]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
+
+        #[test]
+        fn div_with_border_and_gaps() {
+            let input = quote! {
+                <div
+                border="2px"
+                border-top="5px"
+                row-gap="10px"
+                column-gap="15px"
+                >
+                "Borders"
+                </div>
+            };
+            let output = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
+                        row_gap: ::bevy::ui::px(10.0),
+                        column_gap: ::bevy::ui::px(15.0)
+                    }
+                    Children[(
+                        bevy::ui::widget::Text("Borders")
+                    )]
+                }
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), output.to_string());
+        }
     }
 }
