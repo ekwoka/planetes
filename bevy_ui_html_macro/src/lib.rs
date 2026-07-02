@@ -3180,6 +3180,146 @@ mod tests {
             assert_eq!(result.to_string(), expected.to_string());
         }
 
+        mod html_component {
+            use super::*;
+
+            #[test]
+            fn self_closing_custom_tag_no_tuple() {
+                let input = quote! {
+                    <MyComponent />
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        <_ as ::bevy_ui_html::HtmlComponent>::build(
+                            MyComponent,
+                            ::bevy_ui_html::HtmlBundle {
+                                node: bevy::ui::Node,
+                                background_color: ::bevy::ui::BackgroundColor::default(),
+                                border_color: ::bevy::ui::BorderColor::default(),
+                                text_font: ::bevy::text::TextFont::default(),
+                                text_color: ::bevy::text::TextColor::default(),
+                                text_layout: ::bevy::text::TextLayout::default(),
+                            },
+                            &[]
+                        )
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn extra_string_attrs_forwarded_to_additional_attributes() {
+                let input = quote! {
+                    <MyComponent padding="4px" variant="primary" />
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        <_ as ::bevy_ui_html::HtmlComponent>::build(
+                            MyComponent,
+                            ::bevy_ui_html::HtmlBundle {
+                                node: bevy::ui::Node {
+                                    padding: ::bevy::ui::px(4.0).all()
+                                },
+                                background_color: ::bevy::ui::BackgroundColor::default(),
+                                border_color: ::bevy::ui::BorderColor::default(),
+                                text_font: ::bevy::text::TextFont::default(),
+                                text_color: ::bevy::text::TextColor::default(),
+                                text_layout: ::bevy::text::TextLayout::default(),
+                            },
+                            &[("variant", "primary")]
+                        )
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn multiple_extra_attrs_all_forwarded() {
+                let input = quote! {
+                    <MyComponent variant="primary" size="large" disabled="true" />
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        <_ as ::bevy_ui_html::HtmlComponent>::build(
+                            MyComponent,
+                            ::bevy_ui_html::HtmlBundle {
+                                node: bevy::ui::Node,
+                                background_color: ::bevy::ui::BackgroundColor::default(),
+                                border_color: ::bevy::ui::BorderColor::default(),
+                                text_font: ::bevy::text::TextFont::default(),
+                                text_color: ::bevy::text::TextColor::default(),
+                                text_layout: ::bevy::text::TextLayout::default(),
+                            },
+                            &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
+                        )
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn standard_component_attrs_passed_inside_html_bundle() {
+                let input = quote! {
+                    <MyButton padding="4px" background-color="black" variant="primary">
+                        "text"
+                    </MyButton>
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        <_ as ::bevy_ui_html::HtmlComponent>::build(
+                            MyButton,
+                            ::bevy_ui_html::HtmlBundle {
+                                node: bevy::ui::Node {
+                                    padding: ::bevy::ui::px(4.0).all()
+                                },
+                                background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
+                                border_color: ::bevy::ui::BorderColor::default(),
+                                text_font: ::bevy::text::TextFont::default(),
+                                text_color: ::bevy::text::TextColor::default(),
+                                text_layout: ::bevy::text::TextLayout::default(),
+                            },
+                            &[("variant", "primary")]
+                        )
+                        Children[(
+                            bevy::ui::widget::Text("text")
+                        )]
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn rust_expression_extra_attrs_not_in_additional_attributes() {
+                // Rust-expression values on unknown attrs are silently dropped from additional_attributes
+                // since they can't be represented as &'static str
+                let input = quote! {
+                    <MyComponent variant={some_var} />
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        <_ as ::bevy_ui_html::HtmlComponent>::build(
+                            MyComponent,
+                            ::bevy_ui_html::HtmlBundle {
+                                node: bevy::ui::Node,
+                                background_color: ::bevy::ui::BackgroundColor::default(),
+                                border_color: ::bevy::ui::BorderColor::default(),
+                                text_font: ::bevy::text::TextFont::default(),
+                                text_color: ::bevy::text::TextColor::default(),
+                                text_layout: ::bevy::text::TextLayout::default(),
+                            },
+                            &[]
+                        )
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
+
         #[test]
         fn only_removes_bracket_on_single_statement_block() {
             let input = quote! {
@@ -4282,6 +4422,196 @@ mod tests {
                                 linebreak: LineBreak::NoWrap,
                                 ..Default::default()
                             }))
+                        ]
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
+
+        #[cfg(feature = "feathers")]
+        mod feathers_elements {
+            use super::*;
+
+            #[test]
+            fn renders_button() {
+                let input = quote! {
+                    <div>
+                        <button
+                            variant="normal"
+                            corners="rounded">"Hello"</button>
+                    </div>
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node
+                        Children[
+                            (::bevy::feathers::controls::button_bundle(
+                                ::bevy::feathers::controls::ButtonBundleProps {
+                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                    ..Default::default()
+                                },
+                                (),
+                                ((bevy::ui::widget::Text("Hello")))
+                            ))
+                        ]
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn spawns_observer() {
+                let input = quote! {
+                    <div>
+                        <button
+                            variant="primary"
+                            corners="top left"
+                            onActivate={|event: On<Activate>| { info!("{:?}",event.entity); }}>
+                            "Hello"
+                        </button>
+                    </div>
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node
+                        Children[
+                            (::bevy::feathers::controls::button_bundle(
+                                ::bevy::feathers::controls::ButtonBundleProps {
+                                    variant: ::bevy::feathers::controls::ButtonVariant::Primary,
+                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                                    ..Default::default()
+                                },
+                                (),
+                                (
+                                    (bevy::ui::widget::Text("Hello")),
+                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                        let entity = parent.target_entity();
+                                        parent.spawn(
+                                            ::bevy::ecs::observer::Observer::new(
+                                                |event: On<Activate>| {
+                                                    info!("{:?}",event.entity);
+                                                }
+                                            )
+                                            .with_entity(entity)
+                                        );
+                                    })
+                                )
+                            ))
+                        ]
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn button_supports_overrides() {
+                let input = quote! {
+                    <div>
+                        <button
+                            variant="normal"
+                            corners="rounded"
+                            components={Testing::new()}>"Hello"</button>
+                    </div>
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node
+                        Children[
+                            (::bevy::feathers::controls::button_bundle(
+                                ::bevy::feathers::controls::ButtonBundleProps {
+                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                    ..Default::default()
+                                },
+                                Testing::new(),
+                                ((bevy::ui::widget::Text("Hello")))
+                            ))
+                        ]
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn renders_checkbox() {
+                let input = quote! {
+                    <div>
+                        <input
+                            type="checkbox"
+                            label="Hello"
+                            onChange={|event: On<ValueChange<bool>>| {
+                                println!("Hello Changed {}", event.value)
+                            }} />
+                    </div>
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node
+                        Children[
+                            (::bevy::feathers::controls::checkbox_bundle(
+                                (),
+                                (
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                        let entity = parent.target_entity();
+                                        parent.spawn(
+                                            ::bevy::ecs::observer::Observer::new(
+                                                |event: On< ValueChange<bool> >| {
+                                                    println!("Hello Changed {}", event.value)
+                                                }
+                                            )
+                                            .with_entity(entity)
+                                        );
+                                    })
+                                )
+                            ))
+                        ]
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+
+            #[test]
+            fn renders_radio() {
+                let input = quote! {
+                    <div>
+                        <input
+                            type="radio"
+                            label="Hello"
+                            onChange={|event: On<ValueChange<bool>>| {
+                                println!("Hello True {}", event.value)
+                            }}
+                            components={TestComponent} />
+                    </div>
+                };
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node
+                        Children[
+                            (::bevy::feathers::controls::radio_bundle(
+                                TestComponent,
+                                (
+                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
+                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                        let entity = parent.target_entity();
+                                        parent.spawn(
+                                            ::bevy::ecs::observer::Observer::new(
+                                                |event: On< ValueChange<bool> >| {
+                                                    println!("Hello True {}", event.value)
+                                                }
+                                            )
+                                            .with_entity(entity)
+                                        );
+                                    })
+                                )
+                            ))
                         ]
                     }
                 };
