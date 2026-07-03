@@ -4,7 +4,7 @@ members = ["avian_bullet_trajectory", "bevy_ui_html", "bevy_ui_html_macro", "der
 [workspace.package]
 authors = ["Eric Kwoka <43540491+ekwoka@users.noreply.github.com>"]
 edition = "2024"
-rust-version = "1.92"
+rust-version = "1.96"
 
 [workspace.dependencies]
 # Local Packages
