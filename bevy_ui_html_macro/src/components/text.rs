@@ -69,6 +69,22 @@ impl ToTokens for TextFont {
                 _ => None,
             });
 
+        #[cfg(feature = "bsn")]
+        if cfg!(feature = "propagate") {
+            tokens.extend(quote! {
+                    bevy::app::Propagate(::bevy::text::TextFont {
+                    #(#fields,)*
+                    ..Default::default()
+                })
+            })
+        } else {
+            tokens.extend(quote! {
+                bevy::text::TextFont {
+                    #(#fields),*
+                }
+            });
+        }
+        #[cfg(not(feature = "bsn"))]
         if cfg!(feature = "propagate") {
             tokens.extend(quote! {
                     ::bevy::app::Propagate(::bevy::text::TextFont {
@@ -126,6 +142,13 @@ impl ToTokens for TextLayout {
             }
         });
 
+        #[cfg(feature = "bsn")]
+        tokens.extend(quote! {
+            bevy::text::TextLayout {
+                #(#fields),*
+            }
+        });
+        #[cfg(not(feature = "bsn"))]
         tokens.extend(quote! {
             ::bevy::text::TextLayout {
                 #(#fields,)*
@@ -183,6 +206,17 @@ impl ToTokens for TextColor {
         let color = Value::new(&self.attributes[0].value);
 
         if let Some(color) = color.parse_as_color() {
+            #[cfg(feature = "bsn")]
+            if cfg!(feature = "propagate") {
+                tokens.extend(quote! {
+                        bevy::app::Propagate(::bevy::text::TextColor(#color))
+                })
+            } else {
+                tokens.extend(quote! {
+                    bevy::text::TextColor(#color)
+                });
+            }
+            #[cfg(not(feature = "bsn"))]
             if cfg!(feature = "propagate") {
                 tokens.extend(quote! {
                         ::bevy::app::Propagate(::bevy::text::TextColor(#color))

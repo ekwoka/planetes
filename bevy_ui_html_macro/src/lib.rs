@@ -451,11 +451,14 @@ impl ToTokens for ElementNode {
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_block()),
         );
+        #[cfg(feature = "bsn")]
+        components.push_some(Observer::from(&self.attributes).ok());
         let mut children = self
             .children
             .iter()
             .map(|child| child.to_token_stream())
             .collect::<Vec<_>>();
+        #[cfg(not(feature = "bsn"))]
         children.push_some(Observer::from(&self.attributes).ok());
         if !children.is_empty() {
             #[cfg(feature = "bsn")]
@@ -1175,6 +1178,7 @@ mod tests {
                                 padding: ::bevy::ui::px(4.0).all(),
                                 border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
                                 ..Default::default()
+
                             },
                             background_color: ::bevy::ui::BackgroundColor::default(),
                             border_color: ::bevy::ui::BorderColor::default(),
@@ -3506,6 +3510,7 @@ mod tests {
                     "Menu"
                     </div>
                 };
+                #[cfg(feature = "propagate")]
                 let expected = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
@@ -3513,7 +3518,21 @@ mod tests {
                         }
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
                         ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        Children[(
+                            bevy::ui::widget::Text("Menu")
+                        )]
+                    }
+                };
+                #[cfg(not(feature = "propagate"))]
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
                         Children[(
                             bevy::ui::widget::Text("Menu")
                         )]
@@ -4272,21 +4291,13 @@ mod tests {
                 let expected = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node
-                        Children[
-                            (bevy::ui::widget::Text("Hello, World!")),
-                            ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                let entity = parent.target_entity();
-                                parent.spawn(
-                                    ::bevy::ecs::observer::Observer::new(
-                                        |_event: On<Pointer<Click> >,
-                                        mut commands: Commands,
-                                        text: Single<Entity, With<Text> >| {
-                                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                                        }
-                                    )
-                                    .with_entity(entity)
-                                );
+                        on(|_event: On<Pointer<Click> >,
+                            mut commands: Commands,
+                            text: Single<Entity, With<Text> >| {
+                                commands.entity(*text).insert(Text::new("Hi, Mom!"));
                             })
+                        Children[
+                            (bevy::ui::widget::Text("Hello, World!"))
                         ]
                     }
                 };
@@ -4317,7 +4328,7 @@ mod tests {
                             }
                             ::bevy::text::TextFont {
                                 font_size: ::bevy::text::FontSize::Px(10.0),
-                                ..Default::default()
+
                             }
                             Children[(bevy::ui::widget::Text("Menu"))]
                         }
@@ -4369,7 +4380,7 @@ mod tests {
                             bevy::ui::Node {
                                 padding: ::bevy::ui::px(4.0).all()
                             }
-                            ::bevy::app::Propagate(::bevy::text::TextFont {
+                            bevy::app::Propagate(::bevy::text::TextFont {
                                 font_size: ::bevy::text::FontSize::Px(10.0),
                                 ..Default::default()
                             })
@@ -4395,7 +4406,7 @@ mod tests {
                             bevy::ui::Node {
                                 padding: ::bevy::ui::px(4.0).all()
                             }
-                            ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                            bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
                             Children[(bevy::ui::widget::Text("Menu"))]
                         }
                     };
@@ -4413,15 +4424,16 @@ mod tests {
                 let expected = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node
-                        ::bevy::text::TextLayout {
-                            justify: Justify::Left,
-                            ..Default::default()
+                        bevy::text::TextLayout {
+                            justify: Justify::Left
                         }
                         Children[
-                            ((bevy::ui::widget::Text("Hello"), ::bevy::text::TextLayout {
-                                linebreak: LineBreak::NoWrap,
-                                ..Default::default()
-                            }))
+                            ((
+                                bevy::ui::widget::Text("Hello"),
+                                bevy::text::TextLayout {
+                                    linebreak: LineBreak::NoWrap
+                                }
+                            ))
                         ]
                     }
                 };
@@ -4451,7 +4463,7 @@ mod tests {
                                 ::bevy::feathers::controls::ButtonBundleProps {
                                     variant: ::bevy::feathers::controls::ButtonVariant::Normal,
                                     corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-                                    ..Default::default()
+
                                 },
                                 (),
                                 ((bevy::ui::widget::Text("Hello")))
@@ -4483,7 +4495,7 @@ mod tests {
                                 ::bevy::feathers::controls::ButtonBundleProps {
                                     variant: ::bevy::feathers::controls::ButtonVariant::Primary,
                                     corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
-                                    ..Default::default()
+
                                 },
                                 (),
                                 (
@@ -4526,7 +4538,7 @@ mod tests {
                                 ::bevy::feathers::controls::ButtonBundleProps {
                                     variant: ::bevy::feathers::controls::ButtonVariant::Normal,
                                     corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-                                    ..Default::default()
+
                                 },
                                 Testing::new(),
                                 ((bevy::ui::widget::Text("Hello")))
