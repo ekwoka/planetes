@@ -2780,6 +2780,227 @@ mod tests {
         }
     }
 
+    mod nodes {
+        use super::*;
+
+        #[test]
+        fn allows_display_strings() {
+            let input = quote! {
+                <div display={Display::Flex}>
+                    <div display="none"/>
+                    <div display="hidden"/>
+                    <div display="flex"/>
+                    <div display="grid"/>
+                    <div display="block"/>
+                </div>
+            };
+            #[cfg(feature = "bsn")]
+            let expected = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        display: Display::Flex
+                    }
+                    Children[
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::None
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::None
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::Flex
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::Grid
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::Block
+                        })
+                    ]
+                }
+            };
+            #[cfg(not(feature = "bsn"))]
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        display: Display::Flex,
+                        ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::None,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::None,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::Flex,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::Grid,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            display: ::bevy::ui::Display::Block,
+                            ..Default::default()
+                        })
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_position_strings() {
+            let input = quote! {
+                <div position="absolute">
+                    <div position="relative"/>
+                    <div position-type="absolute"/>
+                    <div position-type="relative"/>
+                </div>
+            };
+            #[cfg(feature = "bsn")]
+            let expected = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        position_type: ::bevy::ui::PositionType::Absolute
+                    }
+                    Children[
+                        (bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative
+                        }),
+                        (bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Absolute
+                        }),
+                        (bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative
+                        })
+                    ]
+                }
+            };
+            #[cfg(not(feature = "bsn"))]
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node {
+                        position_type: ::bevy::ui::PositionType::Absolute,
+                        ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Absolute,
+                            ..Default::default()
+                        }),
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative,
+                            ..Default::default()
+                        })
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn allows_flex_direction_strings() {
+            let tests = vec![
+                ("row", "Row"),
+                ("column", "Column"),
+                ("col", "Column"),
+                ("row-reverse", "RowReverse"),
+                ("column-reverse", "ColumnReverse"),
+                ("col-reverse", "ColumnReverse"),
+                ("Invalid", "Invalid"),
+            ];
+            for (input, expected) in tests {
+                let input = quote! {
+                    <div flex-direction=#input/>
+                };
+                let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
+                #[cfg(feature = "bsn")]
+                let expected = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            flex_direction: ::bevy::ui::FlexDirection::#ident
+                        }
+                    }
+                };
+                #[cfg(not(feature = "bsn"))]
+                let expected = quote! {
+                    ::bevy::ui::Node {
+                        flex_direction: ::bevy::ui::FlexDirection::#ident,
+                        ..Default::default()
+                    }
+                };
+                let result = html_inner(input);
+                assert_eq!(result.to_string(), expected.to_string());
+            }
+        }
+    }
+
+    mod children {
+        use super::*;
+
+        #[test]
+        fn adds_observers() {
+            let input = quote! {
+                <div onClick={|_event: On<Pointer<Click>>,
+                    mut commands: Commands,
+                    text: Single<Entity, With<Text>>| {
+                        commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                    }}>
+                    "Hello, World!"
+                </div>
+            };
+            #[cfg(feature = "bsn")]
+            let expected = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    on(|_event: On<Pointer<Click> >,
+                        mut commands: Commands,
+                        text: Single<Entity, With<Text> >| {
+                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                        })
+                    Children[
+                        (bevy::ui::widget::Text("Hello, World!"))
+                    ]
+                }
+            };
+            #[cfg(not(feature = "bsn"))]
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
+                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                            let entity = parent.target_entity();
+                            parent.spawn(
+                                ::bevy::ecs::observer::Observer::new(
+                                    |_event: On<Pointer<Click> >,
+                                    mut commands: Commands,
+                                    text: Single<Entity, With<Text> >| {
+                                        commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                                    }
+                                )
+                                .with_entity(entity)
+                            );
+                        })
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+    }
+
     #[cfg(not(feature = "bsn"))]
     mod legacy {
         use super::*;
@@ -2911,157 +3132,6 @@ mod tests {
                             text_layout: ::bevy::text::TextLayout::default(),
                         },
                         &[]
-                    )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-        }
-
-        mod nodes {
-            use super::*;
-
-            #[test]
-            fn allows_display_strings() {
-                let input = quote! {
-                    <div display={Display::Flex}>
-                        <div display="none"/>
-                        <div display="hidden"/>
-                        <div display="flex"/>
-                        <div display="grid"/>
-                        <div display="block"/>
-                    </div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node {
-                            display: Display::Flex,
-                            ..Default::default()
-                        },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                display: ::bevy::ui::Display::None,
-                                ..Default::default()
-                            }),
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                display: ::bevy::ui::Display::None,
-                                ..Default::default()
-                            }),
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                display: ::bevy::ui::Display::Flex,
-                                ..Default::default()
-                            }),
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                display: ::bevy::ui::Display::Grid,
-                                ..Default::default()
-                            }),
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                display: ::bevy::ui::Display::Block,
-                                ..Default::default()
-                            })
-                        ))
-                    )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn allows_position_strings() {
-                let input = quote! {
-                    <div position="absolute">
-                        <div position="relative"/>
-                        <div position-type="absolute"/>
-                        <div position-type="relative"/>
-                    </div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Absolute,
-                            ..Default::default()
-                        },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                position_type: ::bevy::ui::PositionType::Relative,
-                                ..Default::default()
-                            }),
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                position_type: ::bevy::ui::PositionType::Absolute,
-                                ..Default::default()
-                            }),
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                                position_type: ::bevy::ui::PositionType::Relative,
-                                ..Default::default()
-                            })
-                        ))
-                    )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn allows_flex_direction_strings() {
-                let tests = vec![
-                    ("row", "Row"),
-                    ("column", "Column"),
-                    ("col", "Column"),
-                    ("row-reverse", "RowReverse"),
-                    ("column-reverse", "ColumnReverse"),
-                    ("col-reverse", "ColumnReverse"),
-                    ("Invalid", "Invalid"),
-                ];
-                for (input, expected) in tests {
-                    let input = quote! {
-                        <div flex-direction=#input/>
-                    };
-                    let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
-                    let expected = quote! {
-                        ::bevy::ui::Node {
-                            flex_direction: ::bevy::ui::FlexDirection::#ident,
-                            ..Default::default()
-                        }
-                    };
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-            }
-        }
-
-        mod children {
-            use super::*;
-
-            #[test]
-            fn adds_observers() {
-                let input = quote! {
-                    <div onClick={|_event: On<Pointer<Click>>,
-                        mut commands: Commands,
-                        text: Single<Entity, With<Text>>| {
-                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                        }}>
-                        "Hello, World!"
-                    </div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
-                            ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                let entity = parent.target_entity();
-                                parent.spawn(
-                                    ::bevy::ecs::observer::Observer::new(
-                                        |_event: On<Pointer<Click> >,
-                                        mut commands: Commands,
-                                        text: Single<Entity, With<Text> >| {
-                                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                                        }
-                                    )
-                                    .with_entity(entity)
-                                );
-                            })
-                        ))
                     )
                 };
                 let result = html_inner(input);
@@ -3559,140 +3629,6 @@ mod tests {
                             },
                             &[]
                         )
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-        }
-
-        mod nodes {
-            use super::*;
-
-            #[test]
-            fn allows_display_strings() {
-                let input = quote! {
-                    <div display={Display::Flex}>
-                        <div display="none"/>
-                        <div display="hidden"/>
-                        <div display="flex"/>
-                        <div display="grid"/>
-                        <div display="block"/>
-                    </div>
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            display: Display::Flex
-                        }
-                        Children[
-                            (bevy::ui::Node {
-                                display: ::bevy::ui::Display::None
-                            }),
-                            (bevy::ui::Node {
-                                display: ::bevy::ui::Display::None
-                            }),
-                            (bevy::ui::Node {
-                                display: ::bevy::ui::Display::Flex
-                            }),
-                            (bevy::ui::Node {
-                                display: ::bevy::ui::Display::Grid
-                            }),
-                            (bevy::ui::Node {
-                                display: ::bevy::ui::Display::Block
-                            })
-                        ]
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn allows_position_strings() {
-                let input = quote! {
-                    <div position="absolute">
-                        <div position="relative"/>
-                        <div position-type="absolute"/>
-                        <div position-type="relative"/>
-                    </div>
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Absolute
-                        }
-                        Children[
-                            (bevy::ui::Node {
-                                position_type: ::bevy::ui::PositionType::Relative
-                            }),
-                            (bevy::ui::Node {
-                                position_type: ::bevy::ui::PositionType::Absolute
-                            }),
-                            (bevy::ui::Node {
-                                position_type: ::bevy::ui::PositionType::Relative
-                            })
-                        ]
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn allows_flex_direction_strings() {
-                let tests = vec![
-                    ("row", "Row"),
-                    ("column", "Column"),
-                    ("col", "Column"),
-                    ("row-reverse", "RowReverse"),
-                    ("column-reverse", "ColumnReverse"),
-                    ("col-reverse", "ColumnReverse"),
-                    ("Invalid", "Invalid"),
-                ];
-                for (input, expected) in tests {
-                    let input = quote! {
-                        <div flex-direction=#input/>
-                    };
-                    let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
-                    let expected = quote! {
-                        ::bevy::scene::bsn!{
-                            bevy::ui::Node {
-                                flex_direction: ::bevy::ui::FlexDirection::#ident
-                            }
-                        }
-                    };
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-            }
-        }
-
-        mod children {
-            use super::*;
-
-            #[test]
-            fn adds_observers() {
-                let input = quote! {
-                    <div onClick={|_event: On<Pointer<Click>>,
-                        mut commands: Commands,
-                        text: Single<Entity, With<Text>>| {
-                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                        }}>
-                        "Hello, World!"
-                    </div>
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node
-                        on(|_event: On<Pointer<Click> >,
-                            mut commands: Commands,
-                            text: Single<Entity, With<Text> >| {
-                                commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                            })
-                        Children[
-                            (bevy::ui::widget::Text("Hello, World!"))
-                        ]
                     }
                 };
                 let result = html_inner(input);
