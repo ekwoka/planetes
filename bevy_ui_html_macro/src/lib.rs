@@ -3001,6 +3001,195 @@ mod tests {
         }
     }
 
+    mod text_components {
+        use super::*;
+
+        #[test]
+        fn supports_text_font() {
+            let input = quote! {
+                <div
+                    padding="4px"
+                    font-size="10">
+                    "Menu"
+                </div>
+            };
+            #[cfg(feature = "bsn")]
+            let expected = if cfg!(feature = "propagate") {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        bevy::app::Propagate(::bevy::text::TextFont {
+                            font_size: ::bevy::text::FontSize::Px(10.0),
+                            ..Default::default()
+                        })
+                        Children[(bevy::ui::widget::Text("Menu"))]
+                    }
+                }
+            } else {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        bevy::text::TextFont {
+                            font_size: ::bevy::text::FontSize::Px(10.0)
+                        }
+                        Children[(bevy::ui::widget::Text("Menu"))]
+                    }
+                }
+            };
+            #[cfg(not(feature = "bsn"))]
+            let expected = if cfg!(feature = "propagate") {
+                quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::app::Propagate(::bevy::text::TextFont {
+                            font_size: ::bevy::text::FontSize::Px(10.0),
+                            ..Default::default()
+                        }),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                }
+            } else {
+                quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        bevy::text::TextFont {
+                            font_size: ::bevy::text::FontSize::Px(10.0)
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                }
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn supports_text_color() {
+            let input = quote! {
+                <div
+                    padding="4px"
+                    text-color="srgb(170 170 170)">
+                    "Menu"
+                </div>
+            };
+            #[cfg(feature = "bsn")]
+            let expected = if cfg!(feature = "propagate") {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        Children[(bevy::ui::widget::Text("Menu"))]
+                    }
+                }
+            } else {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        Children[(bevy::ui::widget::Text("Menu"))]
+                    }
+                }
+            };
+            #[cfg(not(feature = "bsn"))]
+            let expected = if cfg!(feature = "propagate") {
+                quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                }
+            } else {
+                quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                }
+            };
+
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn supports_text_layout() {
+            let input = quote! {
+                <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
+            };
+            #[cfg(feature = "bsn")]
+            let expected = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    bevy::text::TextLayout {
+                        justify: Justify::Left
+                    }
+                    Children[
+                        ((
+                            bevy::ui::widget::Text("Hello"),
+                            bevy::text::TextLayout {
+                                linebreak: LineBreak::NoWrap
+                            }
+                        ))
+                    ]
+                }
+            };
+            #[cfg(not(feature = "bsn"))]
+            let expected = quote! {
+                (
+                    ::bevy::ui::Node::default(),
+                    ::bevy::text::TextLayout {
+                        justify: Justify::Left,
+                        ..Default::default()
+                    },
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(
+                            (
+                                ::bevy::ui::widget::Text::new("Hello"),
+                                ::bevy::text::TextLayout {
+                                    linebreak: LineBreak::NoWrap,
+                                    ..Default::default()
+                                }
+                            )
+                        )
+                    ))
+                )
+            };
+            let result = html_inner(input);
+            assert_eq!(result.to_string(), expected.to_string());
+        }
+    }
+
     #[cfg(not(feature = "bsn"))]
     mod legacy {
         use super::*;
@@ -3132,158 +3321,6 @@ mod tests {
                             text_layout: ::bevy::text::TextLayout::default(),
                         },
                         &[]
-                    )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-        }
-
-        mod text_components {
-            use super::*;
-
-            #[cfg(not(feature = "propagate"))]
-            mod no_propagate {
-                use super::*;
-                #[test]
-                fn supports_text_font() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            font-size="10">
-                            "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        (
-                            ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
-                                ..Default::default()
-                            },
-                            ::bevy::text::TextFont {
-                                font_size: ::bevy::text::FontSize::Px(10.0),
-                                ..Default::default()
-                            },
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                            ))
-                        )
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-
-                #[test]
-                fn supports_text_color() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            text-color="rgb(170 170 170)">
-                            "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        (
-                            ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
-                                ..Default::default()
-                            },
-                            ::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                            ))
-                        )
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-            }
-
-            #[cfg(feature = "propagate")]
-            mod propagate {
-                use super::*;
-
-                #[test]
-                fn supports_text_font() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            font-size="10">
-                                "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        (
-                            ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
-                                ..Default::default()
-                            },
-                            ::bevy::app::Propagate(::bevy::text::TextFont {
-                                font_size: ::bevy::text::FontSize::Px(10.0),
-                                ..Default::default()
-                            }),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                            ))
-                        )
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-
-                #[test]
-                fn supports_text_color() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            text-color="srgb(170 170 170)">
-                            "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        (
-                            ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
-                                ..Default::default()
-                            },
-                            ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                            ))
-                        )
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-            }
-
-            #[test]
-            fn supports_text_layout() {
-                let input = quote! {
-                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
-                };
-                let expected = quote! {
-                    (
-                        ::bevy::ui::Node::default(),
-                        ::bevy::text::TextLayout {
-                            justify: Justify::Left,
-                            ..Default::default()
-                        },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(
-                                (
-                                    ::bevy::ui::widget::Text::new("Hello"),
-                                    ::bevy::text::TextLayout {
-                                        linebreak: LineBreak::NoWrap,
-                                        ..Default::default()
-                                    }
-                                )
-                            )
-                        ))
                     )
                 };
                 let result = html_inner(input);
@@ -3629,142 +3666,6 @@ mod tests {
                             },
                             &[]
                         )
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-        }
-
-        mod text_components {
-            use super::*;
-
-            #[cfg(not(feature = "propagate"))]
-            mod no_propagate {
-                use super::*;
-                #[test]
-                fn supports_text_font() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            font-size="10">
-                            "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        ::bevy::scene::bsn!{
-                            bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all()
-                            }
-                            ::bevy::text::TextFont {
-                                font_size: ::bevy::text::FontSize::Px(10.0),
-
-                            }
-                            Children[(bevy::ui::widget::Text("Menu"))]
-                        }
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-
-                #[test]
-                fn supports_text_color() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            text-color="rgb(170 170 170)">
-                            "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        ::bevy::scene::bsn!{
-                            bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all()
-                            }
-                            ::bevy::text::TextColor(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
-                            Children[(bevy::ui::widget::Text("Menu"))]
-                        }
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-            }
-
-            #[cfg(feature = "propagate")]
-            mod propagate {
-                use super::*;
-
-                #[test]
-                fn supports_text_font() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            font-size="10">
-                                "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        ::bevy::scene::bsn!{
-                            bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all()
-                            }
-                            bevy::app::Propagate(::bevy::text::TextFont {
-                                font_size: ::bevy::text::FontSize::Px(10.0),
-                                ..Default::default()
-                            })
-                            Children[(bevy::ui::widget::Text("Menu"))]
-                        }
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-
-                #[test]
-                fn supports_text_color() {
-                    let input = quote! {
-                        <div
-                            padding="4px"
-                            text-color="srgb(170 170 170)">
-                            "Menu"
-                        </div>
-                    };
-                    let expected = quote! {
-                        ::bevy::scene::bsn!{
-                            bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all()
-                            }
-                            bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
-                            Children[(bevy::ui::widget::Text("Menu"))]
-                        }
-                    };
-
-                    let result = html_inner(input);
-                    assert_eq!(result.to_string(), expected.to_string());
-                }
-            }
-
-            #[test]
-            fn supports_text_layout() {
-                let input = quote! {
-                    <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node
-                        bevy::text::TextLayout {
-                            justify: Justify::Left
-                        }
-                        Children[
-                            ((
-                                bevy::ui::widget::Text("Hello"),
-                                bevy::text::TextLayout {
-                                    linebreak: LineBreak::NoWrap
-                                }
-                            ))
-                        ]
                     }
                 };
                 let result = html_inner(input);
