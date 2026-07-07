@@ -34,6 +34,20 @@ impl From<&Vec<Attribute>> for Name {
 impl ToTokens for Name {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = Value::new(&self.attributes[0].value);
+        #[cfg(feature = "bsn")]
+        {
+            if let Some(name) = name.as_ident() {
+                let hash = quote! { # };
+                tokens.extend(quote! {
+                    #hash #name
+                })
+            } else if let Some(name) = name.clean_block() {
+                tokens.extend(quote! {
+                    bevy::ecs::name::Name(#name)
+                })
+            }
+        }
+        #[cfg(not(feature = "bsn"))]
         if let Some(name) = name.clean_block() {
             tokens.extend(quote! {
                 ::bevy::ecs::name::Name::new(#name)

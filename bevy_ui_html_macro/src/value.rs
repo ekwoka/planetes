@@ -239,4 +239,19 @@ impl Value {
             to_color(value)
         }
     }
+
+    pub fn as_ident(&self) -> Option<TokenStream> {
+        if let Some(value) = self.clean_block() {
+            let value = value.to_string();
+            // Check if this is a quoted string
+            if value.starts_with('"') && value.ends_with('"') && !value.contains(' ') {
+                let value = Ident::new(&value.trim_matches('"'), self.0.span());
+                Some(quote! { #value })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
