@@ -35,7 +35,7 @@ tracing = { version = "0.1", features = [
     "release_max_level_warn",
 ] }
 bevy_gizmos = "0.19"
-# bevy_ui_anchor = "0.10"
+# bevy_ui_anchor = "0.12"
 
 # Physics
 avian3d = "0.7"
