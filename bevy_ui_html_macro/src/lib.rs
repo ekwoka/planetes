@@ -3219,15 +3219,11 @@ mod tests {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (::bevy::feathers::controls::button_bundle(
-                            ::bevy::feathers::controls::ButtonBundleProps {
-                                variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-
-                            },
-                            (),
-                            ((bevy::ui::widget::Text("Hello")))
-                        ))
+                        (@::bevy::feathers::controls::FeathersButton {
+                            @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                            @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                            @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
+                        })
                     ]
                 }
             };

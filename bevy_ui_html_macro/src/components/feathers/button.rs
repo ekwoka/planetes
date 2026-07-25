@@ -51,7 +51,23 @@ impl ToTokens for Button {
             .iter()
             .find(|attr| attr.key == "components")
             .and_then(|attr| Value::new(&attr.value).clean_block())
-            .unwrap_or_else(|| quote! { () });
+            .unwrap_or_else(|| {
+                #[cfg(feature = "bsn")]
+                return quote! {};
+                #[cfg(not(feature = "bsn"))]
+                return quote! { () };
+            });
+        #[cfg(feature = "bsn")]
+        tokens.extend(quote! {
+            #components
+            @::bevy::feathers::controls::FeathersButton {
+                #props,
+                @caption: bsn_list![
+                    #(#children),*
+                ]
+            }
+        });
+        #[cfg(not(feature = "bsn"))]
         tokens.extend(quote! {
             ::bevy::feathers::controls::button_bundle(
                 #props,
@@ -60,7 +76,7 @@ impl ToTokens for Button {
                     #(#children),*
                 )
             )
-        })
+        });
     }
 }
 
@@ -167,6 +183,11 @@ impl ToTokens for ButtonProps {
                 })
                 .collect::<Vec<_>>();
 
+            #[cfg(feature = "bsn")]
+            tokens.extend(quote! {
+                #(@#fields),*
+            });
+            #[cfg(not(feature = "bsn"))]
             tokens.extend(quote! {
                 ::bevy::feathers::controls::ButtonBundleProps {
                     #(#fields,)*
