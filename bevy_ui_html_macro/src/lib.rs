@@ -3267,28 +3267,18 @@ mod tests {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (::bevy::feathers::controls::button_bundle(
-                            ::bevy::feathers::controls::ButtonBundleProps {
-                                variant: ::bevy::feathers::controls::ButtonVariant::Primary,
-                                corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
-
-                            },
-                            (),
-                            (
-                                (bevy::ui::widget::Text("Hello")),
-                                ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                    let entity = parent.target_entity();
-                                    parent.spawn(
-                                        ::bevy::ecs::observer::Observer::new(
-                                            |event: On<Activate>| {
-                                                info!("{:?}",event.entity);
-                                            }
-                                        )
-                                        .with_entity(entity)
-                                    );
-                                })
-                            )
-                        ))
+                        (
+                            @::bevy::feathers::controls::FeathersButton {
+                                @variant: ::bevy::feathers::controls::ButtonVariant::Primary,
+                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                                @caption: bsn_list![
+                                    (bevy::ui::widget::Text("Hello"))
+                                ]
+                            }
+                            on(|event: On<Activate>| {
+                                info!("{:?}",event.entity);
+                            })
+                        )
                     ]
                 }
             };
@@ -3395,23 +3385,16 @@ mod tests {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (::bevy::feathers::controls::checkbox_bundle(
-                            (),
-                            (
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                    let entity = parent.target_entity();
-                                    parent.spawn(
-                                        ::bevy::ecs::observer::Observer::new(
-                                            |event: On< ValueChange<bool> >| {
-                                                println!("Hello Changed {}", event.value)
-                                            }
-                                        )
-                                        .with_entity(entity)
-                                    );
-                                })
-                            )
-                        ))
+                        (
+                            @::bevy::feathers::controls::FeathersCheckbox {
+                                @caption: bsn_list![
+                                    ::bevy::ui::widget::Text("Hello")
+                                ]
+                            }
+                            on(|event: On<ValueChange<bool> >| {
+                                println!("Hello Changed {}", event.value)
+                            })
+                        )
                     ]
                 }
             };

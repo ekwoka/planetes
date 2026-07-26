@@ -44,7 +44,6 @@ impl ToTokens for Button {
             .iter()
             .map(|child| child.to_token_stream())
             .collect::<Vec<_>>();
-        children.push_some(Observer::from(&self.attributes).ok());
         let props = ButtonProps::from(&self.attributes);
         let components = self
             .attributes
@@ -57,16 +56,22 @@ impl ToTokens for Button {
                 #[cfg(not(feature = "bsn"))]
                 return quote! { () };
             });
+        let observer = Observer::from(&self.attributes).ok();
+        #[cfg(not(feature = "bsn"))]
+        children.push_some(observer);
         #[cfg(feature = "bsn")]
-        tokens.extend(quote! {
-            #components
-            @::bevy::feathers::controls::FeathersButton {
-                #props,
-                @caption: bsn_list![
-                    #(#children),*
-                ]
-            }
-        });
+        {
+            tokens.extend(quote! {
+                #components
+                @::bevy::feathers::controls::FeathersButton {
+                    #props,
+                    @caption: bsn_list![
+                        #(#children),*
+                    ]
+                }
+                #observer
+            });
+        }
         #[cfg(not(feature = "bsn"))]
         tokens.extend(quote! {
             ::bevy::feathers::controls::button_bundle(
