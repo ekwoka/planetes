@@ -3447,23 +3447,17 @@ mod tests {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (::bevy::feathers::controls::radio_bundle(
-                            TestComponent,
-                            (
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                                    let entity = parent.target_entity();
-                                    parent.spawn(
-                                        ::bevy::ecs::observer::Observer::new(
-                                            |event: On< ValueChange<bool> >| {
-                                                println!("Hello True {}", event.value)
-                                            }
-                                        )
-                                        .with_entity(entity)
-                                    );
-                                })
-                            )
-                        ))
+                        (
+                            TestComponent
+                            @::bevy::feathers::controls::FeathersRadio {
+                                @caption: bsn_list![
+                                    ::bevy::ui::widget::Text("Hello")
+                                ]
+                            }
+                            on(|event: On<ValueChange<bool> >| {
+                                println!("Hello True {}", event.value)
+                            })
+                        )
                     ]
                 }
             };
