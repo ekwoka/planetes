@@ -28,7 +28,8 @@ command = "cargo"
 args = ["clippy", "--allow-dirty", "--fix"]
 
 [tasks.test-all]
-run_task = { name = ["nextest", "test-bsn"], parallel = false }
+run_task = { name = ["nextest", "test-bsn", "test-bsn-feathers"], parallel = false }
+
 [tasks.nextest]
 command = "cargo"
 args = ["nextest", "--workspace"]
@@ -36,6 +37,10 @@ args = ["nextest", "--workspace"]
 [tasks.test-bsn]
 command = "cargo"
 args = ["nextest", "-p", "bevy_ui_html_macro","--features","bsn,propagate"]
+
+[tasks.test-bsn-feathers]
+command = "cargo"
+args = ["nextest", "-p", "bevy_ui_html_macro","--features","bsn,feathers"]
 
 [tasks.docs-deps]
 script = '''
