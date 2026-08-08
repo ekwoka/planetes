@@ -7,21 +7,13 @@ use crate::{Attribute, ChildNode, Observer, PushSomeTokens, Value};
 pub struct Button {
     attributes: Vec<Attribute>,
     children: Option<Vec<ChildNode>>,
+    bsn: bool,
 }
 
 impl Button {
     const KEYS: [&'static str; 3] = ["variant", "corners", "components"];
 
-    pub fn with_children(self, children: Vec<ChildNode>) -> Self {
-        Self {
-            attributes: self.attributes,
-            children: Some(children),
-        }
-    }
-}
-
-impl From<&Vec<Attribute>> for Button {
-    fn from(attributes: &Vec<Attribute>) -> Self {
+    pub fn new(attributes: &[Attribute], bsn: bool) -> Self {
         Self {
             attributes: attributes
                 .iter()
@@ -31,6 +23,14 @@ impl From<&Vec<Attribute>> for Button {
                 .cloned()
                 .collect(),
             children: None,
+            bsn,
+        }
+    }
+
+    pub fn with_children(self, children: Vec<ChildNode>) -> Self {
+        Self {
+            children: Some(children),
+            ..self
         }
     }
 }
@@ -44,23 +44,21 @@ impl ToTokens for Button {
             .iter()
             .map(|child| child.to_token_stream())
             .collect::<Vec<_>>();
-        let props = ButtonProps::from(&self.attributes);
+        let props = ButtonProps::new(&self.attributes, self.bsn);
         let components = self
             .attributes
             .iter()
             .find(|attr| attr.key == "components")
             .and_then(|attr| Value::new(&attr.value).clean_block())
             .unwrap_or_else(|| {
-                #[cfg(feature = "bsn")]
-                return quote! {};
-                #[cfg(not(feature = "bsn"))]
-                return quote! { () };
+                if self.bsn {
+                    quote! {}
+                } else {
+                    quote! { () }
+                }
             });
-        let observer = Observer::from(&self.attributes).ok();
-        #[cfg(not(feature = "bsn"))]
-        children.push_some(observer);
-        #[cfg(feature = "bsn")]
-        {
+        let observer = Observer::new(&self.attributes, self.bsn).ok();
+        if self.bsn {
             tokens.extend(quote! {
                 #components
                 @::bevy::feathers::controls::FeathersButton {
@@ -71,37 +69,38 @@ impl ToTokens for Button {
                 }
                 #observer
             });
-        }
-        #[cfg(not(feature = "bsn"))]
-        tokens.extend(quote! {
-            ::bevy::feathers::controls::button_bundle(
-                #props,
-                #components,
-                (
-                    #(#children),*
+        } else {
+            children.push_some(observer);
+            tokens.extend(quote! {
+                ::bevy::feathers::controls::button_bundle(
+                    #props,
+                    #components,
+                    (
+                        #(#children),*
+                    )
                 )
-            )
-        });
+            });
+        }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ButtonProps {
     attributes: Vec<Attribute>,
+    bsn: bool,
 }
 
 impl ButtonProps {
     const KEYS: [&'static str; 2] = ["variant", "corners"];
-}
 
-impl From<&Vec<Attribute>> for ButtonProps {
-    fn from(attributes: &Vec<Attribute>) -> Self {
+    pub fn new(attributes: &[Attribute], bsn: bool) -> Self {
         Self {
             attributes: attributes
                 .iter()
                 .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
                 .cloned()
                 .collect(),
+            bsn,
         }
     }
 }
@@ -188,17 +187,18 @@ impl ToTokens for ButtonProps {
                 })
                 .collect::<Vec<_>>();
 
-            #[cfg(feature = "bsn")]
-            tokens.extend(quote! {
-                #(@#fields),*
-            });
-            #[cfg(not(feature = "bsn"))]
-            tokens.extend(quote! {
-                ::bevy::feathers::controls::ButtonBundleProps {
-                    #(#fields,)*
-                    ..Default::default()
-                }
-            });
+            if self.bsn {
+                tokens.extend(quote! {
+                    #(@#fields),*
+                });
+            } else {
+                tokens.extend(quote! {
+                    ::bevy::feathers::controls::ButtonBundleProps {
+                        #(#fields,)*
+                        ..Default::default()
+                    }
+                });
+            }
         }
     }
 }

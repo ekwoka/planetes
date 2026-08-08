@@ -5,26 +5,26 @@ use crate::{Attribute, Value};
 #[derive(Clone, Debug)]
 pub struct Observer {
     attributes: Vec<Attribute>,
+    bsn: bool,
 }
 
 impl Observer {
-    pub fn ok(self) -> Option<Self> {
-        if self.attributes.is_empty() {
-            None
-        } else {
-            Some(self)
-        }
-    }
-}
-
-impl From<&Vec<Attribute>> for Observer {
-    fn from(attributes: &Vec<Attribute>) -> Self {
+    pub fn new(attributes: &[Attribute], bsn: bool) -> Self {
         Self {
             attributes: attributes
                 .iter()
                 .filter(|attr| attr.key.as_str().starts_with("on"))
                 .cloned()
                 .collect(),
+            bsn,
+        }
+    }
+
+    pub fn ok(self) -> Option<Self> {
+        if self.attributes.is_empty() {
+            None
+        } else {
+            Some(self)
         }
     }
 }
@@ -35,17 +35,18 @@ impl ToTokens for Observer {
             .attributes
             .iter()
             .filter_map(|attr| Value::new(&attr.value).clean_block());
-        #[cfg(feature = "bsn")]
-        tokens.extend(quote! {
-            #(on(#observers))
-            *
-        });
-        #[cfg(not(feature = "bsn"))]
-        tokens.extend(quote! {
-            ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                let entity = parent.target_entity();
-                #(parent.spawn(::bevy::ecs::observer::Observer::new(#observers).with_entity(entity));)*
-            })
-        });
+        if self.bsn {
+            tokens.extend(quote! {
+                #(on(#observers))
+                *
+            });
+        } else {
+            tokens.extend(quote! {
+                ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                    let entity = parent.target_entity();
+                    #(parent.spawn(::bevy::ecs::observer::Observer::new(#observers).with_entity(entity));)*
+                })
+            });
+        }
     }
 }

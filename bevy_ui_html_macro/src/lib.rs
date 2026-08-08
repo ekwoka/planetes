@@ -26,6 +26,7 @@ enum HtmlNode {
 #[derive(Clone, Debug)]
 struct TextNode {
     value: String,
+    bsn: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -36,19 +37,24 @@ struct Attribute {
 }
 
 #[derive(Clone, Debug)]
-struct ChildNode(HtmlNode);
+struct ChildNode {
+    node: HtmlNode,
+    bsn: bool,
+}
 
 #[derive(Clone, Debug)]
 struct ElementNode {
     tag_name: NodeName,
     children: Vec<ChildNode>,
     attributes: Vec<Attribute>,
+    bsn: bool,
 }
 
 #[derive(Clone, Debug)]
 struct InlineNode {
     children: Vec<HtmlNode>,
     attributes: Vec<Attribute>,
+    bsn: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -66,11 +72,14 @@ struct WithNode {
     block: Box<HtmlNode>,
 }
 
-impl From<Node> for HtmlNode {
-    fn from(node: Node) -> Self {
+impl HtmlNode {
+    /// Builds the node tree, threading `bsn` (scene output vs. bundle output)
+    /// down into every node so each can pick its own emission form.
+    fn new(node: Node, bsn: bool) -> Self {
         match node {
             Node::Text(text) => Self::Text(TextNode {
                 value: text.value_string(),
+                bsn,
             }),
             Node::Element(element) => {
                 let tag_name = element.open_tag.name.to_string();
@@ -82,7 +91,7 @@ impl From<Node> for HtmlNode {
                         .children
                         .into_iter()
                         .filter_map(|child| match child {
-                            Node::Block(_) => Some(Self::from(child)),
+                            Node::Block(_) => Some(Self::new(child, bsn)),
                             _ => None,
                         })
                         .next()
@@ -97,7 +106,7 @@ impl From<Node> for HtmlNode {
                         .children
                         .into_iter()
                         .filter_map(|child| match child {
-                            Node::Block(_) => Some(Self::from(child)),
+                            Node::Block(_) => Some(Self::new(child, bsn)),
                             _ => None,
                         })
                         .next()
@@ -112,7 +121,7 @@ impl From<Node> for HtmlNode {
                     .into_iter()
                     .filter_map(|child| match child {
                         Node::Text(_) | Node::Element(_) | Node::Block(_) => {
-                            Some(Self::from(child))
+                            Some(Self::new(child, bsn))
                         }
                         _ => None,
                     });
@@ -146,12 +155,14 @@ impl From<Node> for HtmlNode {
                     Self::Inline(InlineNode {
                         children: children.collect(),
                         attributes,
+                        bsn,
                     })
                 } else {
                     Self::Element(ElementNode {
                         tag_name: element.open_tag.name,
-                        children: children.map(ChildNode).collect(),
+                        children: children.map(|node| ChildNode { node, bsn }).collect(),
                         attributes,
+                        bsn,
                     })
                 }
             }
@@ -163,7 +174,7 @@ impl From<Node> for HtmlNode {
 
 impl ToTokens for ChildNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let node = self.0.clone();
+        let node = self.node.clone();
         match node {
             HtmlNode::Iter(node) => {
                 tokens.extend(quote! {
@@ -174,14 +185,15 @@ impl ToTokens for ChildNode {
                 ::bevy::ecs::spawn::SpawnWith(#node)
             }),
             _ => {
-                #[cfg(feature = "bsn")]
-                tokens.extend(quote! {
-                    (#node)
-                });
-                #[cfg(not(feature = "bsn"))]
-                tokens.extend(quote! {
-                    ::bevy::ecs::spawn::Spawn(#node)
-                });
+                if self.bsn {
+                    tokens.extend(quote! {
+                        (#node)
+                    });
+                } else {
+                    tokens.extend(quote! {
+                        ::bevy::ecs::spawn::Spawn(#node)
+                    });
+                }
             }
         }
     }
@@ -190,14 +202,15 @@ impl ToTokens for ChildNode {
 impl ToTokens for TextNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let value = &self.value;
-        #[cfg(feature = "bsn")]
-        tokens.extend(quote! {
-            bevy::ui::widget::Text(#value)
-        });
-        #[cfg(not(feature = "bsn"))]
-        tokens.extend(quote! {
-            ::bevy::ui::widget::Text::new(#value)
-        });
+        if self.bsn {
+            tokens.extend(quote! {
+                bevy::ui::widget::Text(#value)
+            });
+        } else {
+            tokens.extend(quote! {
+                ::bevy::ui::widget::Text::new(#value)
+            });
+        }
     }
 }
 
@@ -355,12 +368,12 @@ impl ToTokens for ElementNode {
             "input",
         ];
         let mut components = Vec::<TokenStream>::new();
-        components.push_some(Name::from(&self.attributes).ok());
+        components.push_some(Name::new(&self.attributes, self.bsn).ok());
         let is_custom = !tag_names.contains(&self.tag_name.to_string().as_str());
         if is_custom {
             let tag_name = &self.tag_name;
             let tag_expr = tag_name_as_expr(tag_name);
-            let node = NodeComponent::from(&self.attributes);
+            let node = NodeComponent::new(&self.attributes, self.bsn);
             let extra = Self::extra_attrs(&self.attributes);
 
             let background_color = match BackgroundColor::from(&self.attributes).ok() {
@@ -371,15 +384,15 @@ impl ToTokens for ElementNode {
                 Some(bc) => quote! { #bc },
                 None => quote! { ::bevy::ui::BorderColor::default() },
             };
-            let text_font = match TextFont::from(&self.attributes).ok() {
+            let text_font = match TextFont::new(&self.attributes, self.bsn).ok() {
                 Some(tf) => tf.plain_tokens(),
                 None => quote! { ::bevy::text::TextFont::default() },
             };
-            let text_color = match TextColor::from(&self.attributes).ok() {
+            let text_color = match TextColor::new(&self.attributes, self.bsn).ok() {
                 Some(tc) => tc.plain_tokens(),
                 None => quote! { ::bevy::text::TextColor::default() },
             };
-            let text_layout = match TextLayout::from(&self.attributes).ok() {
+            let text_layout = match TextLayout::new(&self.attributes, self.bsn).ok() {
                 Some(tl) => quote! { #tl },
                 None => quote! { ::bevy::text::TextLayout::default() },
             };
@@ -402,8 +415,8 @@ impl ToTokens for ElementNode {
         #[cfg(feature = "feathers")]
         {
             if self.tag_name.to_string() == "button" {
-                let button =
-                    feathers::Button::from(&self.attributes).with_children(self.children.clone());
+                let button = feathers::Button::new(&self.attributes, self.bsn)
+                    .with_children(self.children.clone());
                 tokens.extend(quote! {
                     #button
                 });
@@ -419,14 +432,14 @@ impl ToTokens for ElementNode {
                 {
                     Some(kind) => match kind.as_str() {
                         "\"checkbox\"" => {
-                            let checkbox = feathers::Checkbox::from(&self.attributes);
+                            let checkbox = feathers::Checkbox::new(&self.attributes, self.bsn);
                             tokens.extend(quote! {
                                 #checkbox
                             });
                             return;
                         }
                         "\"radio\"" => {
-                            let radio = feathers::Radio::from(&self.attributes);
+                            let radio = feathers::Radio::new(&self.attributes, self.bsn);
                             tokens.extend(quote! {
                                 #radio
                             });
@@ -439,59 +452,56 @@ impl ToTokens for ElementNode {
             }
         }
         if !is_custom {
-            components.push_some(NodeComponent::from(&self.attributes).ok());
+            components.push_some(NodeComponent::new(&self.attributes, self.bsn).ok());
             components.push_some(Image::from(&self.attributes).ok());
             components.push_some(BorderColor::from(&self.attributes).ok());
             components.push_some(BackgroundColor::from(&self.attributes).ok());
-            components.push_some(TextFont::from(&self.attributes).ok());
-            components.push_some(TextColor::from(&self.attributes).ok());
-            components.push_some(TextLayout::from(&self.attributes).ok());
+            components.push_some(TextFont::new(&self.attributes, self.bsn).ok());
+            components.push_some(TextColor::new(&self.attributes, self.bsn).ok());
+            components.push_some(TextLayout::new(&self.attributes, self.bsn).ok());
         }
         components.push_some(
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_block()),
         );
-        #[cfg(feature = "bsn")]
-        components.push_some(Observer::from(&self.attributes).ok());
         let mut children = self
             .children
             .iter()
             .map(|child| child.to_token_stream())
             .collect::<Vec<_>>();
-        #[cfg(not(feature = "bsn"))]
-        children.push_some(Observer::from(&self.attributes).ok());
-        if !children.is_empty() {
-            #[cfg(feature = "bsn")]
-            components.push(quote! {
-                Children[
-                    #(#children),*
-                ]
-            });
-            #[cfg(not(feature = "bsn"))]
-            components.push(quote! {
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    #(#children),*
-                ))
-            });
+        // Scenes attach observers to the entity itself, bundles spawn them as children.
+        let observer = Observer::new(&self.attributes, self.bsn).ok();
+        if self.bsn {
+            components.push_some(observer);
+        } else {
+            children.push_some(observer);
         }
-        #[cfg(feature = "bsn")]
-        tokens.extend(quote! {
-            #(#components)*
-        });
-        #[cfg(not(feature = "bsn"))]
-        match components.len() {
-            1 => {
-                tokens.extend(quote! {
-                    #(#components)*
+        if !children.is_empty() {
+            if self.bsn {
+                components.push(quote! {
+                    Children[
+                        #(#children),*
+                    ]
+                });
+            } else {
+                components.push(quote! {
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        #(#children),*
+                    ))
                 });
             }
-            _ => {
-                tokens.extend(quote! {
-                    (
-                        #(#components),*
-                    )
-                });
-            }
+        }
+        // Scenes list their components bare, bundles need a tuple for more than one.
+        if !self.bsn && components.len() > 1 {
+            tokens.extend(quote! {
+                (
+                    #(#components),*
+                )
+            });
+        } else {
+            tokens.extend(quote! {
+                #(#components)*
+            });
         }
     }
 }
@@ -512,9 +522,9 @@ impl ToTokens for InlineNode {
                 })
                 .collect::<Vec<_>>(),
         );
-        components.push_some(TextFont::from(&self.attributes).ok());
-        components.push_some(TextColor::from(&self.attributes).ok());
-        components.push_some(TextLayout::from(&self.attributes).ok());
+        components.push_some(TextFont::new(&self.attributes, self.bsn).ok());
+        components.push_some(TextColor::new(&self.attributes, self.bsn).ok());
+        components.push_some(TextLayout::new(&self.attributes, self.bsn).ok());
         if components.len() == 1 {
             tokens.extend(quote! {
                 #(#components),*
@@ -552,25 +562,28 @@ impl PushSomeTokens for Vec<TokenStream> {
     }
 }
 
-fn html_inner(input: TokenStream) -> TokenStream {
+/// Expands the parsed markup, emitting a `bsn!` scene when `bsn` is set and a
+/// plain component bundle otherwise.
+fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
     let node_tree = parse2(input).unwrap();
     let mut output = TokenStream::new();
 
     for node in node_tree.into_iter() {
         if let Node::Element(_) = node {
-            let html_node = HtmlNode::from(node);
+            let html_node = HtmlNode::new(node, bsn);
             html_node.to_tokens(&mut output);
         }
     }
 
-    #[cfg(feature = "bsn")]
-    let output = quote! {
+    if bsn {
+        quote! {
             ::bevy::scene::bsn! {
                 #output
             }
-    };
-
-    output
+        }
+    } else {
+        output
+    }
 }
 
 /// Transforms HTML-like markup into Bevy UI component tuples.
@@ -662,7 +675,7 @@ fn html_inner(input: TokenStream) -> TokenStream {
 /// See the [crate-level documentation](crate) for complete attribute reference.
 #[proc_macro]
 pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    html_inner(input.into()).into()
+    html_inner(input.into(), cfg!(feature = "bsn")).into()
 }
 
 /// Derive macro that implements [`::bevy_ui_html::HtmlComponent`] for a
@@ -700,22 +713,22 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
 mod tests {
     use super::*;
 
+    /// Expands `input` both ways and checks each against the form it should
+    /// take: `bundle` for the component-tuple path, `bsn` for the scene path.
+    fn assert_html(input: TokenStream, bundle: TokenStream, bsn: TokenStream) {
+        assert_eq!(
+            html_inner(input.clone(), false).to_string(),
+            bundle.to_string()
+        );
+        assert_eq!(html_inner(input, true).to_string(), bsn.to_string());
+    }
+
     #[test]
     fn single_div_with_text() {
         let input = quote! {
             <div>"Hello"</div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (bevy::ui::widget::Text("Hello"))
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -723,8 +736,15 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (bevy::ui::widget::Text("Hello"))
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -732,18 +752,15 @@ mod tests {
         let input = quote! {
             <div/>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
+        let bundle = quote! {
+            ::bevy::ui::Node::default()
+        };
+        let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node
             }
         };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
-            ::bevy::ui::Node::default()
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -754,24 +771,7 @@ mod tests {
                 <div>"World"</div>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (
-                        bevy::ui::Node
-                        Children[(bevy::ui::widget::Text("Hello"))]
-                    ),
-                    (
-                        bevy::ui::Node
-                        Children[(bevy::ui::widget::Text("World"))]
-                    )
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -794,8 +794,22 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (
+                        bevy::ui::Node
+                        Children[(bevy::ui::widget::Text("Hello"))]
+                    ),
+                    (
+                        bevy::ui::Node
+                        Children[(bevy::ui::widget::Text("World"))]
+                    )
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -806,17 +820,7 @@ mod tests {
                 <span>"World"</span>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (bevy::ui::widget::Text("Hello")),(bevy::ui::widget::Text("World"))
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -825,8 +829,15 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (bevy::ui::widget::Text("Hello")),(bevy::ui::widget::Text("World"))
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -843,20 +854,7 @@ mod tests {
             "Hello"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
-                    margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0))
-                }
-                Children[(
-                    bevy::ui::widget::Text("Hello")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                 padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
@@ -868,8 +866,18 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
+                    margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0))
+                }
+                Children[(
+                    bevy::ui::widget::Text("Hello")
+                )]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -886,20 +894,7 @@ mod tests {
             "Hello"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    padding: px(10.0).all().with_bottom(percent(20.0)),
-                    margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0))
-                }
-                Children[(
-                    bevy::ui::widget::Text("Hello")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                 padding: px(10.0).all().with_bottom(percent(20.0)),
@@ -911,8 +906,18 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    padding: px(10.0).all().with_bottom(percent(20.0)),
+                    margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0))
+                }
+                Children[(
+                    bevy::ui::widget::Text("Hello")
+                )]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -929,24 +934,7 @@ mod tests {
             "Test"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    left: ::bevy::ui::px(5.0),
-                    top: ::bevy::ui::px(10.0),
-                    width: ::bevy::ui::px(100.0),
-                    height: ::bevy::ui::px(50.0),
-                    min_width: ::bevy::ui::px(10.0),
-                    max_width: ::bevy::ui::px(200.0)
-                }
-                Children[(
-                    bevy::ui::widget::Text("Test")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                 left: ::bevy::ui::px(5.0),
@@ -962,8 +950,22 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    left: ::bevy::ui::px(5.0),
+                    top: ::bevy::ui::px(10.0),
+                    width: ::bevy::ui::px(100.0),
+                    height: ::bevy::ui::px(50.0),
+                    min_width: ::bevy::ui::px(10.0),
+                    max_width: ::bevy::ui::px(200.0)
+                }
+                Children[(
+                    bevy::ui::widget::Text("Test")
+                )]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -980,24 +982,7 @@ mod tests {
             "Flex"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::Center,
-                    flex_grow: 1.0,
-                    flex_shrink: 0.5
-                }
-                Children[(
-                    bevy::ui::widget::Text("Flex")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                 display: Display::Flex,
@@ -1013,8 +998,22 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    flex_grow: 1.0,
+                    flex_shrink: 0.5
+                }
+                Children[(
+                    bevy::ui::widget::Text("Flex")
+                )]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1029,21 +1028,7 @@ mod tests {
             "Borders"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
-                    row_gap: ::bevy::ui::px(10.0),
-                    column_gap: ::bevy::ui::px(15.0)
-                }
-                Children[(
-                    bevy::ui::widget::Text("Borders")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                 border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
@@ -1056,8 +1041,19 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
+                    row_gap: ::bevy::ui::px(10.0),
+                    column_gap: ::bevy::ui::px(15.0)
+                }
+                Children[(
+                    bevy::ui::widget::Text("Borders")
+                )]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1071,21 +1067,7 @@ mod tests {
             "Aspect"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    width: ::bevy::ui::percent(100.0),
-                    position_type: PositionType::Absolute,
-                    aspect_ratio: Some(1.77)
-                }
-                Children[(
-                    bevy::ui::widget::Text("Aspect")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                 width: ::bevy::ui::percent(100.0),
@@ -1098,8 +1080,19 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    width: ::bevy::ui::percent(100.0),
+                    position_type: PositionType::Absolute,
+                    aspect_ratio: Some(1.77)
+                }
+                Children[(
+                    bevy::ui::widget::Text("Aspect")
+                )]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1107,17 +1100,7 @@ mod tests {
         let input = quote! {
             <div>{Text::new("Hello")}</div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (Text::new("Hello"))
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1125,8 +1108,15 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (Text::new("Hello"))
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1134,17 +1124,7 @@ mod tests {
         let input = quote! {
             <div>{if show { Text::new("Visible") } else { Text::new("Hidden") }}</div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (if show { Text::new("Visible") } else { Text::new("Hidden") })
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1152,28 +1132,23 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (if show { Text::new("Visible") } else { Text::new("Hidden") })
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
     fn div_with_nested_macro_call() {
         // This demonstrates that blocks can contain macro calls (like nested html! calls)
-        let inner = html_inner(quote! { <span>"Nested"</span> });
-        let input = quote! {
-            <div>{#inner}</div>
-        };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (::bevy::scene::bsn!{ bevy::ui::widget::Text("Nested") })
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle_inner = html_inner(quote! { <span>"Nested"</span> }, false);
+        let bsn_inner = html_inner(quote! { <span>"Nested"</span> }, true);
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1181,8 +1156,23 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (::bevy::scene::bsn!{ bevy::ui::widget::Text("Nested") })
+                ]
+            }
+        };
+        // The nested expansion is itself mode specific, so each side gets its own input.
+        assert_eq!(
+            html_inner(quote! { <div>{#bundle_inner}</div> }, false).to_string(),
+            bundle.to_string()
+        );
+        assert_eq!(
+            html_inner(quote! { <div>{#bsn_inner}</div> }, true).to_string(),
+            bsn.to_string()
+        );
     }
 
     #[test]
@@ -1194,19 +1184,7 @@ mod tests {
                 {MyComponent::new()}
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (bevy::ui::widget::Text("Static text")),
-                    (dynamic_content),
-                    (MyComponent::new())
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1216,8 +1194,17 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (bevy::ui::widget::Text("Static text")),
+                    (dynamic_content),
+                    (MyComponent::new())
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1235,23 +1222,7 @@ mod tests {
             </iter>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let output = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    ::bevy::ecs::spawn::SpawnIter(
-                        items.map(|item| {
-                            html! {
-                                <div>{item.name}</div>
-                            }
-                        })
-                    )
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let output = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1265,8 +1236,21 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), output.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    ::bevy::ecs::spawn::SpawnIter(
+                        items.map(|item| {
+                            html! {
+                                <div>{item.name}</div>
+                            }
+                        })
+                    )
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1278,20 +1262,7 @@ mod tests {
             "Menu"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))
-                }
-                Children[(
-                    bevy::ui::widget::Text("Menu")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                     padding: ::bevy::ui::px(4.0).all(),
@@ -1303,9 +1274,19 @@ mod tests {
                 ))
             )
         };
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all(),
+                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))
+                }
+                Children[(
+                    bevy::ui::widget::Text("Menu")
+                )]
+            }
+        };
 
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1317,20 +1298,7 @@ mod tests {
             "Menu"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all()
-                }
-                ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
-                Children[(
-                    bevy::ui::widget::Text("Menu")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                     padding: ::bevy::ui::px(4.0).all(),
@@ -1342,9 +1310,19 @@ mod tests {
                 ))
             )
         };
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all()
+                }
+                ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
+                Children[(
+                    bevy::ui::widget::Text("Menu")
+                )]
+            }
+        };
 
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1356,20 +1334,7 @@ mod tests {
             "Menu"
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all()
-                }
-                ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7))
-                Children[(
-                    bevy::ui::widget::Text("Menu")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node {
                     padding: ::bevy::ui::px(4.0).all(),
@@ -1381,9 +1346,19 @@ mod tests {
                 ))
             )
         };
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node {
+                    padding: ::bevy::ui::px(4.0).all()
+                }
+                ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7))
+                Children[(
+                    bevy::ui::widget::Text("Menu")
+                )]
+            }
+        };
 
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1395,31 +1370,7 @@ mod tests {
             "Menu"
             </MenuButton>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MenuButton,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))
-                        },
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[]
-                )
-                Children[(
-                    bevy::ui::widget::Text("Menu")
-                )]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 <_ as ::bevy_ui_html::HtmlComponent>::build(
                     MenuButton,
@@ -1443,9 +1394,30 @@ mod tests {
                 ))
             )
         };
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MenuButton,
+                    ::bevy_ui_html::HtmlBundle {
+                        node: bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))
+                        },
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[]
+                )
+                Children[(
+                    bevy::ui::widget::Text("Menu")
+                )]
+            }
+        };
 
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1463,27 +1435,7 @@ mod tests {
             </div>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (
-                        bevy::ui::Node
-                        Children[(Text::new("Menu"))]
-                    ),
-                    (
-                        bevy::ui::Node
-                        Children[({
-                            let thing = Text::new("Thing");
-                            thing
-                        })]
-                    )
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1505,9 +1457,26 @@ mod tests {
                 ))
             )
         };
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (
+                        bevy::ui::Node
+                        Children[(Text::new("Menu"))]
+                    ),
+                    (
+                        bevy::ui::Node
+                        Children[({
+                            let thing = Text::new("Thing");
+                            thing
+                        })]
+                    )
+                ]
+            }
+        };
 
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1518,18 +1487,7 @@ mod tests {
                 <span>{let thing = true; if thing { "World" } else { "Mom" }}</span>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                Children[
-                    (::bevy::ui::widget::Text::new("Hello")),
-                    (::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
-                ]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1538,8 +1496,16 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                Children[
+                    (::bevy::ui::widget::Text::new("Hello")),
+                    (::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
+                ]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1557,8 +1523,21 @@ mod tests {
                 </with>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
+        let bundle = quote! {
+            (
+                ::bevy::ui::Node::default(),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                        if true {
+                            parent.spawn(html! { <div>"Hello World"</div>});
+                        } else {
+                            parent.spawn(html! { <div>"Hello Mom"</div>});
+                        }
+                    })
+                ))
+            )
+        };
+        let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
@@ -1572,23 +1551,7 @@ mod tests {
                 ]
             }
         };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
-            (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
-                        if true {
-                            parent.spawn(html! { <div>"Hello World"</div>});
-                        } else {
-                            parent.spawn(html! { <div>"Hello Mom"</div>});
-                        }
-                    })
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1600,16 +1563,7 @@ mod tests {
                 Checked
             )}>"Hello"</div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                (Checkable, Checked)
-                Children[(bevy::ui::widget::Text("Hello"))]
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 (Checkable, Checked),
@@ -1618,8 +1572,14 @@ mod tests {
                 ))
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                (Checkable, Checked)
+                Children[(bevy::ui::widget::Text("Hello"))]
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1629,8 +1589,19 @@ mod tests {
                 <div name={"other".trim()}/>
             </div>
         };
-        #[cfg(feature = "bsn")]
-        let expected = {
+        let bundle = quote! {
+            (
+                ::bevy::ecs::name::Name::new("hello"),
+                ::bevy::ui::Node::default(),
+                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    ::bevy::ecs::spawn::Spawn((
+                        ::bevy::ecs::name::Name::new("other".trim()),
+                        ::bevy::ui::Node::default()
+                    ))
+                ))
+            )
+        };
+        let bsn = {
             let hash = quote! { # };
             quote! {
                 ::bevy::scene::bsn!{
@@ -1643,21 +1614,7 @@ mod tests {
                 }
             }
         };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
-            (
-                ::bevy::ecs::name::Name::new("hello"),
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn((
-                        ::bevy::ecs::name::Name::new("other".trim()),
-                        ::bevy::ui::Node::default()
-                    ))
-                ))
-            )
-        };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        assert_html(input, bundle, bsn);
     }
 
     #[test]
@@ -1666,18 +1623,7 @@ mod tests {
             <img src={asset_server
                 .load("embedded://planetes_editor/assets/filled_triangle.png")} />
         };
-        #[cfg(feature = "bsn")]
-        let expected = quote! {
-            ::bevy::scene::bsn!{
-                bevy::ui::Node
-                ::bevy::ui::widget::ImageNode::new(
-                    asset_server
-                        .load("embedded://planetes_editor/assets/filled_triangle.png")
-                )
-            }
-        };
-        #[cfg(not(feature = "bsn"))]
-        let expected = quote! {
+        let bundle = quote! {
             (
                 ::bevy::ui::Node::default(),
                 ::bevy::ui::widget::ImageNode::new(
@@ -1686,8 +1632,16 @@ mod tests {
                 )
             )
         };
-        let result = html_inner(input);
-        assert_eq!(result.to_string(), expected.to_string());
+        let bsn = quote! {
+            ::bevy::scene::bsn!{
+                bevy::ui::Node
+                ::bevy::ui::widget::ImageNode::new(
+                    asset_server
+                        .load("embedded://planetes_editor/assets/filled_triangle.png")
+                )
+            }
+        };
+        assert_html(input, bundle, bsn);
     }
 
     mod colors {
@@ -1702,20 +1656,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -1727,9 +1668,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -1743,38 +1694,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = if cfg!(feature = "propagate") {
-                quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
-                        Children[(
-                            bevy::ui::widget::Text("Menu")
-                        )]
-                    }
-                }
-            } else {
-                quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        Children[(
-                            bevy::ui::widget::Text("Menu")
-                        )]
-                    }
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = if cfg!(feature = "propagate") {
+            let bundle = if cfg!(feature = "propagate") {
                 quote! {
                     (
                         ::bevy::ui::Node {
@@ -1805,9 +1725,37 @@ mod tests {
                     )
                 }
             };
+            let bsn = if cfg!(feature = "propagate") {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        Children[(
+                            bevy::ui::widget::Text("Menu")
+                        )]
+                    }
+                }
+            } else {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        Children[(
+                            bevy::ui::widget::Text("Menu")
+                        )]
+                    }
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         mod const_colors {
@@ -1821,20 +1769,7 @@ mod tests {
                     "Menu"
                     </div>
                 };
-                #[cfg(feature = "bsn")]
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK)
-                        Children[(
-                            bevy::ui::widget::Text("Menu")
-                        )]
-                    }
-                };
-                #[cfg(not(feature = "bsn"))]
-                let expected = quote! {
+                let bundle = quote! {
                     (
                         ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
@@ -1846,9 +1781,19 @@ mod tests {
                         ))
                     )
                 };
+                let bsn = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK)
+                        Children[(
+                            bevy::ui::widget::Text("Menu")
+                        )]
+                    }
+                };
 
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
+                assert_html(input, bundle, bsn);
             }
 
             #[test]
@@ -1860,20 +1805,7 @@ mod tests {
                     "Menu"
                     </div>
                 };
-                #[cfg(feature = "bsn")]
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE)
-                        Children[(
-                            bevy::ui::widget::Text("Menu")
-                        )]
-                    }
-                };
-                #[cfg(not(feature = "bsn"))]
-                let expected = quote! {
+                let bundle = quote! {
                     (
                         ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
@@ -1885,9 +1817,19 @@ mod tests {
                         ))
                     )
                 };
+                let bsn = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE)
+                        Children[(
+                            bevy::ui::widget::Text("Menu")
+                        )]
+                    }
+                };
 
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
+                assert_html(input, bundle, bsn);
             }
 
             #[test]
@@ -1899,20 +1841,7 @@ mod tests {
                     "Menu"
                     </div>
                 };
-                #[cfg(feature = "bsn")]
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE)
-                        Children[(
-                            bevy::ui::widget::Text("Menu")
-                        )]
-                    }
-                };
-                #[cfg(not(feature = "bsn"))]
-                let expected = quote! {
+                let bundle = quote! {
                     (
                         ::bevy::ui::Node {
                             padding: ::bevy::ui::px(4.0).all(),
@@ -1924,9 +1853,19 @@ mod tests {
                         ))
                     )
                 };
+                let bsn = quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE)
+                        Children[(
+                            bevy::ui::widget::Text("Menu")
+                        )]
+                    }
+                };
 
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
+                assert_html(input, bundle, bsn);
             }
         }
 
@@ -1939,20 +1878,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -1964,9 +1890,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -1978,20 +1914,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2003,9 +1926,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2017,20 +1950,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2042,9 +1962,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2056,20 +1986,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2081,9 +1998,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2095,20 +2022,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2120,9 +2034,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2134,20 +2058,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2159,9 +2070,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2173,20 +2094,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2198,9 +2106,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2212,20 +2130,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2237,9 +2142,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2251,21 +2166,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2277,9 +2178,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2291,20 +2202,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2316,9 +2214,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2330,20 +2238,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2355,9 +2250,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2369,21 +2274,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2395,9 +2286,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2409,20 +2310,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2434,9 +2322,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2448,20 +2346,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2473,9 +2358,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2487,20 +2382,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2512,9 +2394,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2526,20 +2418,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2551,9 +2430,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2565,20 +2454,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2590,9 +2466,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2604,20 +2490,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2629,9 +2502,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2643,20 +2526,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2668,9 +2538,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2682,20 +2562,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2707,9 +2574,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2721,20 +2598,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2746,9 +2610,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2760,20 +2634,7 @@ mod tests {
                 "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
-                    }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5))
-                    Children[(
-                        bevy::ui::widget::Text("Menu")
-                    )]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         padding: ::bevy::ui::px(4.0).all(),
@@ -2785,9 +2646,19 @@ mod tests {
                     ))
                 )
             };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        padding: ::bevy::ui::px(4.0).all()
+                    }
+                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5))
+                    Children[(
+                        bevy::ui::widget::Text("Menu")
+                    )]
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
     }
 
@@ -2805,33 +2676,7 @@ mod tests {
                     <div display="block"/>
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        display: Display::Flex
-                    }
-                    Children[
-                        (bevy::ui::Node {
-                            display: ::bevy::ui::Display::None
-                        }),
-                        (bevy::ui::Node {
-                            display: ::bevy::ui::Display::None
-                        }),
-                        (bevy::ui::Node {
-                            display: ::bevy::ui::Display::Flex
-                        }),
-                        (bevy::ui::Node {
-                            display: ::bevy::ui::Display::Grid
-                        }),
-                        (bevy::ui::Node {
-                            display: ::bevy::ui::Display::Block
-                        })
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         display: Display::Flex,
@@ -2861,8 +2706,31 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        display: Display::Flex
+                    }
+                    Children[
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::None
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::None
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::Flex
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::Grid
+                        }),
+                        (bevy::ui::Node {
+                            display: ::bevy::ui::Display::Block
+                        })
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2874,27 +2742,7 @@ mod tests {
                     <div position-type="relative"/>
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node {
-                        position_type: ::bevy::ui::PositionType::Absolute
-                    }
-                    Children[
-                        (bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative
-                        }),
-                        (bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Absolute
-                        }),
-                        (bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative
-                        })
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node {
                         position_type: ::bevy::ui::PositionType::Absolute,
@@ -2916,8 +2764,25 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node {
+                        position_type: ::bevy::ui::PositionType::Absolute
+                    }
+                    Children[
+                        (bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative
+                        }),
+                        (bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Absolute
+                        }),
+                        (bevy::ui::Node {
+                            position_type: ::bevy::ui::PositionType::Relative
+                        })
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -2936,23 +2801,20 @@ mod tests {
                     <div flex-direction=#input/>
                 };
                 let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
-                #[cfg(feature = "bsn")]
-                let expected = quote! {
+                let bundle = quote! {
+                    ::bevy::ui::Node {
+                        flex_direction: ::bevy::ui::FlexDirection::#ident,
+                        ..Default::default()
+                    }
+                };
+                let bsn = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
                             flex_direction: ::bevy::ui::FlexDirection::#ident
                         }
                     }
                 };
-                #[cfg(not(feature = "bsn"))]
-                let expected = quote! {
-                    ::bevy::ui::Node {
-                        flex_direction: ::bevy::ui::FlexDirection::#ident,
-                        ..Default::default()
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
+                assert_html(input, bundle, bsn);
             }
         }
     }
@@ -2971,22 +2833,7 @@ mod tests {
                     "Hello, World!"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    on(|_event: On<Pointer<Click> >,
-                        mut commands: Commands,
-                        text: Single<Entity, With<Text> >| {
-                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
-                        })
-                    Children[
-                        (bevy::ui::widget::Text("Hello, World!"))
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -3007,8 +2854,20 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    on(|_event: On<Pointer<Click> >,
+                        mut commands: Commands,
+                        text: Single<Entity, With<Text> >| {
+                            commands.entity(*text).insert(Text::new("Hi, Mom!"));
+                        })
+                    Children[
+                        (bevy::ui::widget::Text("Hello, World!"))
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
     }
 
@@ -3024,8 +2883,40 @@ mod tests {
                     "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = if cfg!(feature = "propagate") {
+            let bundle = if cfg!(feature = "propagate") {
+                quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::app::Propagate(::bevy::text::TextFont {
+                            font_size: ::bevy::text::FontSize::Px(10.0),
+                            ..Default::default()
+                        }),
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                }
+            } else {
+                quote! {
+                    (
+                        ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        ::bevy::text::TextFont {
+                            font_size: ::bevy::text::FontSize::Px(10.0),
+                            ..Default::default()
+                        },
+                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        ))
+                    )
+                }
+            };
+            let bsn = if cfg!(feature = "propagate") {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
@@ -3051,42 +2942,8 @@ mod tests {
                     }
                 }
             };
-            #[cfg(not(feature = "bsn"))]
-            let expected = if cfg!(feature = "propagate") {
-                quote! {
-                    (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
-                        },
-                        ::bevy::app::Propagate(::bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0),
-                            ..Default::default()
-                        }),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                        ))
-                    )
-                }
-            } else {
-                quote! {
-                    (
-                        ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            ..Default::default()
-                        },
-                        bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0)
-                        },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                        ))
-                    )
-                }
-            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -3098,30 +2955,7 @@ mod tests {
                     "Menu"
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = if cfg!(feature = "propagate") {
-                quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
-                        Children[(bevy::ui::widget::Text("Menu"))]
-                    }
-                }
-            } else {
-                quote! {
-                    ::bevy::scene::bsn!{
-                        bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
-                        }
-                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        Children[(bevy::ui::widget::Text("Menu"))]
-                    }
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = if cfg!(feature = "propagate") {
+            let bundle = if cfg!(feature = "propagate") {
                 quote! {
                     (
                         ::bevy::ui::Node {
@@ -3148,9 +2982,29 @@ mod tests {
                     )
                 }
             };
+            let bsn = if cfg!(feature = "propagate") {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        Children[(bevy::ui::widget::Text("Menu"))]
+                    }
+                }
+            } else {
+                quote! {
+                    ::bevy::scene::bsn!{
+                        bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all()
+                        }
+                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        Children[(bevy::ui::widget::Text("Menu"))]
+                    }
+                }
+            };
 
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -3158,25 +3012,7 @@ mod tests {
             let input = quote! {
                 <div justify={Justify::Left}><span linebreak={LineBreak::NoWrap}>"Hello"</span></div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    bevy::text::TextLayout {
-                        justify: Justify::Left
-                    }
-                    Children[
-                        ((
-                            bevy::ui::widget::Text("Hello"),
-                            bevy::text::TextLayout {
-                                linebreak: LineBreak::NoWrap
-                            }
-                        ))
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     ::bevy::text::TextLayout {
@@ -3196,8 +3032,23 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    bevy::text::TextLayout {
+                        justify: Justify::Left
+                    }
+                    Children[
+                        ((
+                            bevy::ui::widget::Text("Hello"),
+                            bevy::text::TextLayout {
+                                linebreak: LineBreak::NoWrap
+                            }
+                        ))
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
     }
 
@@ -3214,21 +3065,7 @@ mod tests {
                         corners="rounded">"Hello"</button>
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    Children[
-                        (@::bevy::feathers::controls::FeathersButton {
-                            @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                            @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-                            @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
-                        })
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -3246,8 +3083,19 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (@::bevy::feathers::controls::FeathersButton {
+                            @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                            @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                            @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
+                        })
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -3262,28 +3110,7 @@ mod tests {
                     </button>
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    Children[
-                        (
-                            @::bevy::feathers::controls::FeathersButton {
-                                @variant: ::bevy::feathers::controls::ButtonVariant::Primary,
-                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
-                                @caption: bsn_list![
-                                    (bevy::ui::widget::Text("Hello"))
-                                ]
-                            }
-                            on(|event: On<Activate>| {
-                                info!("{:?}",event.entity);
-                            })
-                        )
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -3314,8 +3141,26 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (
+                            @::bevy::feathers::controls::FeathersButton {
+                                @variant: ::bevy::feathers::controls::ButtonVariant::Primary,
+                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                                @caption: bsn_list![
+                                    (bevy::ui::widget::Text("Hello"))
+                                ]
+                            }
+                            on(|event: On<Activate>| {
+                                info!("{:?}",event.entity);
+                            })
+                        )
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -3328,24 +3173,7 @@ mod tests {
                         components={Testing::new()}>"Hello"</button>
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    Children[
-                        (
-                            Testing::new()
-                            @::bevy::feathers::controls::FeathersButton {
-                                @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
-                                @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
-                            }
-                        )
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -3363,8 +3191,22 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (
+                            Testing::new()
+                            @::bevy::feathers::controls::FeathersButton {
+                                @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
+                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                                @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
+                            }
+                        )
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -3379,26 +3221,7 @@ mod tests {
                         }} />
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    Children[
-                        (
-                            @::bevy::feathers::controls::FeathersCheckbox {
-                                @caption: bsn_list![
-                                    ::bevy::ui::widget::Text("Hello")
-                                ]
-                            }
-                            on(|event: On<ValueChange<bool> >| {
-                                println!("Hello Changed {}", event.value)
-                            })
-                        )
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -3424,8 +3247,24 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (
+                            @::bevy::feathers::controls::FeathersCheckbox {
+                                @caption: bsn_list![
+                                    ::bevy::ui::widget::Text("Hello")
+                                ]
+                            }
+                            on(|event: On<ValueChange<bool> >| {
+                                println!("Hello Changed {}", event.value)
+                            })
+                        )
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
 
         #[test]
@@ -3441,27 +3280,7 @@ mod tests {
                         components={TestComponent} />
                 </div>
             };
-            #[cfg(feature = "bsn")]
-            let expected = quote! {
-                ::bevy::scene::bsn!{
-                    bevy::ui::Node
-                    Children[
-                        (
-                            TestComponent
-                            @::bevy::feathers::controls::FeathersRadio {
-                                @caption: bsn_list![
-                                    ::bevy::ui::widget::Text("Hello")
-                                ]
-                            }
-                            on(|event: On<ValueChange<bool> >| {
-                                println!("Hello True {}", event.value)
-                            })
-                        )
-                    ]
-                }
-            };
-            #[cfg(not(feature = "bsn"))]
-            let expected = quote! {
+            let bundle = quote! {
                 (
                     ::bevy::ui::Node::default(),
                     <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -3487,28 +3306,55 @@ mod tests {
                     ))
                 )
             };
-            let result = html_inner(input);
-            assert_eq!(result.to_string(), expected.to_string());
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (
+                            TestComponent
+                            @::bevy::feathers::controls::FeathersRadio {
+                                @caption: bsn_list![
+                                    ::bevy::ui::widget::Text("Hello")
+                                ]
+                            }
+                            on(|event: On<ValueChange<bool> >| {
+                                println!("Hello True {}", event.value)
+                            })
+                        )
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
     }
-
-    #[cfg(not(feature = "bsn"))]
-    mod legacy {
+    mod html_component {
         use super::*;
 
-        mod html_component {
-            use super::*;
-
-            #[test]
-            fn self_closing_custom_tag_no_tuple() {
-                let input = quote! {
-                    <MyComponent />
-                };
-                let expected = quote! {
+        #[test]
+        fn self_closing_custom_tag_no_tuple() {
+            let input = quote! {
+                <MyComponent />
+            };
+            let bundle = quote! {
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
+                    ::bevy_ui_html::HtmlBundle {
+                        node: ::bevy::ui::Node::default(),
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[]
+                )
+            };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
                     <_ as ::bevy_ui_html::HtmlComponent>::build(
                         MyComponent,
                         ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node::default(),
+                            node: bevy::ui::Node,
                             background_color: ::bevy::ui::BackgroundColor::default(),
                             border_color: ::bevy::ui::BorderColor::default(),
                             text_font: ::bevy::text::TextFont::default(),
@@ -3517,23 +3363,40 @@ mod tests {
                         },
                         &[]
                     )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+                }
+            };
+            assert_html(input, bundle, bsn);
+        }
 
-            #[test]
-            fn extra_string_attrs_forwarded_to_additional_attributes() {
-                let input = quote! {
-                    <MyComponent padding="4px" variant="primary" />
-                };
-                let expected = quote! {
+        #[test]
+        fn extra_string_attrs_forwarded_to_additional_attributes() {
+            let input = quote! {
+                <MyComponent padding="4px" variant="primary" />
+            };
+            let bundle = quote! {
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
+                    ::bevy_ui_html::HtmlBundle {
+                        node: ::bevy::ui::Node {
+                            padding: ::bevy::ui::px(4.0).all(),
+                            ..Default::default()
+                        },
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[("variant", "primary")]
+                )
+            };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
                     <_ as ::bevy_ui_html::HtmlComponent>::build(
                         MyComponent,
                         ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
-                                ..Default::default()
+                            node: bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all()
                             },
                             background_color: ::bevy::ui::BackgroundColor::default(),
                             border_color: ::bevy::ui::BorderColor::default(),
@@ -3543,21 +3406,36 @@ mod tests {
                         },
                         &[("variant", "primary")]
                     )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+                }
+            };
+            assert_html(input, bundle, bsn);
+        }
 
-            #[test]
-            fn multiple_extra_attrs_all_forwarded() {
-                let input = quote! {
-                    <MyComponent variant="primary" size="large" disabled="true" />
-                };
-                let expected = quote! {
+        #[test]
+        fn multiple_extra_attrs_all_forwarded() {
+            let input = quote! {
+                <MyComponent variant="primary" size="large" disabled="true" />
+            };
+            let bundle = quote! {
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
+                    ::bevy_ui_html::HtmlBundle {
+                        node: ::bevy::ui::Node::default(),
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
+                )
+            };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
                     <_ as ::bevy_ui_html::HtmlComponent>::build(
                         MyComponent,
                         ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node::default(),
+                            node: bevy::ui::Node,
                             background_color: ::bevy::ui::BackgroundColor::default(),
                             border_color: ::bevy::ui::BorderColor::default(),
                             text_font: ::bevy::text::TextFont::default(),
@@ -3566,56 +3444,91 @@ mod tests {
                         },
                         &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
                     )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+                }
+            };
+            assert_html(input, bundle, bsn);
+        }
 
-            #[test]
-            fn standard_component_attrs_passed_inside_html_bundle() {
-                let input = quote! {
-                    <MyButton padding="4px" background-color="black" variant="primary">
-                        "text"
-                    </MyButton>
-                };
-                let expected = quote! {
-                    (
-                        <_ as ::bevy_ui_html::HtmlComponent>::build(
-                            MyButton,
-                            ::bevy_ui_html::HtmlBundle {
-                                node: ::bevy::ui::Node {
-                                    padding: ::bevy::ui::px(4.0).all(),
-                                    ..Default::default()
-                                },
-                                background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
-                                border_color: ::bevy::ui::BorderColor::default(),
-                                text_font: ::bevy::text::TextFont::default(),
-                                text_color: ::bevy::text::TextColor::default(),
-                                text_layout: ::bevy::text::TextLayout::default(),
+        #[test]
+        fn standard_component_attrs_passed_inside_html_bundle() {
+            let input = quote! {
+                <MyButton padding="4px" background-color="black" variant="primary">
+                    "text"
+                </MyButton>
+            };
+            let bundle = quote! {
+                (
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyButton,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all(),
+                                ..Default::default()
                             },
-                            &[("variant", "primary")]
-                        ),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
-                        ))
+                            background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[("variant", "primary")]
+                    ),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
+                    ))
+                )
+            };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MyButton,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: bevy::ui::Node {
+                                padding: ::bevy::ui::px(4.0).all()
+                            },
+                            background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[("variant", "primary")]
                     )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+                    Children[(
+                        bevy::ui::widget::Text("text")
+                    )]
+                }
+            };
+            assert_html(input, bundle, bsn);
+        }
 
-            #[test]
-            fn rust_expression_extra_attrs_not_in_additional_attributes() {
-                // Rust-expression values on unknown attrs are silently dropped from additional_attributes
-                // since they can't be represented as &'static str
-                let input = quote! {
-                    <MyComponent variant={some_var} />
-                };
-                let expected = quote! {
+        #[test]
+        fn rust_expression_extra_attrs_not_in_additional_attributes() {
+            // Rust-expression values on unknown attrs are silently dropped from additional_attributes
+            // since they can't be represented as &'static str
+            let input = quote! {
+                <MyComponent variant={some_var} />
+            };
+            let bundle = quote! {
+                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    MyComponent,
+                    ::bevy_ui_html::HtmlBundle {
+                        node: ::bevy::ui::Node::default(),
+                        background_color: ::bevy::ui::BackgroundColor::default(),
+                        border_color: ::bevy::ui::BorderColor::default(),
+                        text_font: ::bevy::text::TextFont::default(),
+                        text_color: ::bevy::text::TextColor::default(),
+                        text_layout: ::bevy::text::TextLayout::default(),
+                    },
+                    &[]
+                )
+            };
+            let bsn = quote! {
+                ::bevy::scene::bsn!{
                     <_ as ::bevy_ui_html::HtmlComponent>::build(
                         MyComponent,
                         ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node::default(),
+                            node: bevy::ui::Node,
                             background_color: ::bevy::ui::BackgroundColor::default(),
                             border_color: ::bevy::ui::BorderColor::default(),
                             text_font: ::bevy::text::TextFont::default(),
@@ -3624,155 +3537,9 @@ mod tests {
                         },
                         &[]
                     )
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-        }
-    }
-
-    #[cfg(feature = "bsn")]
-    mod bsn {
-        use super::*;
-
-        mod html_component {
-            use super::*;
-
-            #[test]
-            fn self_closing_custom_tag_no_tuple() {
-                let input = quote! {
-                    <MyComponent />
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        <_ as ::bevy_ui_html::HtmlComponent>::build(
-                            MyComponent,
-                            ::bevy_ui_html::HtmlBundle {
-                                node: bevy::ui::Node,
-                                background_color: ::bevy::ui::BackgroundColor::default(),
-                                border_color: ::bevy::ui::BorderColor::default(),
-                                text_font: ::bevy::text::TextFont::default(),
-                                text_color: ::bevy::text::TextColor::default(),
-                                text_layout: ::bevy::text::TextLayout::default(),
-                            },
-                            &[]
-                        )
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn extra_string_attrs_forwarded_to_additional_attributes() {
-                let input = quote! {
-                    <MyComponent padding="4px" variant="primary" />
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        <_ as ::bevy_ui_html::HtmlComponent>::build(
-                            MyComponent,
-                            ::bevy_ui_html::HtmlBundle {
-                                node: bevy::ui::Node {
-                                    padding: ::bevy::ui::px(4.0).all()
-                                },
-                                background_color: ::bevy::ui::BackgroundColor::default(),
-                                border_color: ::bevy::ui::BorderColor::default(),
-                                text_font: ::bevy::text::TextFont::default(),
-                                text_color: ::bevy::text::TextColor::default(),
-                                text_layout: ::bevy::text::TextLayout::default(),
-                            },
-                            &[("variant", "primary")]
-                        )
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn multiple_extra_attrs_all_forwarded() {
-                let input = quote! {
-                    <MyComponent variant="primary" size="large" disabled="true" />
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        <_ as ::bevy_ui_html::HtmlComponent>::build(
-                            MyComponent,
-                            ::bevy_ui_html::HtmlBundle {
-                                node: bevy::ui::Node,
-                                background_color: ::bevy::ui::BackgroundColor::default(),
-                                border_color: ::bevy::ui::BorderColor::default(),
-                                text_font: ::bevy::text::TextFont::default(),
-                                text_color: ::bevy::text::TextColor::default(),
-                                text_layout: ::bevy::text::TextLayout::default(),
-                            },
-                            &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
-                        )
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn standard_component_attrs_passed_inside_html_bundle() {
-                let input = quote! {
-                    <MyButton padding="4px" background-color="black" variant="primary">
-                        "text"
-                    </MyButton>
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        <_ as ::bevy_ui_html::HtmlComponent>::build(
-                            MyButton,
-                            ::bevy_ui_html::HtmlBundle {
-                                node: bevy::ui::Node {
-                                    padding: ::bevy::ui::px(4.0).all()
-                                },
-                                background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
-                                border_color: ::bevy::ui::BorderColor::default(),
-                                text_font: ::bevy::text::TextFont::default(),
-                                text_color: ::bevy::text::TextColor::default(),
-                                text_layout: ::bevy::text::TextLayout::default(),
-                            },
-                            &[("variant", "primary")]
-                        )
-                        Children[(
-                            bevy::ui::widget::Text("text")
-                        )]
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
-
-            #[test]
-            fn rust_expression_extra_attrs_not_in_additional_attributes() {
-                // Rust-expression values on unknown attrs are silently dropped from additional_attributes
-                // since they can't be represented as &'static str
-                let input = quote! {
-                    <MyComponent variant={some_var} />
-                };
-                let expected = quote! {
-                    ::bevy::scene::bsn!{
-                        <_ as ::bevy_ui_html::HtmlComponent>::build(
-                            MyComponent,
-                            ::bevy_ui_html::HtmlBundle {
-                                node: bevy::ui::Node,
-                                background_color: ::bevy::ui::BackgroundColor::default(),
-                                border_color: ::bevy::ui::BorderColor::default(),
-                                text_font: ::bevy::text::TextFont::default(),
-                                text_color: ::bevy::text::TextColor::default(),
-                                text_layout: ::bevy::text::TextLayout::default(),
-                            },
-                            &[]
-                        )
-                    }
-                };
-                let result = html_inner(input);
-                assert_eq!(result.to_string(), expected.to_string());
-            }
+                }
+            };
+            assert_html(input, bundle, bsn);
         }
     }
 }

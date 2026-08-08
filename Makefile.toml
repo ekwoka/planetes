@@ -63,14 +63,14 @@ args = ["fmt", "--all"]
 [tasks.test-build]
 run_task = { name = ["test-all", "build"], parallel = false }
 
-[tasks.do-docs]
+[tasks.docs]
 run_task = { name = ["docs-deps", "docs-own"], parallel = false }
 
 [tasks.lint]
 run_task = { name = ["check", "clippy", "fmt"], parallel = false }
 
 [tasks.build-all]
-run_task = { name = ["test-build", "do-docs"], parallel = false }
+run_task = { name = ["test-build"], parallel = false }
 
 [tasks.precommit]
 run_task = { name = ["lint", "build-all"], parallel = false }

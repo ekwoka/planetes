@@ -5,6 +5,7 @@ use crate::{Attribute, BorderRadius, Value};
 #[derive(Clone, Debug)]
 pub struct NodeComponent {
     attributes: Vec<Attribute>,
+    bsn: bool,
 }
 
 impl NodeComponent {
@@ -57,6 +58,17 @@ impl NodeComponent {
         "overflow-clip-margin",
         "border-radius",
     ];
+
+    pub fn new(attributes: &[Attribute], bsn: bool) -> Self {
+        Self {
+            attributes: attributes
+                .iter()
+                .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
+                .cloned()
+                .collect(),
+            bsn,
+        }
+    }
 
     pub fn ok(self) -> Option<Self> {
         Some(self)
@@ -221,25 +233,14 @@ impl NodeComponent {
     }
 }
 
-impl From<&Vec<Attribute>> for NodeComponent {
-    fn from(attributes: &Vec<Attribute>) -> Self {
-        Self {
-            attributes: attributes
-                .iter()
-                .filter(|attr| Self::KEYS.contains(&attr.key.as_str()))
-                .cloned()
-                .collect(),
-        }
-    }
-}
-
 impl ToTokens for NodeComponent {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.attributes.is_empty() {
-            #[cfg(feature = "bsn")]
-            tokens.extend(quote! { bevy::ui::Node });
-            #[cfg(not(feature = "bsn"))]
-            tokens.extend(quote! { ::bevy::ui::Node::default() });
+            if self.bsn {
+                tokens.extend(quote! { bevy::ui::Node });
+            } else {
+                tokens.extend(quote! { ::bevy::ui::Node::default() });
+            }
         } else {
             let mut fields = Vec::new();
 
@@ -423,19 +424,20 @@ impl ToTokens for NodeComponent {
                     overflow_clip_margin: #value
                 });
             }
-            #[cfg(feature = "bsn")]
-            tokens.extend(quote! {
-                bevy::ui::Node {
-                    #(#fields),*
-                }
-            });
-            #[cfg(not(feature = "bsn"))]
-            tokens.extend(quote! {
-                ::bevy::ui::Node {
-                    #(#fields,)*
-                    ..Default::default()
-                }
-            });
+            if self.bsn {
+                tokens.extend(quote! {
+                    bevy::ui::Node {
+                        #(#fields),*
+                    }
+                });
+            } else {
+                tokens.extend(quote! {
+                    ::bevy::ui::Node {
+                        #(#fields,)*
+                        ..Default::default()
+                    }
+                });
+            }
         }
     }
 }
