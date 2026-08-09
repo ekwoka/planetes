@@ -598,7 +598,7 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 /// use bevy_ui_html::html;
 ///
 /// fn setup(mut commands: Commands) {
-///     commands.spawn(html! {
+///     commands.spawn(html_bundle! {
 ///         <div padding="10px" background-color="black">
 ///             "Hello, World!"
 ///         </div>
@@ -620,7 +620,7 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 /// Attributes accept either CSS-like string values or Rust expressions in braces:
 ///
 /// ```ignore
-/// html! {
+/// html_bundle! {
 ///     <div
 ///         padding="10px"           // CSS-like string
 ///         width={Val::Percent(50.0)} // Rust expression
@@ -652,7 +652,7 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 /// Attributes starting with `on` attach `bevy::ecs::observer::Observer` components:
 ///
 /// ```ignore
-/// html! {
+/// html_bundle! {
 ///     <div onClick={|_: On<Pointer<Click>>| { /* handle click */ }}>
 ///         "Click me"
 ///     </div>
@@ -664,7 +664,7 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 /// The macro generates component tuples compatible with Bevy's spawn system:
 ///
 /// ```ignore
-/// // html! { <div padding="10px">"Hello"</div> }
+/// // html_bundle! { <div padding="10px">"Hello"</div> }
 /// // expands to:
 /// (
 ///     Node { padding: px(10.0).all(), ..Default::default() },
@@ -674,8 +674,17 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 ///
 /// See the [crate-level documentation](crate) for complete attribute reference.
 #[proc_macro]
+pub fn html_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    html_inner(input.into(), false).into()
+}
+
+/// Transforms HTML-like markup into Bevy Scene (with bsn).
+///
+/// This procedural macro parses an HTML/JSX-like syntax and generates component tuples
+/// that can be spawned directly with Bevy's `commands.spawn_scene()`.
+#[proc_macro]
 pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    html_inner(input.into(), cfg!(feature = "bsn")).into()
+    html_inner(input.into(), true).into()
 }
 
 /// Derive macro that implements [`::bevy_ui_html::HtmlComponent`] for a
@@ -688,7 +697,7 @@ pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// #[derive(Component, HtmlComponent)]
 /// struct MenuButton;
 ///
-/// // html! { <MenuButton padding="8px">"Click"</MenuButton> }
+/// // html_bundle! { <MenuButton padding="8px">"Click"</MenuButton> }
 /// // spawns an entity with MenuButton + Node { padding: px(8.0).all() } + Children
 /// ```
 #[proc_macro_derive(HtmlComponent)]
@@ -1214,7 +1223,7 @@ mod tests {
             <iter>
                 {
                         items.map(|item| {
-                            html! {
+                            html_bundle! {
                                 <div>{item.name}</div>
                             }
                         })
@@ -1228,7 +1237,7 @@ mod tests {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::SpawnIter(
                         items.map(|item| {
-                            html! {
+                            html_bundle! {
                                 <div>{item.name}</div>
                             }
                         })
@@ -1242,7 +1251,7 @@ mod tests {
                 Children[
                     ::bevy::ecs::spawn::SpawnIter(
                         items.map(|item| {
-                            html! {
+                            html_bundle! {
                                 <div>{item.name}</div>
                             }
                         })
@@ -1515,9 +1524,9 @@ mod tests {
                 <with>
                     {
                         if true {
-                            parent.spawn(html! { <div>"Hello World"</div>});
+                            parent.spawn(html_bundle! { <div>"Hello World"</div>});
                         } else {
-                            parent.spawn(html! { <div>"Hello Mom"</div>});
+                            parent.spawn(html_bundle! { <div>"Hello Mom"</div>});
                         }
                     }
                 </with>
@@ -1529,9 +1538,9 @@ mod tests {
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
                     ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
                         if true {
-                            parent.spawn(html! { <div>"Hello World"</div>});
+                            parent.spawn(html_bundle! { <div>"Hello World"</div>});
                         } else {
-                            parent.spawn(html! { <div>"Hello Mom"</div>});
+                            parent.spawn(html_bundle! { <div>"Hello Mom"</div>});
                         }
                     })
                 ))
@@ -1543,9 +1552,9 @@ mod tests {
                 Children[
                     ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
                         if true {
-                            parent.spawn(html! { <div>"Hello World"</div>});
+                            parent.spawn(html_bundle! { <div>"Hello World"</div>});
                         } else {
-                            parent.spawn(html! { <div>"Hello Mom"</div>});
+                            parent.spawn(html_bundle! { <div>"Hello Mom"</div>});
                         }
                     })
                 ]

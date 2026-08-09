@@ -102,7 +102,7 @@ pub struct MenuBar;
 
 /// Builds entire Editor UI
 pub fn build_ui(mut commands: Commands) {
-    commands.spawn(html! {
+    commands.spawn(html_bundle! {
     <div
     padding="1px"
     flex-grow="0"
@@ -132,7 +132,7 @@ pub fn build_ui(mut commands: Commands) {
             <iter>
                 {["File", "Edit", "View", "Help"].into_iter().map(|item| {
                     let content = item.to_string();
-                    html! {
+                    html_bundle! {
                         <button
                             variant="normal"
                             corners="rounded"
@@ -230,7 +230,7 @@ impl DefaultTargetTexture for Image {
 
 /// Renders the Application bottom status bar.
 fn bottom_bar() -> impl Bundle {
-    html! {
+    html_bundle! {
         <div
             padding="8px"
             padding-top="2px"

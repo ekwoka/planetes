@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_ui_html::{HtmlAttributes, HtmlBundle, HtmlComponent, html};
+use bevy_ui_html::{HtmlAttributes, HtmlBundle, HtmlComponent, html_bundle};
 
 // ── Marker derive ──────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ fn supports_unit_struct() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <UnitStructComponent padding="8px" /> })
+        .spawn(html_bundle! { <UnitStructComponent padding="8px" /> })
         .id();
     let node = app
         .world_mut()
@@ -39,7 +39,7 @@ fn supports_enum() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <Enum::VariantOne padding="8px" /> })
+        .spawn(html_bundle! { <Enum::VariantOne padding="8px" /> })
         .id();
     let (node, variant) = app
         .world_mut()
@@ -65,7 +65,7 @@ fn support_closure() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! {
+        .spawn(html_bundle! {
             <{|props: HtmlBundle, _attrs: &[_]| (MyMarker, props)} padding="8px" />
         })
         .id();
@@ -96,7 +96,7 @@ fn supports_fn() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <make_marker padding="6px" /> })
+        .spawn(html_bundle! { <make_marker padding="6px" /> })
         .id();
     let node = app
         .world_mut()
@@ -123,7 +123,7 @@ fn supports_struct() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <{StructWithData { no: 1 }} padding="6px" /> })
+        .spawn(html_bundle! { <{StructWithData { no: 1 }} padding="6px" /> })
         .id();
     let (node, data) = app
         .world_mut()
@@ -151,7 +151,10 @@ fn supports_struct_instance() {
     let data = StructWithData { no: 1 };
 
     let mut app = App::new();
-    let root = app.world_mut().spawn(html! { <data padding="6px" /> }).id();
+    let root = app
+        .world_mut()
+        .spawn(html_bundle! { <data padding="6px" /> })
+        .id();
     let (node, data) = app
         .world_mut()
         .query::<(&Node, &StructWithData)>()
@@ -186,7 +189,7 @@ fn custom_impl_spawns_with_correct_node() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <MyMarker padding="8px" /> })
+        .spawn(html_bundle! { <MyMarker padding="8px" /> })
         .id();
     let node = app
         .world_mut()
@@ -224,7 +227,7 @@ fn extra_attrs_accessible_in_build() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <{ThemedButton::default()} variant="primary"/> })
+        .spawn(html_bundle! { <{ThemedButton::default()} variant="primary"/> })
         .id();
     let button = app
         .world_mut()
@@ -256,7 +259,7 @@ fn extra_attrs_absent_key_falls_back() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <{ThemedButton::default()} /> })
+        .spawn(html_bundle! { <{ThemedButton::default()} /> })
         .id();
     let button = app
         .world_mut()
@@ -283,7 +286,7 @@ fn build_can_override_node_values() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <OverrideButton padding="4px" /> })
+        .spawn(html_bundle! { <OverrideButton padding="4px" /> })
         .id();
     let node = app
         .world_mut()
@@ -309,7 +312,7 @@ fn standard_attrs_still_spawn_as_extra_components() {
     let mut app = App::new();
     let root = app
         .world_mut()
-        .spawn(html! { <MyMarker padding="4px" background-color="black" /> })
+        .spawn(html_bundle! { <MyMarker padding="4px" background-color="black" /> })
         .id();
 
     let result = app
@@ -335,7 +338,7 @@ fn children_still_spawn_correctly() {
 
     let root = app
         .world_mut()
-        .spawn(html! {
+        .spawn(html_bundle! {
             <MyMarker padding="4px">
                 "Hello"
             </MyMarker>

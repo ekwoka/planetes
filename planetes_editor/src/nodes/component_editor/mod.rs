@@ -85,7 +85,7 @@ pub struct Path(pub String);
 
 /// Renders a base Component Editor without content
 pub fn base(type_id: TypeId) -> impl Bundle {
-    html! {
+    html_bundle! {
         <div
             padding-left="2px"
             flex-grow="0"
@@ -108,7 +108,7 @@ pub struct RemoveComponentButton(pub TypeId);
 /// Builds out the full Component Editor with content
 pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let cloned_type_info = type_info.clone();
-    html! {
+    html_bundle! {
         <div display="flex" flex-direction="column" row-gap="2px" width="100%" onenter={handle_commit}>
             <with>
             {
@@ -221,14 +221,14 @@ fn handle_commit(
 
 /// Renders the editor for a Unit Component
 fn unit_component() -> impl Bundle {
-    html! {
+    html_bundle! {
         <span linebreak={LineBreak::WordBoundary}>"Unit Struct"</span>
     }
 }
 
 /// Renders the editor for an Unknown Component
 fn unknown_component() -> impl Bundle {
-    html! {
+    html_bundle! {
         <span linebreak={LineBreak::WordBoundary}>"Unknown Struct"</span>
     }
 }
@@ -237,7 +237,7 @@ fn unknown_component() -> impl Bundle {
 fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let struct_data = reflect.reflect_owned().into_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
-    html! {
+    html_bundle! {
         <div
             width="100%"
             display="flex"
@@ -250,7 +250,7 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
                    let value = struct_data
                        .field(field.name())
                        .map(|partial| partial.to_dynamic());
-                   html! {
+                   html_bundle! {
                        <div
                           display="flex"
                           flex-direction="row"
@@ -302,7 +302,7 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
 fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let struct_data = reflect.reflect_owned().into_tuple_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
-    html! {
+    html_bundle! {
         <div
             width="100%"
             display="flex"
@@ -315,7 +315,7 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
                    let value = struct_data
                        .field(field.index())
                        .map(|partial| partial.to_dynamic());
-                   html! {
+                   html_bundle! {
                        <div
                           display="flex"
                           flex-direction="row"
@@ -366,7 +366,7 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
 fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let enum_data = reflect.reflect_owned().into_enum().unwrap();
     let variants = info.iter().cloned().collect::<Vec<_>>();
-    html! {
+    html_bundle! {
         <div
             width="100%"
             display="flex"
@@ -392,7 +392,7 @@ fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bund
                     let is_this = enum_data
                         .variant_name() == variant.name();
                     if is_this {
-                        parent.spawn(html! {
+                        parent.spawn(html_bundle! {
                             <div
                             display="flex"
                             flex-direction="row"
@@ -404,7 +404,7 @@ fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bund
                             </div>
                         });
                     } else {
-                        parent.spawn(html! {
+                        parent.spawn(html_bundle! {
                             <div
                             display="flex"
                             flex-direction="row"
@@ -432,7 +432,7 @@ fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflec
         .iter_fields()
         .map(|field| format!("{field:?}"))
         .collect::<Vec<String>>();
-    html! {
+    html_bundle! {
         <div
            display="flex"
            flex-direction="row"
@@ -467,7 +467,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                 TypeInfo::Opaque(info) => Some(info),
                 _ => None,
             });
-            html! {
+            html_bundle! {
                 <div
                    display="flex"
                    flex-direction="row"
@@ -488,7 +488,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
             }
         })
         .collect::<Vec<_>>();
-    html! {
+    html_bundle! {
         <div
            display="flex"
            flex-direction="row"
@@ -512,7 +512,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
 fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
     let input_type = input_type.clone();
     let reflect = reflect.to_dynamic();
-    html! {
+    html_bundle! {
         <div>
            <with>
                {

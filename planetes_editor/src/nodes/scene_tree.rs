@@ -23,7 +23,7 @@ pub struct SceneTreeView;
 pub struct SceneTreeBranch;
 
 pub fn view() -> impl Bundle {
-    html! {
+    html_bundle! {
         <SceneTreeView
             padding="8px"
             flex-grow="1"
@@ -140,7 +140,7 @@ pub fn branch(
         );
         let children = children.clone();
         let text = format!("{name}:");
-        Some(html! {
+        Some(html_bundle! {
             <SceneTreeBranch
                 padding-left="2px"
                     flex-grow="0"
@@ -163,7 +163,7 @@ pub fn branch(
                             asset_server.clone(),
                         ));
                     } else {
-                        parent.spawn(html! {
+                        parent.spawn(html_bundle! {
                             <div
                                 name={name}
                                 padding="2px"

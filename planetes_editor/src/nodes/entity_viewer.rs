@@ -37,7 +37,7 @@ pub fn plugin(app: &mut App) {
 }
 
 pub fn view() -> impl Bundle {
-    html! {
+    html_bundle! {
         <EntityViewer
             padding="8px"
             flex-grow="1"
@@ -106,7 +106,7 @@ pub fn update_entity_viewer(
         .entity(editor)
         .despawn_children()
         .with_children(move |parent| {
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div
                   display="flex"
                   flex-direction="row"
@@ -125,7 +125,7 @@ pub fn update_entity_viewer(
             });
 
 
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div
                    display="flex"
                    flex-direction="col"
@@ -135,14 +135,14 @@ pub fn update_entity_viewer(
                    </iter>
                 </div>
             });
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div>
                     {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
                         commands.trigger(OpenAddComponent { entity: target.0 });
                     })}
                 </div>
             });
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(180 180 180)">
                    <span>"Required Components:"</span>
                    <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
@@ -208,7 +208,7 @@ pub fn update_required_components(
     }
     commands.entity(event.entity).with_children(|parent| {
         for (name, id) in required_components.into_iter() {
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div
                     display="flex"
                     flex-direction="row"
@@ -288,7 +288,7 @@ pub fn handle_components_changed(
         .entity(editor)
         .despawn_children()
         .with_children(move |parent| {
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div
                   display="flex"
                   flex-direction="row"
@@ -307,7 +307,7 @@ pub fn handle_components_changed(
             });
 
 
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div
                     display="flex"
                     flex-direction="col"
@@ -317,7 +317,7 @@ pub fn handle_components_changed(
                     </iter>
                 </div>
             });
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div
                     display="block"
                 >
@@ -331,7 +331,7 @@ pub fn handle_components_changed(
                     </button>
                 </div>
             });
-            parent.spawn(html! {
+            parent.spawn(html_bundle! {
                 <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(120 120 120)">
                     <span>"Required Components:"</span>
                     <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>

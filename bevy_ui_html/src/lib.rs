@@ -2,7 +2,7 @@
 //!
 //! A procedural macro crate for writing Bevy UI using an HTML-like syntax.
 //!
-//! This crate provides the [`html!`] macro which transforms familiar HTML/JSX-like markup
+//! This crate provides the [`html_bundle!`] macro which transforms familiar HTML/JSX-like markup
 //! into Bevy UI Bundles, making UI development more ergonomic for developers
 //! coming from web backgrounds.
 //!
@@ -13,7 +13,7 @@
 //! use bevy_ui_html::html;
 //!
 //! fn my_ui() -> impl Bundle {
-//!     html! {
+//!     html_bundle! {
 //!         <div padding="10px">
 //!             "Hello, Bevy!"
 //!         </div>
@@ -36,7 +36,7 @@
 //! }
 //! ```
 //!
-//! > `html!` expands to fully qualified Bevy paths as in the above (eg. `::bevy::ui::Node`). For simplicity, the rest of the docs will show expansions using already in scope references (eg. `Node`) where relevant.
+//! > `html_bundle!` expands to fully qualified Bevy paths as in the above (eg. `::bevy::ui::Node`). For simplicity, the rest of the docs will show expansions using already in scope references (eg. `Node`) where relevant.
 //!
 //! ## Syntax
 //!
@@ -57,7 +57,7 @@
 //! This essentially is a "nothing" element. Generates a `bevy::ui::Node` as standard, along with any components indicated by the attributes.
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div>
 //!         <div>"Child 1"</div>
 //!         <div>"Child 2"</div>
@@ -74,7 +74,7 @@
 //! The main purpose of this is to allow for using inline Rust code to render the text. The contents of the block below are directly rendered into `Text::new(<HERE>)`
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div>
 //!         <span>{
 //!             format!("Hello, {}!", "World")
@@ -90,7 +90,7 @@
 //! Creates a `bevy::ui::widget::ImageNode` using the `src` attribute fed into `ImageNode::new(<SRC>)`.
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <img src={asset_server.load("icon.png")} width="64px" height="64px" />
 //! }
 //! ```
@@ -103,7 +103,7 @@
 //! #[derive(Component, HtmlComponent)]
 //! struct MenuButton;
 //!
-//! html! {
+//! html_bundle! {
 //!     <MenuButton padding="8px" border-radius="4px">
 //!         "Click Me"
 //!     </MenuButton>
@@ -117,7 +117,7 @@
 //! The simplest way to represent the `Children/ChildOf` relationship, is nesting elements.
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div>
 //!         <MenuButton padding="8px" border-radius="4px">
 //!             <img src={asset_server.load("icon.png")} width="64px" height="64px" />
@@ -141,11 +141,11 @@
 //! Wraps an iterator expression in `bevy::ecs::spawn::SpawnIter` for spawning multiple children.
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div>
 //!         <iter>
 //!             {
-//!                 items.iter().map(|item| html! {
+//!                 items.iter().map(|item| html_bundle! {
 //!                     <div>{item.name.clone()}</div>
 //!                 })
 //!             }
@@ -160,12 +160,12 @@
 //! The block receives a `parent: &mut RelatedSpawner<ChildOf>` parameter.
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div>
 //!         <with>
 //!             {
 //!                 if show_content {
-//!                     parent.spawn(html! { <div>"Visible"</div> });
+//!                     parent.spawn(html_bundle! { <div>"Visible"</div> });
 //!                 }
 //!             }
 //!         </with>
@@ -184,7 +184,7 @@
 //!     Text::new(label.into())
 //! }
 //!
-//! html! {
+//! html_bundle! {
 //!     <div>
 //!         {button("Click me!")}
 //!     </div>
@@ -193,7 +193,7 @@
 //!
 //! ## Attributes
 //!
-//! One of the major benefits of using `html!` over writing out your own UI Bundles, is not needing to worry about which specific UI components to use for different functionality (`TextFont` vs `TextColor` vs `BorderRadius` etc).
+//! One of the major benefits of using `html_bundle!` over writing out your own UI Bundles, is not needing to worry about which specific UI components to use for different functionality (`TextFont` vs `TextColor` vs `BorderRadius` etc).
 //!
 //! This is because you can put all the attributes directly on a single element, and the compiler splits them out into the appropriate components.
 //!
@@ -204,7 +204,7 @@
 //! The value can be any arbitrary Rust block that returns the appropriate type for that property.
 //!
 //! ```ignore
-//! html!{
+//! html_bundle!{
 //!     <div
 //!         display={Display::Flex}
 //!         flex-direction={FlexDirection::Row}>
@@ -215,7 +215,7 @@
 //! Luckily, many attributes also support string representations and other shorthands, allowing a more `HTML`-like experience. The above could also be represented as
 //!
 //! ```ignore
-//! html!{
+//! html_bundle!{
 //!     <div
 //!         display="flex"
 //!         flex-direction="row">
@@ -262,7 +262,7 @@
 //!
 //! The `components` attribute allows injecting arbitrary components:
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div components={(Focusable, TabIndex(0))}>
 //!         "Interactive"
 //!     </div>
@@ -274,7 +274,7 @@
 //! Attributes starting with `on` attach `bevy::ecs::observer::Observer` components.
 //!
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div onClick={|_: On<Pointer<Click>>, mut commands: Commands| {
 //!         // Handle click
 //!     }}>
@@ -302,7 +302,7 @@
 //!
 //! Use braces for Rust expressions:
 //! ```ignore
-//! html! {
+//! html_bundle! {
 //!     <div width={Val::Percent(50.0)} padding={px(10.0)}>
 //!         {format!("Count: {}", count)}
 //!     </div>
@@ -351,7 +351,7 @@
 //!
 //! ```ignore
 //! // This:
-//! html! {
+//! html_bundle! {
 //!     <div padding="10px" background-color="black">
 //!         "Hello"
 //!     </div>
@@ -374,9 +374,9 @@
 //! blocks in `SpawnWith`, leveraging Bevy's spawn-related traits.
 
 use bevy::prelude::*;
-pub use bevy_ui_html_macro::{HtmlComponent, html};
+pub use bevy_ui_html_macro::{HtmlComponent, html, html_bundle};
 
-/// A struct grouping all UI properties parsed from the `html!` macro attributes.
+/// A struct grouping all UI properties parsed from the `html_bundle!` macro attributes.
 ///
 /// `node` carries every layout/styling attribute (padding, margin, width, …).
 /// The remaining fields hold the parsed value when the corresponding CSS-like
@@ -398,7 +398,7 @@ pub struct HtmlBundle {
 /// Type Alias for the unclaimed HtmlAttributes to simplify trait
 pub type HtmlAttributes = &'static [(&'static str, &'static str)];
 
-/// Trait for types that can be used as custom tags in the `html!` macro.
+/// Trait for types that can be used as custom tags in the `html_bundle!` macro.
 ///
 /// The implementor is the tag expression itself — unit structs, enum unit
 /// variants, and tuple-struct instances all work as `self`.
@@ -420,7 +420,7 @@ pub type HtmlAttributes = &'static [(&'static str, &'static str)];
 ///     }
 /// }
 ///
-/// // html! {
+/// // html_bundle! {
 /// //   <{PrimaryButton::default()} variant="danger" padding="8px">"Click"</{PrimaryButton::default()}>
 /// // }
 /// ```
@@ -437,7 +437,7 @@ pub type HtmlAttributes = &'static [(&'static str, &'static str)];
 /// }
 ///
 /// fn render_ui() -> impl Bundle {
-///    html! {
+///    html_bundle! {
 ///       <header content="Heading 1" />
 ///    }
 /// }
@@ -460,7 +460,7 @@ pub type HtmlAttributes = &'static [(&'static str, &'static str)];
 /// }
 ///
 /// fn render_ui() -> impl Bundle {
-///    html! {
+///    html_bundle! {
 ///       <div>
 ///          <Clickable>"Hello"</Clickable>
 ///          <Button::Primary>"Do Something"</Button::Primary>

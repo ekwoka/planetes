@@ -9,11 +9,11 @@ use bevy::{
     picking::pointer::Location,
     prelude::*,
 };
-use bevy_ui_html::{HtmlAttributes, HtmlBundle, HtmlComponent, html};
+use bevy_ui_html::{HtmlAttributes, HtmlBundle, HtmlComponent, html_bundle};
 
 #[test]
 fn test_basic_div() {
-    let input = html! {
+    let input = html_bundle! {
         <div padding="10px">
             "Hello World"
         </div>
@@ -30,7 +30,7 @@ fn test_basic_div() {
 
 #[test]
 fn test_basic_span() {
-    let input = html! {
+    let input = html_bundle! {
         <span>
             "Hello World"
         </span>
@@ -48,7 +48,7 @@ fn test_simple_iter() {
 
     let root = app
         .world_mut()
-        .spawn(html! {
+        .spawn(html_bundle! {
             <div>
                 <iter>
                     {
@@ -86,7 +86,7 @@ fn test_editor_menu_button() {
     let mut text = app.world_mut().query::<&Text>();
     let root = app
         .world_mut()
-        .spawn(html! {
+        .spawn(html_bundle! {
             <MenuButton
                padding="4px"
                border-radius="2px">
@@ -125,15 +125,15 @@ fn test_simple_with() {
 
     let root = app
         .world_mut()
-        .spawn(html! {
+        .spawn(html_bundle! {
             <div>
                 <with>
                     {
                         let thing = true;
                         if thing {
-                            parent.spawn(html! { <span>"Hello World"</span> });
+                            parent.spawn(html_bundle! { <span>"Hello World"</span> });
                         } else {
-                            parent.spawn(html! { <span>"Hello Mom"</span> });
+                            parent.spawn(html_bundle! { <span>"Hello Mom"</span> });
                         }
                     }
                 </with>
@@ -160,7 +160,7 @@ fn allows_listeners() {
 
     let root = app
         .world_mut()
-        .spawn(html! {
+        .spawn(html_bundle! {
             <div onClick={|_event: On<Pointer<Click>>,
                 mut commands: Commands,
                 text: Single<Entity, With<Text>>| {

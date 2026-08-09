@@ -87,7 +87,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     content: SpawnIter<I>,
     asset_server: AssetServer,
 ) -> impl Bundle {
-    html! {
+    html_bundle! {
         <div
             name={Into::<String>::into(label.clone())}
             display="flex"

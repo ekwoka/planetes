@@ -1,9 +1,8 @@
 use std::any::TypeId;
 
 use bevy::{prelude::*, reflect::TypeInfo};
-use bevy_ui_html::{HtmlComponent, html};
 
-use crate::{events::AddComponentToEntity, nodes::entity_viewer::Viewing};
+use crate::{events::AddComponentToEntity, nodes::entity_viewer::Viewing, prelude::*};
 
 pub fn plugin(app: &mut App) {
     app.add_observer(handle_open_add_component)
@@ -31,7 +30,7 @@ pub fn handle_open_add_component(
     let mut all_components = collect_default_components(&registry);
     all_components
         .sort_by_cached_key(|info| info.type_path_table().crate_name().unwrap_or("Unknown"));
-    commands.spawn(html! {
+    commands.spawn(html_bundle! {
         <AddComponentModal
           display="flex"
           flex-direction="column"
@@ -67,7 +66,7 @@ pub fn handle_open_add_component(
                   components={ScrollPosition(Vec2::new(0.0, 10.0))}>
                     <iter>
                         {all_components.into_iter().map(|info| {
-                            html!{
+                            html_bundle!{
                                 <div
                                     display="flex"
                                     justify-content="space-between"
