@@ -247,28 +247,28 @@ impl ToTokens for NodeComponent {
             // Process padding attributes
             if let Some(padding_tokens) = Self::build_spacing_chain(&self.attributes, "padding") {
                 fields.push(quote! {
-                    padding: #padding_tokens
+                    padding: { #padding_tokens }
                 });
             }
 
             // Process margin attributes
             if let Some(margin_tokens) = Self::build_spacing_chain(&self.attributes, "margin") {
                 fields.push(quote! {
-                    margin: #margin_tokens
+                    margin: { #margin_tokens }
                 });
             }
 
             // Process border attributes
             if let Some(border_tokens) = Self::build_spacing_chain(&self.attributes, "border") {
                 fields.push(quote! {
-                    border: #border_tokens
+                    border: { #border_tokens }
                 });
             }
 
             // Process BorderRadius attributes
             if let Some(border_radius) = BorderRadius::from(&self.attributes).ok() {
                 fields.push(quote! {
-                    border_radius: #border_radius
+                    border_radius: { #border_radius }
                 });
             }
 

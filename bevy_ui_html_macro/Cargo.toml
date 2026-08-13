@@ -22,4 +22,3 @@ proc-macro = true
 propagate = []
 # Allows Bevy Feathers usage for additional Elements
 feathers = []
-bsn = []

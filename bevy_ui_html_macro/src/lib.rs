@@ -370,7 +370,7 @@ impl ToTokens for ElementNode {
         let mut components = Vec::<TokenStream>::new();
         components.push_some(Name::new(&self.attributes, self.bsn).ok());
         let is_custom = !tag_names.contains(&self.tag_name.to_string().as_str());
-        if is_custom {
+        if is_custom && !self.bsn {
             let tag_name = &self.tag_name;
             let tag_expr = tag_name_as_expr(tag_name);
             let node = NodeComponent::new(&self.attributes, self.bsn);
@@ -412,6 +412,11 @@ impl ToTokens for ElementNode {
                 )
             });
         }
+        if is_custom && self.bsn {
+            let tag_name = &self.tag_name;
+            let tag_expr = tag_name_as_expr(tag_name);
+            components.push(tag_expr);
+        }
         #[cfg(feature = "feathers")]
         {
             if self.tag_name.to_string() == "button" {
@@ -451,7 +456,7 @@ impl ToTokens for ElementNode {
                 }
             }
         }
-        if !is_custom {
+        if !is_custom || self.bsn {
             components.push_some(NodeComponent::new(&self.attributes, self.bsn).ok());
             components.push_some(Image::from(&self.attributes).ok());
             components.push_some(BorderColor::from(&self.attributes).ok());
@@ -866,8 +871,8 @@ mod tests {
         let bundle = quote! {
             (
                 ::bevy::ui::Node {
-                padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
-                margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)),
+                padding: { ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)) },
+                margin: { ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)) },
                 ..Default::default()
                 },
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -878,8 +883,8 @@ mod tests {
         let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)),
-                    margin: ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0))
+                    padding: { ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)) },
+                    margin: { ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)) }
                 }
                 Children[(
                     bevy::ui::widget::Text("Hello")
@@ -906,8 +911,8 @@ mod tests {
         let bundle = quote! {
             (
                 ::bevy::ui::Node {
-                padding: px(10.0).all().with_bottom(percent(20.0)),
-                margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)),
+                padding: { px(10.0).all().with_bottom(percent(20.0)) },
+                margin: { vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)) },
                 ..Default::default()
                 },
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -918,8 +923,8 @@ mod tests {
         let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: px(10.0).all().with_bottom(percent(20.0)),
-                    margin: vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0))
+                    padding: { px(10.0).all().with_bottom(percent(20.0)) },
+                    margin: { vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)) }
                 }
                 Children[(
                     bevy::ui::widget::Text("Hello")
@@ -1040,7 +1045,7 @@ mod tests {
         let bundle = quote! {
             (
                 ::bevy::ui::Node {
-                border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
+                border: { ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)) },
                 row_gap: ::bevy::ui::px(10.0),
                 column_gap: ::bevy::ui::px(15.0),
                 ..Default::default()
@@ -1053,7 +1058,7 @@ mod tests {
         let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node {
-                    border: ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)),
+                    border: { ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)) },
                     row_gap: ::bevy::ui::px(10.0),
                     column_gap: ::bevy::ui::px(15.0)
                 }
@@ -1274,8 +1279,8 @@ mod tests {
         let bundle = quote! {
             (
                 ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                    padding: { ::bevy::ui::px(4.0).all() },
+                    border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)) },
                     ..Default::default()
                 },
                 <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
@@ -1286,8 +1291,8 @@ mod tests {
         let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
-                    border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))
+                    padding: { ::bevy::ui::px(4.0).all() },
+                    border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)) }
                 }
                 Children[(
                     bevy::ui::widget::Text("Menu")
@@ -1310,7 +1315,7 @@ mod tests {
         let bundle = quote! {
             (
                 ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
+                    padding: { ::bevy::ui::px(4.0).all() },
                     ..Default::default()
                 },
                 ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
@@ -1322,7 +1327,7 @@ mod tests {
         let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all()
+                    padding: { ::bevy::ui::px(4.0).all() }
                 }
                 ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
                 Children[(
@@ -1346,7 +1351,7 @@ mod tests {
         let bundle = quote! {
             (
                 ::bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all(),
+                    padding: { ::bevy::ui::px(4.0).all() },
                     ..Default::default()
                 },
                 ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7)),
@@ -1358,7 +1363,7 @@ mod tests {
         let bsn = quote! {
             ::bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: ::bevy::ui::px(4.0).all()
+                    padding: { ::bevy::ui::px(4.0).all() }
                 }
                 ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7))
                 Children[(
@@ -1385,8 +1390,8 @@ mod tests {
                     MenuButton,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)),
+                            padding: { ::bevy::ui::px(4.0).all() },
+                            border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))},
                             ..Default::default()
 
                         },
@@ -1404,25 +1409,15 @@ mod tests {
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MenuButton,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
-                            border_radius: ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))
-                        },
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[]
-                )
-                Children[(
-                    bevy::ui::widget::Text("Menu")
-                )]
+            ::bevy::scene::bsn! {
+                MenuButton
+                bevy::ui::Node {
+                    padding: { ::bevy::ui::px (4.0) . all () },
+                    border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                }
+                Children [
+                    (bevy::ui::widget::Text ("Menu"))
+                ]
             }
         };
 
@@ -1433,15 +1428,15 @@ mod tests {
     fn only_removes_bracket_on_single_statement_block() {
         let input = quote! {
             <div>
-            <div>
-            {Text::new("Menu")}
-            </div>
-            <div>
-            {
-                let thing = Text::new("Thing");
-                thing
-            }
-            </div>
+                <div>
+                    {Text::new("Menu")}
+                </div>
+                <div>
+                    {
+                        let thing = Text::new("Thing");
+                        thing
+                    }
+                </div>
             </div>
         };
         let bundle = quote! {
@@ -1668,7 +1663,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
@@ -1680,7 +1675,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
                     Children[(
@@ -1707,7 +1702,7 @@ mod tests {
                 quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
@@ -1722,7 +1717,7 @@ mod tests {
                 quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
@@ -1738,7 +1733,7 @@ mod tests {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
                         ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
@@ -1752,7 +1747,7 @@ mod tests {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
                         ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
@@ -1781,7 +1776,7 @@ mod tests {
                 let bundle = quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK),
@@ -1793,7 +1788,7 @@ mod tests {
                 let bsn = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK)
                         Children[(
@@ -1817,7 +1812,7 @@ mod tests {
                 let bundle = quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE),
@@ -1829,7 +1824,7 @@ mod tests {
                 let bsn = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE)
                         Children[(
@@ -1853,7 +1848,7 @@ mod tests {
                 let bundle = quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE),
@@ -1865,7 +1860,7 @@ mod tests {
                 let bsn = quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE)
                         Children[(
@@ -1890,7 +1885,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
@@ -1902,7 +1897,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
                     Children[(
@@ -1926,7 +1921,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
@@ -1938,7 +1933,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5))
                     Children[(
@@ -1962,7 +1957,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7)),
@@ -1974,7 +1969,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7))
                     Children[(
@@ -1998,7 +1993,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
@@ -2010,7 +2005,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
                     Children[(
@@ -2034,7 +2029,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5)),
@@ -2046,7 +2041,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5))
                     Children[(
@@ -2070,7 +2065,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127)),
@@ -2082,7 +2077,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127))
                     Children[(
@@ -2106,7 +2101,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7)),
@@ -2118,7 +2113,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7))
                     Children[(
@@ -2142,7 +2137,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5)),
@@ -2154,7 +2149,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2178,7 +2173,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7)),
@@ -2190,7 +2185,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7))
                     Children[(
@@ -2214,7 +2209,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5)),
@@ -2226,7 +2221,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2250,7 +2245,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7)),
@@ -2262,7 +2257,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7))
                     Children[(
@@ -2286,7 +2281,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5)),
@@ -2298,7 +2293,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2322,7 +2317,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7)),
@@ -2334,7 +2329,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7))
                     Children[(
@@ -2358,7 +2353,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5)),
@@ -2370,7 +2365,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2394,7 +2389,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7)),
@@ -2406,7 +2401,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7))
                     Children[(
@@ -2430,7 +2425,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5)),
@@ -2442,7 +2437,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2466,7 +2461,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7)),
@@ -2478,7 +2473,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7))
                     Children[(
@@ -2502,7 +2497,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5)),
@@ -2514,7 +2509,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2538,7 +2533,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7)),
@@ -2550,7 +2545,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7))
                     Children[(
@@ -2574,7 +2569,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5)),
@@ -2586,7 +2581,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2610,7 +2605,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7)),
@@ -2622,7 +2617,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7))
                     Children[(
@@ -2646,7 +2641,7 @@ mod tests {
             let bundle = quote! {
                 (
                     ::bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all(),
+                        padding: { ::bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5)),
@@ -2658,7 +2653,7 @@ mod tests {
             let bsn = quote! {
                 ::bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: ::bevy::ui::px(4.0).all()
+                        padding: { ::bevy::ui::px(4.0).all() }
                     }
                     ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5))
                     Children[(
@@ -2896,7 +2891,7 @@ mod tests {
                 quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::app::Propagate(::bevy::text::TextFont {
@@ -2912,7 +2907,7 @@ mod tests {
                 quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::text::TextFont {
@@ -2929,7 +2924,7 @@ mod tests {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         bevy::app::Propagate(::bevy::text::TextFont {
                             font_size: ::bevy::text::FontSize::Px(10.0),
@@ -2942,7 +2937,7 @@ mod tests {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         bevy::text::TextFont {
                             font_size: ::bevy::text::FontSize::Px(10.0)
@@ -2968,7 +2963,7 @@ mod tests {
                 quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
@@ -2981,7 +2976,7 @@ mod tests {
                 quote! {
                     (
                         ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         ::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
@@ -2995,7 +2990,7 @@ mod tests {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
                         Children[(bevy::ui::widget::Text("Menu"))]
@@ -3005,7 +3000,7 @@ mod tests {
                 quote! {
                     ::bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all()
+                            padding: { ::bevy::ui::px(4.0).all() }
                         }
                         bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
                         Children[(bevy::ui::widget::Text("Menu"))]
@@ -3359,19 +3354,9 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
-                        MyComponent,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: bevy::ui::Node,
-                            background_color: ::bevy::ui::BackgroundColor::default(),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
-                        },
-                        &[]
-                    )
+                :: bevy :: scene :: bsn ! {
+                    MyComponent
+                    bevy :: ui :: Node
                 }
             };
             assert_html(input, bundle, bsn);
@@ -3387,7 +3372,7 @@ mod tests {
                     MyComponent,
                     ::bevy_ui_html::HtmlBundle {
                         node: ::bevy::ui::Node {
-                            padding: ::bevy::ui::px(4.0).all(),
+                            padding: { ::bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
                         background_color: ::bevy::ui::BackgroundColor::default(),
@@ -3400,21 +3385,11 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
-                        MyComponent,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all()
-                            },
-                            background_color: ::bevy::ui::BackgroundColor::default(),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
-                        },
-                        &[("variant", "primary")]
-                    )
+                ::bevy::scene::bsn! {
+                    MyComponent
+                    bevy::ui::Node {
+                        padding: { ::bevy::ui::px(4.0).all () }
+                    }
                 }
             };
             assert_html(input, bundle, bsn);
@@ -3440,19 +3415,9 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
-                        MyComponent,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: bevy::ui::Node,
-                            background_color: ::bevy::ui::BackgroundColor::default(),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
-                        },
-                        &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
-                    )
+                ::bevy::scene::bsn! {
+                    MyComponent
+                    bevy::ui::Node
                 }
             };
             assert_html(input, bundle, bsn);
@@ -3471,7 +3436,7 @@ mod tests {
                         MyButton,
                         ::bevy_ui_html::HtmlBundle {
                             node: ::bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all(),
+                                padding: { ::bevy::ui::px(4.0).all() },
                                 ..Default::default()
                             },
                             background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
@@ -3488,25 +3453,11 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
-                        MyButton,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: bevy::ui::Node {
-                                padding: ::bevy::ui::px(4.0).all()
-                            },
-                            background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
-                        },
-                        &[("variant", "primary")]
-                    )
-                    Children[(
-                        bevy::ui::widget::Text("text")
-                    )]
-                }
+                ::bevy::scene::bsn! {
+                    MyButton
+                    bevy :: ui :: Node { padding : { :: bevy :: ui :: px (4.0) . all () } }
+                    :: bevy :: ui :: BackgroundColor (:: bevy :: color :: Color :: BLACK)
+                    Children [(bevy :: ui :: widget :: Text ("text"))] }
             };
             assert_html(input, bundle, bsn);
         }
@@ -3533,19 +3484,9 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
-                        MyComponent,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: bevy::ui::Node,
-                            background_color: ::bevy::ui::BackgroundColor::default(),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
-                        },
-                        &[]
-                    )
+                :: bevy :: scene :: bsn ! {
+                    MyComponent
+                    bevy :: ui :: Node
                 }
             };
             assert_html(input, bundle, bsn);

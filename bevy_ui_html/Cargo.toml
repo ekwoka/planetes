@@ -17,4 +17,3 @@ workspace = true
 propagate = ["bevy_ui_html_macro/propagate"]
 # Allows Bevy Feathers usage for additional Elements
 feathers = ["bevy_ui_html_macro/feathers"]
-bsn = ["bevy_ui_html_macro/bsn", "feathers"]
