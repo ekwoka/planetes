@@ -21,6 +21,8 @@ bevy = { version = "0.19", features = [
 ] }
 bevy_enhanced_input = "0.26"
 
+bevy_file_dialog = { git = "https://github.com/superjesse07/bevy_file_dialog" }
+
 # Keep this in sync with Bevy
 rand = "0.10"
 

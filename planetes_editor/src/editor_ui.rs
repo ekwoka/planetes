@@ -6,11 +6,11 @@ use bevy::{
     app::HierarchyPropagatePlugin,
     asset::embedded_asset,
     camera::{ImageRenderTarget, RenderTarget, visibility::RenderLayers},
+    feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme},
     prelude::*,
     render::render_resource::TextureFormat,
     ui_widgets::Activate,
 };
-use bevy_feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme};
 use bevy_ui_html::HtmlComponent;
 
 use crate::{

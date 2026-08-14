@@ -2,20 +2,30 @@
 
 use std::{fs::File, io::Write};
 
-use crate::{EditorMode, ReflectPlanetesComponent};
-use bevy::{app::HierarchyPropagatePlugin, prelude::*, tasks::IoTaskPool};
-// use bevy_file_dialog::prelude::*;
-// use planetes_scene_state::CanonicalScene;
+use crate::{
+    EditorMode, ReflectPlanetesComponent, editor_ui::ActiveScene,
+    nodes::scene_tree::UpdateSceneTree,
+};
+use bevy::{
+    app::{HierarchyPropagatePlugin, Propagate},
+    prelude::*,
+    tasks::IoTaskPool,
+};
+use bevy_file_dialog::prelude::*;
+use planetes_scene_state::CanonicalScene;
 
 pub fn plugin(app: &mut App) {
     info!("Plugin SCENE");
-    app.add_plugins(HierarchyPropagatePlugin::<InScene>::new(Update))
-        .register_type_data::<Name, ReflectPlanetesComponent>()
-        .add_systems(OnEnter(EditorMode::Edit), initialize_editor)
-        .add_systems(OnEnter(EditorMode::Edit), save_scene)
-        .add_systems(Update, add_meshes_to_scene);
-    // app.add_systems(Update, load_scene);
-    // app.add_observer(open_file_dialog);
+    app.add_plugins((
+        HierarchyPropagatePlugin::<InScene>::new(Update),
+        FileDialogPlugin::new().with_pick_file::<ActiveScene>(),
+    ))
+    .register_type_data::<Name, ReflectPlanetesComponent>()
+    .add_systems(OnEnter(EditorMode::Edit), initialize_editor)
+    .add_systems(OnEnter(EditorMode::Edit), save_scene)
+    .add_systems(Update, add_meshes_to_scene);
+    app.add_systems(Update, load_scene);
+    app.add_observer(open_file_dialog);
 }
 
 #[derive(Component)]
@@ -65,29 +75,32 @@ pub fn save_scene(
     }
 }
 
-// pub fn load_scene(
-//     mut events: MessageReader<DialogFilePicked<ActiveScene>>,
-//     mut commands: Commands,
-//     asset_server: Res<AssetServer>,
-//     mut canonical: ResMut<CanonicalScene>,
-// ) {
-//     for event in events.read() {
-//         let path = event.path.clone();
-//         info!("loading scene in {}", path.display());
-//         let scene_handle = asset_server.load_override::<DynamicWorld>(path);
-//         let scene_root = commands
-//             .spawn((
-//                 Name::new("Root"),
-//                 EditorScene,
-//                 Transform::default(),
-//                 Propagate(InScene),
-//                 DynamicWorldRoot(scene_handle.clone()),
-//             ))
-//             .id();
-//         canonical.insert(scene_handle);
-//         commands.write_message(UpdateSceneTree { entity: scene_root });
-//     }
-// }
+pub fn load_scene(
+    mut events: MessageReader<DialogFilePicked<ActiveScene>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut canonical: ResMut<CanonicalScene>,
+) {
+    for event in events.read() {
+        let path = event.path.clone();
+        info!("loading scene in {}", path.display());
+        let scene_handle = asset_server
+            .load_builder()
+            .override_unapproved()
+            .load::<DynamicWorld>(path);
+        let scene_root = commands
+            .spawn((
+                Name::new("Root"),
+                EditorScene,
+                Transform::default(),
+                Propagate(InScene),
+                DynamicWorldRoot(scene_handle.clone()),
+            ))
+            .id();
+        canonical.insert(scene_handle);
+        commands.write_message(UpdateSceneTree { entity: scene_root });
+    }
+}
 
 #[derive(Event)]
 pub struct OpenSceneFileDialog;
@@ -96,13 +109,13 @@ pub fn initialize_editor(mut commands: Commands) {
     commands.trigger(OpenSceneFileDialog);
 }
 
-// pub fn open_file_dialog(_event: On<OpenSceneFileDialog>, mut commands: Commands) {
-//     commands
-//         .dialog()
-//         .set_title("Open Scene")
-//         .add_filter("Bevy Scene", &["ron"])
-//         .pick_file_path::<ActiveScene>();
-// }
+pub fn open_file_dialog(_event: On<OpenSceneFileDialog>, mut commands: Commands) {
+    commands
+        .dialog()
+        .set_title("Open Scene")
+        .add_filter("Bevy Scene", &["ron"])
+        .pick_file_path::<ActiveScene>();
+}
 
 fn add_meshes_to_scene(
     mut commands: Commands,

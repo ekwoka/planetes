@@ -1,8 +1,9 @@
 //! Provides simple rendering of an [InputField] with hover states
 
 use crate::prelude::*;
-use bevy::{input_focus::InputFocus, prelude::*, window::SystemCursorIcon};
-use bevy_feathers::cursor::EntityCursor;
+use bevy::{
+    feathers::cursor::EntityCursor, input_focus::InputFocus, prelude::*, window::SystemCursorIcon,
+};
 use planetes_input::prelude::{EditableText, InputField, Validable};
 
 pub fn input_field<T: Validable>(value: T) -> impl Bundle {
