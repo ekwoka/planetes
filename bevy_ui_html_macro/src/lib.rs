@@ -139,6 +139,7 @@ impl HtmlNode {
                                     value: value_expr.clone(),
                                     span: match attr.key {
                                         NodeName::Path(path) => path.span(),
+                                        NodeName::AtPath(path) => path.span(),
                                         NodeName::Punctuated(path) => path.span(),
                                         NodeName::Block(block) => block.span(),
                                     }
@@ -341,6 +342,47 @@ impl ElementNode {
             })
             .collect()
     }
+    fn extra_attrs_scene_component(attributes: &[Attribute]) -> Vec<TokenStream> {
+        attributes
+            .iter()
+            .filter(|attr| {
+                !Self::KNOWN_KEYS.contains(&attr.key.as_str()) && !attr.key.starts_with("on")
+            })
+            .filter_map(|attr| {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit_str),
+                    ..
+                }) = &attr.value
+                {
+                    attr.key
+                        .strip_prefix('@')
+                        .map(|key| {
+                            let key = syn::Ident::new(&key, attr.span);
+                            let val = syn::LitStr::new(&lit_str.value(), lit_str.span());
+                            quote! { @#key: #val }
+                        })
+                        .or_else(|| {
+                            let key = syn::Ident::new(&attr.key, attr.span);
+                            let val = syn::LitStr::new(&lit_str.value(), lit_str.span());
+                            Some(quote! { #key: #val })
+                        })
+                } else if let syn::Expr::Block(block) = &attr.value {
+                    attr.key
+                        .strip_prefix('@')
+                        .map(|key| {
+                            let key = syn::Ident::new(&key, attr.span);
+                            quote! { @#key: #block }
+                        })
+                        .or_else(|| {
+                            let key = syn::Ident::new(&attr.key, attr.span);
+                            Some(quote! { #key: #block })
+                        })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 /// Emit a `NodeName` as a value expression, stripping the outer braces from a
@@ -415,7 +457,14 @@ impl ToTokens for ElementNode {
         if is_custom && self.bsn {
             let tag_name = &self.tag_name;
             let tag_expr = tag_name_as_expr(tag_name);
-            components.push(tag_expr);
+            let extra = Self::extra_attrs_scene_component(&self.attributes);
+            if extra.len() > 0 {
+                components.push(quote! { @#tag_expr {
+                    #(#extra),*
+                } });
+            } else {
+                components.push(quote! { @#tag_expr });
+            }
         }
         #[cfg(feature = "feathers")]
         {
@@ -1376,55 +1425,6 @@ mod tests {
     }
 
     #[test]
-    fn supports_unit_struct_elements() {
-        let input = quote! {
-            <MenuButton
-            padding="4px"
-            border-radius="2px">
-            "Menu"
-            </MenuButton>
-        };
-        let bundle = quote! {
-            (
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
-                    MenuButton,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
-                            border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))},
-                            ..Default::default()
-
-                        },
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
-                    },
-                    &[]
-                ),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
-                ))
-            )
-        };
-        let bsn = quote! {
-            ::bevy::scene::bsn! {
-                MenuButton
-                bevy::ui::Node {
-                    padding: { ::bevy::ui::px (4.0) . all () },
-                    border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
-                }
-                Children [
-                    (bevy::ui::widget::Text ("Menu"))
-                ]
-            }
-        };
-
-        assert_html(input, bundle, bsn);
-    }
-
-    #[test]
     fn only_removes_bracket_on_single_statement_block() {
         let input = quote! {
             <div>
@@ -1646,6 +1646,93 @@ mod tests {
             }
         };
         assert_html(input, bundle, bsn);
+    }
+
+    mod scene_components {
+        use super::*;
+
+        #[test]
+        fn tagname_as_scene_component() {
+            let input = quote! {
+                <MenuButton
+                padding="4px"
+                border-radius="2px">
+                "Menu"
+                </MenuButton>
+            };
+
+            let expected = quote! {
+                ::bevy::scene::bsn! {
+                    @MenuButton
+                    bevy::ui::Node {
+                        padding: { ::bevy::ui::px (4.0) . all () },
+                        border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                    }
+                    Children [
+                        (bevy::ui::widget::Text ("Menu"))
+                    ]
+                }
+            };
+            assert_eq!(html_inner(input, true).to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn extra_props_passed_to_scene_component() {
+            let input = quote! {
+                <MenuButton
+                    variant="200"
+                    padding="4px"
+                    border-radius="2px">
+                    "Menu"
+                </MenuButton>
+            };
+
+            let expected = quote! {
+                ::bevy::scene::bsn! {
+                    @MenuButton {
+                        variant: "200"
+                    }
+                    bevy::ui::Node {
+                        padding: { ::bevy::ui::px (4.0) . all () },
+                        border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                    }
+                    Children [
+                        (bevy::ui::widget::Text ("Menu"))
+                    ]
+                }
+            };
+            assert_eq!(html_inner(input, true).to_string(), expected.to_string());
+        }
+
+        #[test]
+        fn at_props_passed_to_scene_props() {
+            let input = quote! {
+                <MenuButton
+                    variant="200"
+                    @color="green"
+                    padding="4px"
+                    border-radius="2px">
+                    "Menu"
+                </MenuButton>
+            };
+
+            let expected = quote! {
+                ::bevy::scene::bsn! {
+                    @MenuButton {
+                        variant: "200",
+                        @color: "green"
+                    }
+                    bevy::ui::Node {
+                        padding: { ::bevy::ui::px (4.0) . all () },
+                        border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                    }
+                    Children [
+                        (bevy::ui::widget::Text ("Menu"))
+                    ]
+                }
+            };
+            assert_eq!(html_inner(input, true).to_string(), expected.to_string());
+        }
     }
 
     mod colors {
@@ -3335,6 +3422,43 @@ mod tests {
         use super::*;
 
         #[test]
+        fn supports_unit_struct_elements() {
+            let input = quote! {
+                <MenuButton
+                padding="4px"
+                border-radius="2px">
+                "Menu"
+                </MenuButton>
+            };
+            let bundle = quote! {
+                (
+                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                        MenuButton,
+                        ::bevy_ui_html::HtmlBundle {
+                            node: ::bevy::ui::Node {
+                                padding: { ::bevy::ui::px(4.0).all() },
+                                border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))},
+                                ..Default::default()
+
+                            },
+                            background_color: ::bevy::ui::BackgroundColor::default(),
+                            border_color: ::bevy::ui::BorderColor::default(),
+                            text_font: ::bevy::text::TextFont::default(),
+                            text_color: ::bevy::text::TextColor::default(),
+                            text_layout: ::bevy::text::TextLayout::default(),
+                        },
+                        &[]
+                    ),
+                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    ))
+                )
+            };
+
+            assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
+        }
+
+        #[test]
         fn self_closing_custom_tag_no_tuple() {
             let input = quote! {
                 <MyComponent />
@@ -3353,13 +3477,7 @@ mod tests {
                     &[]
                 )
             };
-            let bsn = quote! {
-                :: bevy :: scene :: bsn ! {
-                    MyComponent
-                    bevy :: ui :: Node
-                }
-            };
-            assert_html(input, bundle, bsn);
+            assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
         }
 
         #[test]
@@ -3384,15 +3502,7 @@ mod tests {
                     &[("variant", "primary")]
                 )
             };
-            let bsn = quote! {
-                ::bevy::scene::bsn! {
-                    MyComponent
-                    bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all () }
-                    }
-                }
-            };
-            assert_html(input, bundle, bsn);
+            assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
         }
 
         #[test]
@@ -3414,13 +3524,7 @@ mod tests {
                     &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
                 )
             };
-            let bsn = quote! {
-                ::bevy::scene::bsn! {
-                    MyComponent
-                    bevy::ui::Node
-                }
-            };
-            assert_html(input, bundle, bsn);
+            assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
         }
 
         #[test]
@@ -3452,14 +3556,7 @@ mod tests {
                     ))
                 )
             };
-            let bsn = quote! {
-                ::bevy::scene::bsn! {
-                    MyButton
-                    bevy :: ui :: Node { padding : { :: bevy :: ui :: px (4.0) . all () } }
-                    :: bevy :: ui :: BackgroundColor (:: bevy :: color :: Color :: BLACK)
-                    Children [(bevy :: ui :: widget :: Text ("text"))] }
-            };
-            assert_html(input, bundle, bsn);
+            assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
         }
 
         #[test]
@@ -3483,13 +3580,7 @@ mod tests {
                     &[]
                 )
             };
-            let bsn = quote! {
-                :: bevy :: scene :: bsn ! {
-                    MyComponent
-                    bevy :: ui :: Node
-                }
-            };
-            assert_html(input, bundle, bsn);
+            assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
         }
     }
 }

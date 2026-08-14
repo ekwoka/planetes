@@ -5529,8 +5529,7 @@ dependencies = [
 [[package]]
 name = "rstml"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c008ffc8b9cd3238289f5d25b3d9b00fc63445c9cdf766995b3c8bbe43612f6"
+source = "git+https://github.com/ekwoka/rstml?branch=allow-attributes-starting-with-at#eb41447b646111c1276c81d4e49dec955754762d"
 dependencies = [
  "derive-where",
  "proc-macro2",
