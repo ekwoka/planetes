@@ -65,11 +65,11 @@ unwrap_used = "warn"
 uninlined_format_args = "warn"
 
 [workspace.metadata.bin]
-cargo-edit = { version = "0.13.11", bins = ["cargo-rm", "cargo-upgrade"], locked = true }
+cargo-edit = { version = "0.13.13", bins = ["cargo-rm", "cargo-upgrade"], locked = true }
 cargo-make = { version = "0.37.24", locked = false }
-cargo-nextest = { version = "0.9.138", locked = true }
+cargo-nextest = { version = "0.9.143", locked = true }
 cargo-watch = { version = "8.5.3", locked = true }
-dioxus-cli = { version = "0.7.9", bins = ["dx"], locked = true }
+dioxus-cli = { version = "0.7.10", bins = ["dx"], locked = true }
 
 [package]
 name = "planetes_sandbox"
