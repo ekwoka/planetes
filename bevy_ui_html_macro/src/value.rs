@@ -28,40 +28,40 @@ impl Value {
                             &format!("{px_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
-                        Some(quote! { ::bevy::ui::px(#num) })
+                        Some(quote! { bevy::ui::px(#num) })
                     } else if let Some(percent_value) = value_string.strip_suffix("%") {
                         let num = syn::LitFloat::new(
                             &format!("{percent_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
-                        Some(quote! { ::bevy::ui::percent(#num) })
+                        Some(quote! { bevy::ui::percent(#num) })
                     } else if let Some(vw_value) = value_string.strip_suffix("vw") {
                         let num = syn::LitFloat::new(
                             &format!("{vw_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
-                        Some(quote! { ::bevy::ui::vw(#num) })
+                        Some(quote! { bevy::ui::vw(#num) })
                     } else if let Some(vh_value) = value_string.strip_suffix("vh") {
                         let num = syn::LitFloat::new(
                             &format!("{vh_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
-                        Some(quote! { ::bevy::ui::vh(#num) })
+                        Some(quote! { bevy::ui::vh(#num) })
                     } else if let Some(vmin_value) = value_string.strip_suffix("vmin") {
                         let num = syn::LitFloat::new(
                             &format!("{vmin_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
-                        Some(quote! { ::bevy::ui::vmin(#num) })
+                        Some(quote! { bevy::ui::vmin(#num) })
                     } else if let Some(vmax_value) = value_string.strip_suffix("vmax") {
                         let num = syn::LitFloat::new(
                             &format!("{vmax_value}.0"),
                             proc_macro2::Span::call_site(),
                         );
-                        Some(quote! { ::bevy::ui::vmax(#num) })
+                        Some(quote! { bevy::ui::vmax(#num) })
                     } else {
                         let tokens = self.0.to_token_stream();
-                        Some(quote! { ::bevy::ui::Val::from(#tokens) })
+                        Some(quote! { bevy::ui::Val::from(#tokens) })
                     }
                 } else {
                     // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))
@@ -118,7 +118,7 @@ impl Value {
                     };
                     let ident = Ident::new(name, self.0.span());
                     let path: Path = parse_quote_spanned! {
-                    self.0.span() => ::bevy::ui::Display::#ident
+                    self.0.span() => bevy::ui::Display::#ident
                     };
                     Some(path.to_token_stream())
                 }
@@ -144,7 +144,7 @@ impl Value {
                     };
                     let ident = Ident::new(name, self.0.span());
                     let path: Path = parse_quote_spanned! {
-                    self.0.span() => ::bevy::ui::FlexDirection::#ident
+                    self.0.span() => bevy::ui::FlexDirection::#ident
                     };
                     Some(path.to_token_stream())
                 }
@@ -176,7 +176,7 @@ impl Value {
                     };
                     let ident = Ident::new(name, self.0.span());
                     let path: Path = parse_quote_spanned! {
-                    self.0.span() => ::bevy::ui::JustifyContent::#ident
+                    self.0.span() => bevy::ui::JustifyContent::#ident
                     };
                     Some(path.to_token_stream())
                 }
@@ -200,7 +200,7 @@ impl Value {
                     };
                     let ident = Ident::new(name, self.0.span());
                     let path: Path = parse_quote_spanned! {
-                    self.0.span() => ::bevy::ui::PositionType::#ident
+                    self.0.span() => bevy::ui::PositionType::#ident
                     };
                     Some(path.to_token_stream())
                 }

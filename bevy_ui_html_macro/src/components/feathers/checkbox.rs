@@ -36,11 +36,11 @@ impl ToTokens for Checkbox {
                 let value = attr.value.clone();
                 if self.bsn {
                     quote! {
-                        ::bevy::ui::widget::Text(#value)
+                        bevy::ui::widget::Text(#value)
                     }
                 } else {
                     quote! {
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new(#value))
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new(#value))
                     }
                 }
             })
@@ -61,7 +61,7 @@ impl ToTokens for Checkbox {
         if self.bsn {
             tokens.extend(quote! {
                 #components
-                @::bevy::feathers::controls::FeathersCheckbox {
+                @bevy::feathers::controls::FeathersCheckbox {
                     @caption: bsn_list![
                         #(#children),*
                     ]
@@ -71,7 +71,7 @@ impl ToTokens for Checkbox {
         } else {
             children.push_some(observer);
             tokens.extend(quote! {
-                ::bevy::feathers::controls::checkbox_bundle(
+                bevy::feathers::controls::checkbox_bundle(
                     #components,
                     (
                         #(#children),*

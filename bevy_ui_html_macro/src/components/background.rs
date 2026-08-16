@@ -37,7 +37,7 @@ impl ToTokens for BackgroundColor {
 
         if let Some(color) = color.parse_as_color() {
             tokens.extend(quote! {
-                ::bevy::ui::BackgroundColor(#color)
+                bevy::ui::BackgroundColor(#color)
             })
         }
     }

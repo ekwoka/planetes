@@ -36,11 +36,11 @@ impl ToTokens for Radio {
                 let value = attr.value.clone();
                 if self.bsn {
                     quote! {
-                        ::bevy::ui::widget::Text(#value)
+                        bevy::ui::widget::Text(#value)
                     }
                 } else {
                     quote! {
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new(#value))
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new(#value))
                     }
                 }
             })
@@ -61,7 +61,7 @@ impl ToTokens for Radio {
         if self.bsn {
             tokens.extend(quote! {
                 #components
-                @::bevy::feathers::controls::FeathersRadio {
+                @bevy::feathers::controls::FeathersRadio {
                     @caption: bsn_list![
                         #(#children),*
                     ]
@@ -71,7 +71,7 @@ impl ToTokens for Radio {
         } else {
             children.push_some(observer);
             tokens.extend(quote! {
-                ::bevy::feathers::controls::radio_bundle(
+                bevy::feathers::controls::radio_bundle(
                     #components,
                     (
                         #(#children),*

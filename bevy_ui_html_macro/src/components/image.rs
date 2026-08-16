@@ -36,7 +36,7 @@ impl ToTokens for Image {
         let name = Value::new(&self.attributes[0].value);
         if let Some(name) = name.clean_block() {
             tokens.extend(quote! {
-                ::bevy::ui::widget::ImageNode::new(#name)
+                bevy::ui::widget::ImageNode::new(#name)
             })
         }
     }

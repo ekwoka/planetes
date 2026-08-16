@@ -30,16 +30,14 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
                             .parse::<f32>()
                             .ok()
                             .map(|a| syn::LitFloat::new(&format!("{a}"), value.span()));
-                        return Some(
-                            quote! { ::bevy::color::Color::linear_rgba(#(#rgb),*, #alpha) },
-                        );
+                        return Some(quote! { bevy::color::Color::linear_rgba(#(#rgb),*, #alpha) });
                     } else {
                         let values = values
                             .split_whitespace()
                             .filter_map(|value| value.parse::<f32>().ok())
                             .map(|value| value / 255.0)
                             .map(|value| syn::LitFloat::new(&format!("{value}"), value.span()));
-                        return Some(quote! { ::bevy::color::Color::linear_rgb(#(#values),*) });
+                        return Some(quote! { bevy::color::Color::linear_rgb(#(#values),*) });
                     }
                 }
                 "srgb" => {
@@ -57,7 +55,7 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
                                 .map(|value| syn::LitFloat::new(&format!("{value}"), value.span()));
                             let alpha = alpha
                                 .map(|value| syn::LitFloat::new(&format!("{value}"), value.span()));
-                            return Some(quote! { ::bevy::color::Color::srgba(#(#rgb),*, #alpha) });
+                            return Some(quote! { bevy::color::Color::srgba(#(#rgb),*, #alpha) });
                         } else {
                             let rgb = rgb
                                 .map(|value| syn::LitInt::new(&format!("{value}"), value.span()));
@@ -65,7 +63,7 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
                                 .map(|a| (a * 255.0).trunc())
                                 .map(|value| syn::LitInt::new(&format!("{value}"), value.span()));
                             return Some(
-                                quote! { ::bevy::color::Color::srgba_u8(#(#rgb),*, #alpha) },
+                                quote! { bevy::color::Color::srgba_u8(#(#rgb),*, #alpha) },
                             );
                         }
                     } else {
@@ -82,11 +80,11 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
                             let values = values
                                 .map(|value| value / 255.0)
                                 .map(|value| syn::LitFloat::new(&format!("{value}"), value.span()));
-                            return Some(quote! { ::bevy::color::Color::srgb(#(#values),*) });
+                            return Some(quote! { bevy::color::Color::srgb(#(#values),*) });
                         } else {
                             let values = values
                                 .map(|value| syn::LitInt::new(&format!("{value}"), value.span()));
-                            return Some(quote! { ::bevy::color::Color::srgb_u8(#(#values),*) });
+                            return Some(quote! { bevy::color::Color::srgb_u8(#(#values),*) });
                         }
                     }
                 }
@@ -109,9 +107,7 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
                             .ok()
                             .map(|a| syn::LitFloat::new(&format!("{a}"), value.span()));
                         let colorspace = syn::Ident::new(&format!("{colorspace}a"), value.span());
-                        return Some(
-                            quote! { ::bevy::color::Color::#colorspace(#(#rgb),*, #alpha) },
-                        );
+                        return Some(quote! { bevy::color::Color::#colorspace(#(#rgb),*, #alpha) });
                     } else {
                         let values = values
                             .split_whitespace()
@@ -126,7 +122,7 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
                                 }
                             });
                         let colorspace = syn::Ident::new(colorspace, value.span());
-                        return Some(quote! { ::bevy::color::Color::#colorspace(#(#values),*) });
+                        return Some(quote! { bevy::color::Color::#colorspace(#(#values),*) });
                     }
                 }
                 _ => {
@@ -135,9 +131,9 @@ pub fn to_color(value: &Expr) -> Option<TokenStream> {
             };
         } else {
             return match value_str {
-                "black" | "BLACK" => Some(quote! { ::bevy::color::Color::BLACK }),
-                "white" | "WHITE" => Some(quote! { ::bevy::color::Color::WHITE }),
-                "none" | "NONE" => Some(quote! { ::bevy::color::Color::NONE }),
+                "black" | "BLACK" => Some(quote! { bevy::color::Color::BLACK }),
+                "white" | "WHITE" => Some(quote! { bevy::color::Color::WHITE }),
+                "none" | "NONE" => Some(quote! { bevy::color::Color::NONE }),
                 _ => None,
             };
         }

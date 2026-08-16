@@ -47,7 +47,7 @@ impl ToTokens for Name {
             }
         } else if let Some(name) = name.clean_block() {
             tokens.extend(quote! {
-                ::bevy::ecs::name::Name::new(#name)
+                bevy::ecs::name::Name::new(#name)
             })
         }
     }

@@ -61,7 +61,7 @@ impl ToTokens for Button {
         if self.bsn {
             tokens.extend(quote! {
                 #components
-                @::bevy::feathers::controls::FeathersButton {
+                @bevy::feathers::controls::FeathersButton {
                     #props,
                     @caption: bsn_list![
                         #(#children),*
@@ -72,7 +72,7 @@ impl ToTokens for Button {
         } else {
             children.push_some(observer);
             tokens.extend(quote! {
-                ::bevy::feathers::controls::button_bundle(
+                bevy::feathers::controls::button_bundle(
                     #props,
                     #components,
                     (
@@ -108,7 +108,7 @@ impl ButtonProps {
 impl ToTokens for ButtonProps {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.attributes.is_empty() {
-            tokens.extend(quote! { ::bevy::feathers::controls::ButtonBundleProps::default() })
+            tokens.extend(quote! { bevy::feathers::controls::ButtonBundleProps::default() })
         } else {
             let fields = self
                 .attributes
@@ -137,7 +137,7 @@ impl ToTokens for ButtonProps {
                                 &_ => unreachable!(),
                             };
                             quote! {
-                                ::bevy::feathers::controls::ButtonVariant::#value
+                                bevy::feathers::controls::ButtonVariant::#value
                             }
                         }
                         "corners" => {
@@ -175,7 +175,7 @@ impl ToTokens for ButtonProps {
                                 &_ => unreachable!(),
                             };
                             quote! {
-                                ::bevy::feathers::rounded_corners::RoundedCorners::#value
+                                bevy::feathers::rounded_corners::RoundedCorners::#value
                             }
                         }
                         &_ => unreachable!(),
@@ -193,7 +193,7 @@ impl ToTokens for ButtonProps {
                 });
             } else {
                 tokens.extend(quote! {
-                    ::bevy::feathers::controls::ButtonBundleProps {
+                    bevy::feathers::controls::ButtonBundleProps {
                         #(#fields,)*
                         ..Default::default()
                     }

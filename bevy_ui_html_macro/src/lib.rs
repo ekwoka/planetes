@@ -179,11 +179,11 @@ impl ToTokens for ChildNode {
         match node {
             HtmlNode::Iter(node) => {
                 tokens.extend(quote! {
-                    ::bevy::ecs::spawn::SpawnIter(#node)
+                    bevy::ecs::spawn::SpawnIter(#node)
                 });
             }
             HtmlNode::With(node) => tokens.extend(quote! {
-                ::bevy::ecs::spawn::SpawnWith(#node)
+                bevy::ecs::spawn::SpawnWith(#node)
             }),
             _ => {
                 if self.bsn {
@@ -192,7 +192,7 @@ impl ToTokens for ChildNode {
                     });
                 } else {
                     tokens.extend(quote! {
-                        ::bevy::ecs::spawn::Spawn(#node)
+                        bevy::ecs::spawn::Spawn(#node)
                     });
                 }
             }
@@ -209,7 +209,7 @@ impl ToTokens for TextNode {
             });
         } else {
             tokens.extend(quote! {
-                ::bevy::ui::widget::Text::new(#value)
+                bevy::ui::widget::Text::new(#value)
             });
         }
     }
@@ -242,7 +242,7 @@ impl ToTokens for WithNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let block = &self.block;
         tokens.extend(quote! {
-            move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+            move |parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                 #block
             }
         });
@@ -420,29 +420,29 @@ impl ToTokens for ElementNode {
 
             let background_color = match BackgroundColor::from(&self.attributes).ok() {
                 Some(bc) => quote! { #bc },
-                None => quote! { ::bevy::ui::BackgroundColor::default() },
+                None => quote! { bevy::ui::BackgroundColor::default() },
             };
             let border_color = match BorderColor::from(&self.attributes).ok() {
                 Some(bc) => quote! { #bc },
-                None => quote! { ::bevy::ui::BorderColor::default() },
+                None => quote! { bevy::ui::BorderColor::default() },
             };
             let text_font = match TextFont::new(&self.attributes, self.bsn).ok() {
                 Some(tf) => tf.plain_tokens(),
-                None => quote! { ::bevy::text::TextFont::default() },
+                None => quote! { bevy::text::TextFont::default() },
             };
             let text_color = match TextColor::new(&self.attributes, self.bsn).ok() {
                 Some(tc) => tc.plain_tokens(),
-                None => quote! { ::bevy::text::TextColor::default() },
+                None => quote! { bevy::text::TextColor::default() },
             };
             let text_layout = match TextLayout::new(&self.attributes, self.bsn).ok() {
                 Some(tl) => quote! { #tl },
-                None => quote! { ::bevy::text::TextLayout::default() },
+                None => quote! { bevy::text::TextLayout::default() },
             };
 
             components.push(quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as bevy_ui_html::HtmlComponent>::build(
                     #tag_expr,
-                    ::bevy_ui_html::HtmlBundle {
+                    bevy_ui_html::HtmlBundle {
                         node: #node,
                         background_color: #background_color,
                         border_color: #border_color,
@@ -539,7 +539,7 @@ impl ToTokens for ElementNode {
                 });
             } else {
                 components.push(quote! {
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
                         #(#children),*
                     ))
                 });
@@ -568,7 +568,7 @@ impl ToTokens for InlineNode {
                 .iter()
                 .map(|child| match child {
                     HtmlNode::Block(block) => quote! {
-                        ::bevy::ui::widget::Text::new(#block)
+                        bevy::ui::widget::Text::new(#block)
                     },
                     _ => quote! {
                         #child
@@ -631,7 +631,7 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 
     if bsn {
         quote! {
-            ::bevy::scene::bsn! {
+            bevy::scene::bsn! {
                 #output
             }
         }
@@ -741,7 +741,7 @@ pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     html_inner(input.into(), true).into()
 }
 
-/// Derive macro that implements [`::bevy_ui_html::HtmlComponent`] for a
+/// Derive macro that implements [`bevy_ui_html::HtmlComponent`] for a
 /// type as a simple marker: the type itself plus the parsed `Node` are
 /// returned as the bundle, and `extra_attrs` are ignored.
 ///
@@ -760,9 +760,9 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     quote! {
-        impl #impl_generics ::bevy_ui_html::HtmlComponent for #name #ty_generics #where_clause {
-            fn build(self, props: ::bevy_ui_html::HtmlBundle, _: &'static [(&'static str, &'static str)]) -> impl ::bevy::ecs::bundle::Bundle {
-                let ::bevy_ui_html::HtmlBundle {
+        impl #impl_generics bevy_ui_html::HtmlComponent for #name #ty_generics #where_clause {
+            fn build(self, props: bevy_ui_html::HtmlBundle, _: &'static [(&'static str, &'static str)]) -> impl bevy::ecs::bundle::Bundle {
+                let bevy_ui_html::HtmlBundle {
                     node, background_color, border_color, text_font, text_color, text_layout
                 } = props;
                 (self, node, background_color, border_color, text_font, text_color, text_layout)
@@ -793,14 +793,14 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (bevy::ui::widget::Text("Hello"))
@@ -816,10 +816,10 @@ mod tests {
             <div/>
         };
         let bundle = quote! {
-            ::bevy::ui::Node::default()
+            bevy::ui::Node::default()
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
             }
         };
@@ -836,21 +836,21 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(
                         (
-                            ::bevy::ui::Node::default(),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                            bevy::ui::Node::default(),
+                            <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                                bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello"))
                             ))
                         )
                     ),
-                    ::bevy::ecs::spawn::Spawn(
+                    bevy::ecs::spawn::Spawn(
                         (
-                            ::bevy::ui::Node::default(),
-                            <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                                ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
+                            bevy::ui::Node::default(),
+                            <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                                bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("World"))
                             ))
                         )
                     )
@@ -858,7 +858,7 @@ mod tests {
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (
@@ -885,15 +885,15 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("World"))
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")),
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("World"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (bevy::ui::widget::Text("Hello")),(bevy::ui::widget::Text("World"))
@@ -919,21 +919,21 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                padding: { ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)) },
-                margin: { ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)) },
+                bevy::ui::Node {
+                padding: { bevy::ui::px(10.0).all().with_bottom(bevy::ui::percent(20.0)) },
+                margin: { bevy::ui::vw(5.0).top().with_right(bevy::ui::vmax(20.0)).with_bottom(bevy::ui::vmin(15.0)).with_left(bevy::ui::vh(10.0)) },
                 ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: { ::bevy::ui::px(10.0).all().with_bottom(::bevy::ui::percent(20.0)) },
-                    margin: { ::bevy::ui::vw(5.0).top().with_right(::bevy::ui::vmax(20.0)).with_bottom(::bevy::ui::vmin(15.0)).with_left(::bevy::ui::vh(10.0)) }
+                    padding: { bevy::ui::px(10.0).all().with_bottom(bevy::ui::percent(20.0)) },
+                    margin: { bevy::ui::vw(5.0).top().with_right(bevy::ui::vmax(20.0)).with_bottom(bevy::ui::vmin(15.0)).with_left(bevy::ui::vh(10.0)) }
                 }
                 Children[(
                     bevy::ui::widget::Text("Hello")
@@ -959,18 +959,18 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
+                bevy::ui::Node {
                 padding: { px(10.0).all().with_bottom(percent(20.0)) },
                 margin: { vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)) },
                 ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
                     padding: { px(10.0).all().with_bottom(percent(20.0)) },
                     margin: { vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)) }
@@ -999,29 +999,29 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                left: ::bevy::ui::px(5.0),
-                top: ::bevy::ui::px(10.0),
-                width: ::bevy::ui::px(100.0),
-                height: ::bevy::ui::px(50.0),
-                min_width: ::bevy::ui::px(10.0),
-                max_width: ::bevy::ui::px(200.0),
+                bevy::ui::Node {
+                left: bevy::ui::px(5.0),
+                top: bevy::ui::px(10.0),
+                width: bevy::ui::px(100.0),
+                height: bevy::ui::px(50.0),
+                min_width: bevy::ui::px(10.0),
+                max_width: bevy::ui::px(200.0),
                 ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Test"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Test"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    left: ::bevy::ui::px(5.0),
-                    top: ::bevy::ui::px(10.0),
-                    width: ::bevy::ui::px(100.0),
-                    height: ::bevy::ui::px(50.0),
-                    min_width: ::bevy::ui::px(10.0),
-                    max_width: ::bevy::ui::px(200.0)
+                    left: bevy::ui::px(5.0),
+                    top: bevy::ui::px(10.0),
+                    width: bevy::ui::px(100.0),
+                    height: bevy::ui::px(50.0),
+                    min_width: bevy::ui::px(10.0),
+                    max_width: bevy::ui::px(200.0)
                 }
                 Children[(
                     bevy::ui::widget::Text("Test")
@@ -1047,7 +1047,7 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
+                bevy::ui::Node {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::SpaceBetween,
@@ -1056,13 +1056,13 @@ mod tests {
                 flex_shrink: 0.5,
                 ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Flex"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Flex"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
                     display: Display::Flex,
                     flex_direction: FlexDirection::Column,
@@ -1093,23 +1093,23 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                border: { ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)) },
-                row_gap: ::bevy::ui::px(10.0),
-                column_gap: ::bevy::ui::px(15.0),
+                bevy::ui::Node {
+                border: { bevy::ui::px(2.0).all().with_top(bevy::ui::px(5.0)) },
+                row_gap: bevy::ui::px(10.0),
+                column_gap: bevy::ui::px(15.0),
                 ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Borders"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Borders"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    border: { ::bevy::ui::px(2.0).all().with_top(::bevy::ui::px(5.0)) },
-                    row_gap: ::bevy::ui::px(10.0),
-                    column_gap: ::bevy::ui::px(15.0)
+                    border: { bevy::ui::px(2.0).all().with_top(bevy::ui::px(5.0)) },
+                    row_gap: bevy::ui::px(10.0),
+                    column_gap: bevy::ui::px(15.0)
                 }
                 Children[(
                     bevy::ui::widget::Text("Borders")
@@ -1132,21 +1132,21 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                width: ::bevy::ui::percent(100.0),
+                bevy::ui::Node {
+                width: bevy::ui::percent(100.0),
                 position_type: PositionType::Absolute,
                 aspect_ratio: Some(1.77),
                 ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Aspect"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Aspect"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    width: ::bevy::ui::percent(100.0),
+                    width: bevy::ui::percent(100.0),
                     position_type: PositionType::Absolute,
                     aspect_ratio: Some(1.77)
                 }
@@ -1165,14 +1165,14 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(Text::new("Hello"))
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(Text::new("Hello"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (Text::new("Hello"))
@@ -1189,14 +1189,14 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(if show { Text::new("Visible") } else { Text::new("Hidden") })
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(if show { Text::new("Visible") } else { Text::new("Hidden") })
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (if show { Text::new("Visible") } else { Text::new("Hidden") })
@@ -1213,17 +1213,17 @@ mod tests {
         let bsn_inner = html_inner(quote! { <span>"Nested"</span> }, true);
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Nested"))
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Nested"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (::bevy::scene::bsn!{ bevy::ui::widget::Text("Nested") })
+                    (bevy::scene::bsn!{ bevy::ui::widget::Text("Nested") })
                 ]
             }
         };
@@ -1249,16 +1249,16 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Static text")),
-                    ::bevy::ecs::spawn::Spawn(dynamic_content),
-                    ::bevy::ecs::spawn::Spawn(MyComponent::new())
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Static text")),
+                    bevy::ecs::spawn::Spawn(dynamic_content),
+                    bevy::ecs::spawn::Spawn(MyComponent::new())
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (bevy::ui::widget::Text("Static text")),
@@ -1287,9 +1287,9 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::SpawnIter(
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::SpawnIter(
                         items.map(|item| {
                             html_bundle! {
                                 <div>{item.name}</div>
@@ -1300,10 +1300,10 @@ mod tests {
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    ::bevy::ecs::spawn::SpawnIter(
+                    bevy::ecs::spawn::SpawnIter(
                         items.map(|item| {
                             html_bundle! {
                                 <div>{item.name}</div>
@@ -1327,21 +1327,21 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                    padding: { ::bevy::ui::px(4.0).all() },
-                    border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)) },
+                bevy::ui::Node {
+                    padding: { bevy::ui::px(4.0).all() },
+                    border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px(2.0)) },
                     ..Default::default()
                 },
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: { ::bevy::ui::px(4.0).all() },
-                    border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0)) }
+                    padding: { bevy::ui::px(4.0).all() },
+                    border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px(2.0)) }
                 }
                 Children[(
                     bevy::ui::widget::Text("Menu")
@@ -1363,22 +1363,22 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                    padding: { ::bevy::ui::px(4.0).all() },
+                bevy::ui::Node {
+                    padding: { bevy::ui::px(4.0).all() },
                     ..Default::default()
                 },
-                ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: { ::bevy::ui::px(4.0).all() }
+                    padding: { bevy::ui::px(4.0).all() }
                 }
-                ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
+                bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
                 Children[(
                     bevy::ui::widget::Text("Menu")
                 )]
@@ -1399,22 +1399,22 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node {
-                    padding: { ::bevy::ui::px(4.0).all() },
+                bevy::ui::Node {
+                    padding: { bevy::ui::px(4.0).all() },
                     ..Default::default()
                 },
-                ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7)),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7)),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node {
-                    padding: { ::bevy::ui::px(4.0).all() }
+                    padding: { bevy::ui::px(4.0).all() }
                 }
-                ::bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7))
+                bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7))
                 Children[(
                     bevy::ui::widget::Text("Menu")
                 )]
@@ -1441,18 +1441,18 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn((
-                        ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(Text::new("Menu"))
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn((
+                        bevy::ui::Node::default(),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(Text::new("Menu"))
                         ))
                     )),
-                    ::bevy::ecs::spawn::Spawn((
-                        ::bevy::ui::Node::default(),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn({
+                    bevy::ecs::spawn::Spawn((
+                        bevy::ui::Node::default(),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn({
                                 let thing = Text::new("Thing");
                                 thing
                             })
@@ -1462,7 +1462,7 @@ mod tests {
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
                     (
@@ -1493,19 +1493,19 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")),
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (::bevy::ui::widget::Text::new("Hello")),
-                    (::bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
+                    (bevy::ui::widget::Text::new("Hello")),
+                    (bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
                 ]
             }
         };
@@ -1529,9 +1529,9 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::SpawnWith(move |parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                         if true {
                             parent.spawn(html_bundle! { <div>"Hello World"</div>});
                         } else {
@@ -1542,10 +1542,10 @@ mod tests {
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    ::bevy::ecs::spawn::SpawnWith(move |parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                    bevy::ecs::spawn::SpawnWith(move |parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                         if true {
                             parent.spawn(html_bundle! { <div>"Hello World"</div>});
                         } else {
@@ -1569,15 +1569,15 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
+                bevy::ui::Node::default(),
                 (Checkable, Checked),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello"))
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello"))
                 ))
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
                 (Checkable, Checked)
                 Children[(bevy::ui::widget::Text("Hello"))]
@@ -1595,12 +1595,12 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ecs::name::Name::new("hello"),
-                ::bevy::ui::Node::default(),
-                <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                    ::bevy::ecs::spawn::Spawn((
-                        ::bevy::ecs::name::Name::new("other".trim()),
-                        ::bevy::ui::Node::default()
+                bevy::ecs::name::Name::new("hello"),
+                bevy::ui::Node::default(),
+                <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                    bevy::ecs::spawn::Spawn((
+                        bevy::ecs::name::Name::new("other".trim()),
+                        bevy::ui::Node::default()
                     ))
                 ))
             )
@@ -1608,7 +1608,7 @@ mod tests {
         let bsn = {
             let hash = quote! { # };
             quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     #hash hello
                     bevy::ui::Node
                     Children[(
@@ -1629,17 +1629,17 @@ mod tests {
         };
         let bundle = quote! {
             (
-                ::bevy::ui::Node::default(),
-                ::bevy::ui::widget::ImageNode::new(
+                bevy::ui::Node::default(),
+                bevy::ui::widget::ImageNode::new(
                     asset_server
                         .load("embedded://planetes_editor/assets/filled_triangle.png")
                 )
             )
         };
         let bsn = quote! {
-            ::bevy::scene::bsn!{
+            bevy::scene::bsn!{
                 bevy::ui::Node
-                ::bevy::ui::widget::ImageNode::new(
+                bevy::ui::widget::ImageNode::new(
                     asset_server
                         .load("embedded://planetes_editor/assets/filled_triangle.png")
                 )
@@ -1662,11 +1662,11 @@ mod tests {
             };
 
             let expected = quote! {
-                ::bevy::scene::bsn! {
+                bevy::scene::bsn! {
                     @MenuButton
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px (4.0) . all () },
-                        border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                        padding: { bevy::ui::px (4.0) . all () },
+                        border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px (2.0)) }
                     }
                     Children [
                         (bevy::ui::widget::Text ("Menu"))
@@ -1688,13 +1688,13 @@ mod tests {
             };
 
             let expected = quote! {
-                ::bevy::scene::bsn! {
+                bevy::scene::bsn! {
                     @MenuButton {
                         variant: "200"
                     }
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px (4.0) . all () },
-                        border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                        padding: { bevy::ui::px (4.0) . all () },
+                        border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px (2.0)) }
                     }
                     Children [
                         (bevy::ui::widget::Text ("Menu"))
@@ -1717,14 +1717,14 @@ mod tests {
             };
 
             let expected = quote! {
-                ::bevy::scene::bsn! {
+                bevy::scene::bsn! {
                     @MenuButton {
                         variant: "200",
                         @color: "green"
                     }
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px (4.0) . all () },
-                        border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px (2.0)) }
+                        padding: { bevy::ui::px (4.0) . all () },
+                        border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px (2.0)) }
                     }
                     Children [
                         (bevy::ui::widget::Text ("Menu"))
@@ -1749,22 +1749,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -1788,43 +1788,43 @@ mod tests {
             let bundle = if cfg!(feature = "propagate") {
                 quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170)),
+                        bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170)),
+                        bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 }
             } else {
                 quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                        ::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170)),
+                        bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170)),
+                        bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 }
             };
             let bsn = if cfg!(feature = "propagate") {
                 quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))
                         Children[(
                             bevy::ui::widget::Text("Menu")
                         )]
@@ -1832,13 +1832,13 @@ mod tests {
                 }
             } else {
                 quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        ::bevy::ui::BackgroundColor(::bevy::color::Color::srgb_u8(170, 170, 170))
-                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))
                         Children[(
                             bevy::ui::widget::Text("Menu")
                         )]
@@ -1862,22 +1862,22 @@ mod tests {
                 };
                 let bundle = quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::ui::BorderColor::all(bevy::color::Color::BLACK),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 };
                 let bsn = quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::BLACK)
+                        bevy::ui::BorderColor::all(bevy::color::Color::BLACK)
                         Children[(
                             bevy::ui::widget::Text("Menu")
                         )]
@@ -1898,22 +1898,22 @@ mod tests {
                 };
                 let bundle = quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::ui::BorderColor::all(bevy::color::Color::WHITE),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 };
                 let bsn = quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::WHITE)
+                        bevy::ui::BorderColor::all(bevy::color::Color::WHITE)
                         Children[(
                             bevy::ui::widget::Text("Menu")
                         )]
@@ -1934,22 +1934,22 @@ mod tests {
                 };
                 let bundle = quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::ui::BorderColor::all(bevy::color::Color::NONE),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 };
                 let bsn = quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        ::bevy::ui::BorderColor::all(::bevy::color::Color::NONE)
+                        bevy::ui::BorderColor::all(bevy::color::Color::NONE)
                         Children[(
                             bevy::ui::widget::Text("Menu")
                         )]
@@ -1971,22 +1971,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
+                    bevy::ui::BorderColor::all(bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2007,22 +2007,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2043,22 +2043,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgb(0.7, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb(0.7, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgb(0.7, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2079,22 +2079,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgb_u8(170, 170, 170))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2115,22 +2115,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2151,22 +2151,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgba_u8(170, 170, 170, 127)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::srgba_u8(170, 170, 170, 127))
+                    bevy::ui::BorderColor::all(bevy::color::Color::srgba_u8(170, 170, 170, 127))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2187,22 +2187,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsl(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsl(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsl(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2223,22 +2223,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2259,22 +2259,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsv(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsv(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsv(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2295,22 +2295,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2331,22 +2331,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hwb(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwb(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hwb(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2367,22 +2367,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2403,22 +2403,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::lab(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lab(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::lab(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2439,22 +2439,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2475,22 +2475,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::lch(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lch(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::lch(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2511,22 +2511,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2547,22 +2547,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklab(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklab(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklab(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2583,22 +2583,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2619,22 +2619,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklch(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklch(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklch(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2655,22 +2655,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2691,22 +2691,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::xyz(170.0, 0.7, 0.7)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyz(170.0, 0.7, 0.7))
+                    bevy::ui::BorderColor::all(bevy::color::Color::xyz(170.0, 0.7, 0.7))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2727,22 +2727,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() },
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px(4.0).all() },
                         ..Default::default()
                     },
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5)),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    bevy::ui::BorderColor::all(bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5)),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        padding: { ::bevy::ui::px(4.0).all() }
+                        padding: { bevy::ui::px(4.0).all() }
                     }
-                    ::bevy::ui::BorderColor::all(::bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5))
+                    bevy::ui::BorderColor::all(bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5))
                     Children[(
                         bevy::ui::widget::Text("Menu")
                     )]
@@ -2769,54 +2769,54 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
+                    bevy::ui::Node {
                         display: Display::Flex,
                         ..Default::default()
                     },
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::None,
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            display: bevy::ui::Display::None,
                             ..Default::default()
                         }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::None,
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            display: bevy::ui::Display::None,
                             ..Default::default()
                         }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::Flex,
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            display: bevy::ui::Display::Flex,
                             ..Default::default()
                         }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::Grid,
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            display: bevy::ui::Display::Grid,
                             ..Default::default()
                         }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            display: ::bevy::ui::Display::Block,
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            display: bevy::ui::Display::Block,
                             ..Default::default()
                         })
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
                         display: Display::Flex
                     }
                     Children[
                         (bevy::ui::Node {
-                            display: ::bevy::ui::Display::None
+                            display: bevy::ui::Display::None
                         }),
                         (bevy::ui::Node {
-                            display: ::bevy::ui::Display::None
+                            display: bevy::ui::Display::None
                         }),
                         (bevy::ui::Node {
-                            display: ::bevy::ui::Display::Flex
+                            display: bevy::ui::Display::Flex
                         }),
                         (bevy::ui::Node {
-                            display: ::bevy::ui::Display::Grid
+                            display: bevy::ui::Display::Grid
                         }),
                         (bevy::ui::Node {
-                            display: ::bevy::ui::Display::Block
+                            display: bevy::ui::Display::Block
                         })
                     ]
                 }
@@ -2835,40 +2835,40 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node {
-                        position_type: ::bevy::ui::PositionType::Absolute,
+                    bevy::ui::Node {
+                        position_type: bevy::ui::PositionType::Absolute,
                         ..Default::default()
                     },
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative,
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            position_type: bevy::ui::PositionType::Relative,
                             ..Default::default()
                         }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Absolute,
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            position_type: bevy::ui::PositionType::Absolute,
                             ..Default::default()
                         }),
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative,
+                        bevy::ecs::spawn::Spawn(bevy::ui::Node {
+                            position_type: bevy::ui::PositionType::Relative,
                             ..Default::default()
                         })
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node {
-                        position_type: ::bevy::ui::PositionType::Absolute
+                        position_type: bevy::ui::PositionType::Absolute
                     }
                     Children[
                         (bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative
+                            position_type: bevy::ui::PositionType::Relative
                         }),
                         (bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Absolute
+                            position_type: bevy::ui::PositionType::Absolute
                         }),
                         (bevy::ui::Node {
-                            position_type: ::bevy::ui::PositionType::Relative
+                            position_type: bevy::ui::PositionType::Relative
                         })
                     ]
                 }
@@ -2893,15 +2893,15 @@ mod tests {
                 };
                 let ident = syn::Ident::new(expected, proc_macro2::Span::call_site());
                 let bundle = quote! {
-                    ::bevy::ui::Node {
-                        flex_direction: ::bevy::ui::FlexDirection::#ident,
+                    bevy::ui::Node {
+                        flex_direction: bevy::ui::FlexDirection::#ident,
                         ..Default::default()
                     }
                 };
                 let bsn = quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            flex_direction: ::bevy::ui::FlexDirection::#ident
+                            flex_direction: bevy::ui::FlexDirection::#ident
                         }
                     }
                 };
@@ -2926,13 +2926,13 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello, World!")),
-                        ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello, World!")),
+                        bevy::ecs::spawn::SpawnWith(|parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                             let entity = parent.target_entity();
                             parent.spawn(
-                                ::bevy::ecs::observer::Observer::new(
+                                bevy::ecs::observer::Observer::new(
                                     |_event: On<Pointer<Click> >,
                                     mut commands: Commands,
                                     text: Single<Entity, With<Text> >| {
@@ -2946,7 +2946,7 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     on(|_event: On<Pointer<Click> >,
                         mut commands: Commands,
@@ -2977,44 +2977,44 @@ mod tests {
             let bundle = if cfg!(feature = "propagate") {
                 quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::app::Propagate(::bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0),
+                        bevy::app::Propagate(bevy::text::TextFont {
+                            font_size: bevy::text::FontSize::Px(10.0),
                             ..Default::default()
                         }),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 }
             } else {
                 quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0),
+                        bevy::text::TextFont {
+                            font_size: bevy::text::FontSize::Px(10.0),
                             ..Default::default()
                         },
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 }
             };
             let bsn = if cfg!(feature = "propagate") {
                 quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        bevy::app::Propagate(::bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0),
+                        bevy::app::Propagate(bevy::text::TextFont {
+                            font_size: bevy::text::FontSize::Px(10.0),
                             ..Default::default()
                         })
                         Children[(bevy::ui::widget::Text("Menu"))]
@@ -3022,12 +3022,12 @@ mod tests {
                 }
             } else {
                 quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::text::TextFont {
-                            font_size: ::bevy::text::FontSize::Px(10.0)
+                            font_size: bevy::text::FontSize::Px(10.0)
                         }
                         Children[(bevy::ui::widget::Text("Menu"))]
                     }
@@ -3049,47 +3049,47 @@ mod tests {
             let bundle = if cfg!(feature = "propagate") {
                 quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 }
             } else {
                 quote! {
                     (
-                        ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        ::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)),
-                        <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                            ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                        bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)),
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                         ))
                     )
                 }
             };
             let bsn = if cfg!(feature = "propagate") {
                 quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        bevy::app::Propagate(::bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170)))
+                        bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))
                         Children[(bevy::ui::widget::Text("Menu"))]
                     }
                 }
             } else {
                 quote! {
-                    ::bevy::scene::bsn!{
+                    bevy::scene::bsn!{
                         bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() }
+                            padding: { bevy::ui::px(4.0).all() }
                         }
-                        bevy::text::TextColor(::bevy::color::Color::srgb_u8(170, 170, 170))
+                        bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))
                         Children[(bevy::ui::widget::Text("Menu"))]
                     }
                 }
@@ -3105,16 +3105,16 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    ::bevy::text::TextLayout {
+                    bevy::ui::Node::default(),
+                    bevy::text::TextLayout {
                         justify: Justify::Left,
                         ..Default::default()
                     },
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
                             (
-                                ::bevy::ui::widget::Text::new("Hello"),
-                                ::bevy::text::TextLayout {
+                                bevy::ui::widget::Text::new("Hello"),
+                                bevy::text::TextLayout {
                                     linebreak: LineBreak::NoWrap,
                                     ..Default::default()
                                 }
@@ -3124,7 +3124,7 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     bevy::text::TextLayout {
                         justify: Justify::Left
@@ -3158,29 +3158,29 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button_bundle(
-                                ::bevy::feathers::controls::ButtonBundleProps {
-                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
+                            bevy::feathers::controls::button_bundle(
+                                bevy::feathers::controls::ButtonBundleProps {
+                                    variant: bevy::feathers::controls::ButtonVariant::Normal,
+                                    corners: bevy::feathers::rounded_corners::RoundedCorners::All,
                                     ..Default::default()
                                 },
                                 (),
-                                (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
+                                (bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")))
                             )
                         )
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (@::bevy::feathers::controls::FeathersButton {
-                            @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                            @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                        (@bevy::feathers::controls::FeathersButton {
+                            @variant: bevy::feathers::controls::ButtonVariant::Normal,
+                            @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
                             @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
                         })
                     ]
@@ -3203,22 +3203,22 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button_bundle(
-                                ::bevy::feathers::controls::ButtonBundleProps {
-                                    variant: ::bevy::feathers::controls::ButtonVariant::Primary,
-                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
+                            bevy::feathers::controls::button_bundle(
+                                bevy::feathers::controls::ButtonBundleProps {
+                                    variant: bevy::feathers::controls::ButtonVariant::Primary,
+                                    corners: bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
                                     ..Default::default()
                                 },
                                 (),
                                 (
-                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")),
+                                    bevy::ecs::spawn::SpawnWith(|parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                                         let entity = parent.target_entity();
                                         parent.spawn(
-                                            ::bevy::ecs::observer::Observer::new(
+                                            bevy::ecs::observer::Observer::new(
                                                 |event: On<Activate>| {
                                                     info!("{:?}",event.entity);
                                                 }
@@ -3233,13 +3233,13 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
                         (
-                            @::bevy::feathers::controls::FeathersButton {
-                                @variant: ::bevy::feathers::controls::ButtonVariant::Primary,
-                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                            @bevy::feathers::controls::FeathersButton {
+                                @variant: bevy::feathers::controls::ButtonVariant::Primary,
+                                @corners: bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
                                 @caption: bsn_list![
                                     (bevy::ui::widget::Text("Hello"))
                                 ]
@@ -3266,31 +3266,31 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::button_bundle(
-                                ::bevy::feathers::controls::ButtonBundleProps {
-                                    variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                    corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
+                            bevy::feathers::controls::button_bundle(
+                                bevy::feathers::controls::ButtonBundleProps {
+                                    variant: bevy::feathers::controls::ButtonVariant::Normal,
+                                    corners: bevy::feathers::rounded_corners::RoundedCorners::All,
                                     ..Default::default()
                                 },
                                 Testing::new(),
-                                (::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")))
+                                (bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")))
                             )
                         )
                     ))
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
                         (
                             Testing::new()
-                            @::bevy::feathers::controls::FeathersButton {
-                                @variant: ::bevy::feathers::controls::ButtonVariant::Normal,
-                                @corners: ::bevy::feathers::rounded_corners::RoundedCorners::All,
+                            @bevy::feathers::controls::FeathersButton {
+                                @variant: bevy::feathers::controls::ButtonVariant::Normal,
+                                @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
                                 @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
                             }
                         )
@@ -3314,17 +3314,17 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::checkbox_bundle(
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
+                            bevy::feathers::controls::checkbox_bundle(
                                 (),
                                 (
-                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")),
+                                    bevy::ecs::spawn::SpawnWith(|parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                                         let entity = parent.target_entity();
                                         parent.spawn(
-                                            ::bevy::ecs::observer::Observer::new(
+                                            bevy::ecs::observer::Observer::new(
                                                 |event: On< ValueChange<bool> >| {
                                                     println!("Hello Changed {}", event.value)
                                                 }
@@ -3339,13 +3339,13 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
                         (
-                            @::bevy::feathers::controls::FeathersCheckbox {
+                            @bevy::feathers::controls::FeathersCheckbox {
                                 @caption: bsn_list![
-                                    ::bevy::ui::widget::Text("Hello")
+                                    bevy::ui::widget::Text("Hello")
                                 ]
                             }
                             on(|event: On<ValueChange<bool> >| {
@@ -3373,17 +3373,17 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    ::bevy::ui::Node::default(),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(
-                            ::bevy::feathers::controls::radio_bundle(
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
+                            bevy::feathers::controls::radio_bundle(
                                 TestComponent,
                                 (
-                                    ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Hello")),
-                                    ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                                    bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Hello")),
+                                    bevy::ecs::spawn::SpawnWith(|parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                                         let entity = parent.target_entity();
                                         parent.spawn(
-                                            ::bevy::ecs::observer::Observer::new(
+                                            bevy::ecs::observer::Observer::new(
                                                 |event: On< ValueChange<bool> >| {
                                                     println!("Hello True {}", event.value)
                                                 }
@@ -3398,14 +3398,14 @@ mod tests {
                 )
             };
             let bsn = quote! {
-                ::bevy::scene::bsn!{
+                bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
                         (
                             TestComponent
-                            @::bevy::feathers::controls::FeathersRadio {
+                            @bevy::feathers::controls::FeathersRadio {
                                 @caption: bsn_list![
-                                    ::bevy::ui::widget::Text("Hello")
+                                    bevy::ui::widget::Text("Hello")
                                 ]
                             }
                             on(|event: On<ValueChange<bool> >| {
@@ -3432,25 +3432,25 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    <_ as bevy_ui_html::HtmlComponent>::build(
                         MenuButton,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node {
-                                padding: { ::bevy::ui::px(4.0).all() },
-                                border_radius: { ::bevy::ui::BorderRadius::all(::bevy::ui::px(2.0))},
+                        bevy_ui_html::HtmlBundle {
+                            node: bevy::ui::Node {
+                                padding: { bevy::ui::px(4.0).all() },
+                                border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px(2.0))},
                                 ..Default::default()
 
                             },
-                            background_color: ::bevy::ui::BackgroundColor::default(),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
+                            background_color: bevy::ui::BackgroundColor::default(),
+                            border_color: bevy::ui::BorderColor::default(),
+                            text_font: bevy::text::TextFont::default(),
+                            text_color: bevy::text::TextColor::default(),
+                            text_layout: bevy::text::TextLayout::default(),
                         },
                         &[]
                     ),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("Menu"))
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("Menu"))
                     ))
                 )
             };
@@ -3464,15 +3464,15 @@ mod tests {
                 <MyComponent />
             };
             let bundle = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as bevy_ui_html::HtmlComponent>::build(
                     MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node::default(),
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
+                    bevy_ui_html::HtmlBundle {
+                        node: bevy::ui::Node::default(),
+                        background_color: bevy::ui::BackgroundColor::default(),
+                        border_color: bevy::ui::BorderColor::default(),
+                        text_font: bevy::text::TextFont::default(),
+                        text_color: bevy::text::TextColor::default(),
+                        text_layout: bevy::text::TextLayout::default(),
                     },
                     &[]
                 )
@@ -3486,18 +3486,18 @@ mod tests {
                 <MyComponent padding="4px" variant="primary" />
             };
             let bundle = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as bevy_ui_html::HtmlComponent>::build(
                     MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node {
-                            padding: { ::bevy::ui::px(4.0).all() },
+                    bevy_ui_html::HtmlBundle {
+                        node: bevy::ui::Node {
+                            padding: { bevy::ui::px(4.0).all() },
                             ..Default::default()
                         },
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
+                        background_color: bevy::ui::BackgroundColor::default(),
+                        border_color: bevy::ui::BorderColor::default(),
+                        text_font: bevy::text::TextFont::default(),
+                        text_color: bevy::text::TextColor::default(),
+                        text_layout: bevy::text::TextLayout::default(),
                     },
                     &[("variant", "primary")]
                 )
@@ -3511,15 +3511,15 @@ mod tests {
                 <MyComponent variant="primary" size="large" disabled="true" />
             };
             let bundle = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as bevy_ui_html::HtmlComponent>::build(
                     MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node::default(),
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
+                    bevy_ui_html::HtmlBundle {
+                        node: bevy::ui::Node::default(),
+                        background_color: bevy::ui::BackgroundColor::default(),
+                        border_color: bevy::ui::BorderColor::default(),
+                        text_font: bevy::text::TextFont::default(),
+                        text_color: bevy::text::TextColor::default(),
+                        text_layout: bevy::text::TextLayout::default(),
                     },
                     &[("variant", "primary"), ("size", "large"), ("disabled", "true")]
                 )
@@ -3536,23 +3536,23 @@ mod tests {
             };
             let bundle = quote! {
                 (
-                    <_ as ::bevy_ui_html::HtmlComponent>::build(
+                    <_ as bevy_ui_html::HtmlComponent>::build(
                         MyButton,
-                        ::bevy_ui_html::HtmlBundle {
-                            node: ::bevy::ui::Node {
-                                padding: { ::bevy::ui::px(4.0).all() },
+                        bevy_ui_html::HtmlBundle {
+                            node: bevy::ui::Node {
+                                padding: { bevy::ui::px(4.0).all() },
                                 ..Default::default()
                             },
-                            background_color: ::bevy::ui::BackgroundColor(::bevy::color::Color::BLACK),
-                            border_color: ::bevy::ui::BorderColor::default(),
-                            text_font: ::bevy::text::TextFont::default(),
-                            text_color: ::bevy::text::TextColor::default(),
-                            text_layout: ::bevy::text::TextLayout::default(),
+                            background_color: bevy::ui::BackgroundColor(bevy::color::Color::BLACK),
+                            border_color: bevy::ui::BorderColor::default(),
+                            text_font: bevy::text::TextFont::default(),
+                            text_color: bevy::text::TextColor::default(),
+                            text_layout: bevy::text::TextLayout::default(),
                         },
                         &[("variant", "primary")]
                     ),
-                    <::bevy::ecs::hierarchy::Children as ::bevy::ecs::spawn::SpawnRelated>::spawn((
-                        ::bevy::ecs::spawn::Spawn(::bevy::ui::widget::Text::new("text"))
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new("text"))
                     ))
                 )
             };
@@ -3567,15 +3567,15 @@ mod tests {
                 <MyComponent variant={some_var} />
             };
             let bundle = quote! {
-                <_ as ::bevy_ui_html::HtmlComponent>::build(
+                <_ as bevy_ui_html::HtmlComponent>::build(
                     MyComponent,
-                    ::bevy_ui_html::HtmlBundle {
-                        node: ::bevy::ui::Node::default(),
-                        background_color: ::bevy::ui::BackgroundColor::default(),
-                        border_color: ::bevy::ui::BorderColor::default(),
-                        text_font: ::bevy::text::TextFont::default(),
-                        text_color: ::bevy::text::TextColor::default(),
-                        text_layout: ::bevy::text::TextLayout::default(),
+                    bevy_ui_html::HtmlBundle {
+                        node: bevy::ui::Node::default(),
+                        background_color: bevy::ui::BackgroundColor::default(),
+                        border_color: bevy::ui::BorderColor::default(),
+                        text_font: bevy::text::TextFont::default(),
+                        text_color: bevy::text::TextColor::default(),
+                        text_layout: bevy::text::TextLayout::default(),
                     },
                     &[]
                 )

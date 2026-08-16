@@ -105,31 +105,31 @@ impl NodeComponent {
             if let Some(px_value) = value_str.strip_suffix("px") {
                 let num =
                     syn::LitFloat::new(&format!("{px_value}.0"), proc_macro2::Span::call_site());
-                Some(quote! { ::bevy::ui::px(#num) })
+                Some(quote! { bevy::ui::px(#num) })
             } else if let Some(percent_value) = value_str.strip_suffix("%") {
                 let num = syn::LitFloat::new(
                     &format!("{percent_value}.0"),
                     proc_macro2::Span::call_site(),
                 );
-                Some(quote! { ::bevy::ui::percent(#num) })
+                Some(quote! { bevy::ui::percent(#num) })
             } else if let Some(vw_value) = value_str.strip_suffix("vw") {
                 let num =
                     syn::LitFloat::new(&format!("{vw_value}.0"), proc_macro2::Span::call_site());
-                Some(quote! { ::bevy::ui::vw(#num) })
+                Some(quote! { bevy::ui::vw(#num) })
             } else if let Some(vh_value) = value_str.strip_suffix("vh") {
                 let num =
                     syn::LitFloat::new(&format!("{vh_value}.0"), proc_macro2::Span::call_site());
-                Some(quote! { ::bevy::ui::vh(#num) })
+                Some(quote! { bevy::ui::vh(#num) })
             } else if let Some(vmin_value) = value_str.strip_suffix("vmin") {
                 let num =
                     syn::LitFloat::new(&format!("{vmin_value}.0"), proc_macro2::Span::call_site());
-                Some(quote! { ::bevy::ui::vmin(#num) })
+                Some(quote! { bevy::ui::vmin(#num) })
             } else if let Some(vmax_value) = value_str.strip_suffix("vmax") {
                 let num =
                     syn::LitFloat::new(&format!("{vmax_value}.0"), proc_macro2::Span::call_site());
-                Some(quote! { ::bevy::ui::vmax(#num) })
+                Some(quote! { bevy::ui::vmax(#num) })
             } else {
-                Some(quote! { ::bevy::ui::Val::from(#value_tokens) })
+                Some(quote! { bevy::ui::Val::from(#value_tokens) })
             }
         } else {
             // Not a CSS-style value, assume it's a Rust expression (e.g., px(10.0))
@@ -239,7 +239,7 @@ impl ToTokens for NodeComponent {
             if self.bsn {
                 tokens.extend(quote! { bevy::ui::Node });
             } else {
-                tokens.extend(quote! { ::bevy::ui::Node::default() });
+                tokens.extend(quote! { bevy::ui::Node::default() });
             }
         } else {
             let mut fields = Vec::new();
@@ -432,7 +432,7 @@ impl ToTokens for NodeComponent {
                 });
             } else {
                 tokens.extend(quote! {
-                    ::bevy::ui::Node {
+                    bevy::ui::Node {
                         #(#fields,)*
                         ..Default::default()
                     }

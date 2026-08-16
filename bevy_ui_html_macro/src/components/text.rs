@@ -33,7 +33,7 @@ impl TextFont {
 }
 
 impl TextFont {
-    /// Returns tokens for the plain `::bevy::text::TextFont { … }` struct,
+    /// Returns tokens for the plain `bevy::text::TextFont { … }` struct,
     /// without any `Propagate` wrapping. Used when populating `HtmlBundle`
     /// for custom component `build()` calls.
     pub fn plain_tokens(&self) -> TokenStream {
@@ -42,12 +42,12 @@ impl TextFont {
             .iter()
             .filter_map(|attr| match attr.key.as_str() {
                 "font-size" => Value::new(&attr.value).parse_as_float().map(|value| {
-                    quote! { font_size: ::bevy::text::FontSize::Px(#value) }
+                    quote! { font_size: bevy::text::FontSize::Px(#value) }
                 }),
                 _ => None,
             });
         quote! {
-            ::bevy::text::TextFont {
+            bevy::text::TextFont {
                 #(#fields,)*
                 ..Default::default()
             }
@@ -63,7 +63,7 @@ impl ToTokens for TextFont {
             .filter_map(|attr| match attr.key.as_str() {
                 "font-size" => Value::new(&attr.value).parse_as_float().map(|value| {
                     quote! {
-                        font_size: ::bevy::text::FontSize::Px(#value)
+                        font_size: bevy::text::FontSize::Px(#value)
                     }
                 }),
                 _ => None,
@@ -72,7 +72,7 @@ impl ToTokens for TextFont {
         if self.bsn {
             if cfg!(feature = "propagate") {
                 tokens.extend(quote! {
-                        bevy::app::Propagate(::bevy::text::TextFont {
+                        bevy::app::Propagate(bevy::text::TextFont {
                         #(#fields,)*
                         ..Default::default()
                     })
@@ -86,14 +86,14 @@ impl ToTokens for TextFont {
             }
         } else if cfg!(feature = "propagate") {
             tokens.extend(quote! {
-                    ::bevy::app::Propagate(::bevy::text::TextFont {
+                    bevy::app::Propagate(bevy::text::TextFont {
                     #(#fields,)*
                     ..Default::default()
                 })
             })
         } else {
             tokens.extend(quote! {
-                ::bevy::text::TextFont {
+                bevy::text::TextFont {
                     #(#fields,)*
                     ..Default::default()
                 }
@@ -149,7 +149,7 @@ impl ToTokens for TextLayout {
             });
         } else {
             tokens.extend(quote! {
-                ::bevy::text::TextLayout {
+                bevy::text::TextLayout {
                     #(#fields,)*
                     ..Default::default()
                 }
@@ -188,15 +188,15 @@ impl TextColor {
 }
 
 impl TextColor {
-    /// Returns tokens for the plain `::bevy::text::TextColor(…)` value,
+    /// Returns tokens for the plain `bevy::text::TextColor(…)` value,
     /// without any `Propagate` wrapping. Used when populating `HtmlBundle`
     /// for custom component `build()` calls.
     pub fn plain_tokens(&self) -> TokenStream {
         let color = Value::new(&self.attributes[0].value);
         if let Some(color) = color.parse_as_color() {
-            quote! { ::bevy::text::TextColor(#color) }
+            quote! { bevy::text::TextColor(#color) }
         } else {
-            quote! { ::bevy::text::TextColor::default() }
+            quote! { bevy::text::TextColor::default() }
         }
     }
 }
@@ -209,7 +209,7 @@ impl ToTokens for TextColor {
             if self.bsn {
                 if cfg!(feature = "propagate") {
                     tokens.extend(quote! {
-                            bevy::app::Propagate(::bevy::text::TextColor(#color))
+                            bevy::app::Propagate(bevy::text::TextColor(#color))
                     })
                 } else {
                     tokens.extend(quote! {
@@ -218,11 +218,11 @@ impl ToTokens for TextColor {
                 }
             } else if cfg!(feature = "propagate") {
                 tokens.extend(quote! {
-                        ::bevy::app::Propagate(::bevy::text::TextColor(#color))
+                        bevy::app::Propagate(bevy::text::TextColor(#color))
                 })
             } else {
                 tokens.extend(quote! {
-                    ::bevy::text::TextColor(#color)
+                    bevy::text::TextColor(#color)
                 })
             }
         }

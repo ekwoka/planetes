@@ -38,7 +38,7 @@ impl ToTokens for BorderRadius {
 
         if let Some(radius) = radius.parse_as_css_value() {
             tokens.extend(quote! {
-                ::bevy::ui::BorderRadius::all(#radius)
+                bevy::ui::BorderRadius::all(#radius)
             })
         };
     }
@@ -79,7 +79,7 @@ impl ToTokens for BorderColor {
 
         if let Some(color) = color.parse_as_color() {
             tokens.extend(quote! {
-                ::bevy::ui::BorderColor::all(#color)
+                bevy::ui::BorderColor::all(#color)
             })
         }
     }

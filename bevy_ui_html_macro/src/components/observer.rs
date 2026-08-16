@@ -42,9 +42,9 @@ impl ToTokens for Observer {
             });
         } else {
             tokens.extend(quote! {
-                ::bevy::ecs::spawn::SpawnWith(|parent: &mut ::bevy::ecs::relationship::RelatedSpawner<::bevy::ecs::hierarchy::ChildOf>| {
+                bevy::ecs::spawn::SpawnWith(|parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
                     let entity = parent.target_entity();
-                    #(parent.spawn(::bevy::ecs::observer::Observer::new(#observers).with_entity(entity));)*
+                    #(parent.spawn(bevy::ecs::observer::Observer::new(#observers).with_entity(entity));)*
                 })
             });
         }
