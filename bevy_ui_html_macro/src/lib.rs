@@ -3014,8 +3014,7 @@ mod tests {
                             padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::app::Propagate(bevy::text::TextFont {
-                            font_size: bevy::text::FontSize::Px(10.0),
-                            ..Default::default()
+                            font_size: bevy::text::FontSize::Px(10.0)
                         })
                         Children[(bevy::ui::widget::Text("Menu"))]
                     }

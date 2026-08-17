@@ -16,14 +16,30 @@ pub fn plugin(app: &mut App) {
         .add_observer(select_entity);
 }
 
-#[derive(Component, HtmlComponent)]
+#[derive(SceneComponent, HtmlComponent, Default, Clone)]
 pub struct SceneTreeView;
+
+impl SceneTreeView {
+    fn scene() -> impl Scene {
+        html! {
+            <div
+                padding="8px"
+                flex-grow="1"
+                flex-shrink="1"
+                display="flex"
+                flex-direction="col"
+                column-gap="8px"
+                width="100%"
+                height="100%"/>
+        }
+    }
+}
 
 #[derive(Component, HtmlComponent)]
 pub struct SceneTreeBranch;
 
-pub fn view() -> impl Bundle {
-    html_bundle! {
+pub fn scene() -> impl Scene {
+    html! {
         <SceneTreeView
             padding="8px"
             flex-grow="1"

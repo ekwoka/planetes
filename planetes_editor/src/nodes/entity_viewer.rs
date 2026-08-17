@@ -36,35 +36,6 @@ pub fn plugin(app: &mut App) {
     .add_observer(update_required_components);
 }
 
-pub fn view() -> impl Bundle {
-    html_bundle! {
-        <EntityViewer
-            padding="8px"
-            flex-grow="1"
-            flex-shrink="1"
-            display="flex"
-            flex-direction="col"
-            row-gap="8px"
-            width="100%"
-            height="100%"
-        >
-            <div padding="2px">
-               "Entity Viewer"
-            </div>
-            <EntityEditor
-                padding="2px"
-                flex-grow="1"
-                flex-shrink="1"
-                display="flex"
-                flex-direction="col"
-                row-gap="8px"
-            >
-              "No Entity Selected"
-            </EntityEditor>
-        </EntityViewer>
-    }
-}
-
 pub fn update_entity_viewer(
     mut commands: Commands,
     entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
@@ -372,11 +343,50 @@ fn update_name(
     }
 }
 
-#[derive(Component, HtmlComponent)]
+#[derive(SceneComponent, HtmlComponent, Default, Clone)]
 pub struct EntityViewer;
 
-#[derive(Component, HtmlComponent)]
+impl EntityViewer {
+    fn scene() -> impl Scene {
+        html! {
+            <div
+                padding="8px"
+                flex-grow="1"
+                flex-shrink="1"
+                display="flex"
+                flex-direction="col"
+                row-gap="8px"
+                width="100%"
+                height="100%"
+            >
+                <div padding="2px">
+                   "Entity Viewer"
+                </div>
+                <EntityEditor/>
+            </div>
+        }
+    }
+}
+
+#[derive(SceneComponent, HtmlComponent, Default, Clone)]
 pub struct EntityEditor;
+
+impl EntityEditor {
+    fn scene() -> impl Scene {
+        html! {
+            <div
+                padding="2px"
+                flex-grow="1"
+                flex-shrink="1"
+                display="flex"
+                flex-direction="col"
+                row-gap="8px"
+            >
+                "No Entity Selected"
+            </div>
+        }
+    }
+}
 
 #[derive(Component)]
 pub struct Viewing(pub Entity);

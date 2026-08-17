@@ -17,7 +17,11 @@ use crate::{
     EditorMode, ReflectPlanetesComponent,
     atoms::{on_checkbox_add, on_checkbox_value_change},
     events::{handle_add_component, handle_remove_component},
-    nodes::{scene_tree::UpdateSceneTree, *},
+    nodes::{
+        entity_viewer::EntityViewer,
+        scene_tree::{SceneTreeView, UpdateSceneTree},
+        *,
+    },
     prelude::*,
     scene::OpenSceneFileDialog,
 };
@@ -51,7 +55,7 @@ pub fn plugin(app: &mut App) {
     .register_type_data::<Children, ReflectPlanetesComponent>()
     .add_systems(
         OnEnter(EditorMode::Edit),
-        (setup_camera_system, build_ui).chain(),
+        (setup_camera_system, build_ui_scene).chain(),
     )
     .add_systems(Update, update_viewport)
     .add_observer(on_checkbox_value_change)
@@ -93,93 +97,121 @@ pub struct MainView;
 pub struct UiView;
 
 /// Indicates the UI Node that the [MainView] is rendered to.
-#[derive(Component)]
+#[derive(SceneComponent, HtmlComponent, Clone, Default)]
 pub struct ViewPort;
 
+impl ViewPort {
+    fn scene() -> impl Scene {
+        bsn! {}
+    }
+}
+
 /// Marker component for the MenuBar UI
-#[derive(Component, HtmlComponent)]
+#[derive(SceneComponent, HtmlComponent, Clone, Default)]
 pub struct MenuBar;
 
+impl MenuBar {
+    fn scene() -> impl Scene {
+        bsn! {}
+    }
+}
+
 /// Builds entire Editor UI
-pub fn build_ui(mut commands: Commands) {
-    commands.spawn(html_bundle! {
-    <div
-    padding="1px"
-    flex-grow="0"
-    display="flex"
-    flex-direction="col"
-    width="100%"
-    height="100%"
-    font-size="12"
-    text-color="srgb(178 178 178)">
-        <MenuBar
-            padding="4px"
+pub fn build_ui_scene(mut commands: Commands) {
+    commands.spawn_scene(html! {
+        <div
+            padding="1px"
             flex-grow="0"
             display="flex"
-            flex-direction="row"
-            column-gap="8px"
+            flex-direction="col"
             width="100%"
-            border-bottom="1px"
-            border-color="srgb(178 178 178)">
-            <button
-                variant="normal"
-                corners="rounded"
-                onActivate={move |_event: On<Activate>, mut commands: Commands| {
-                    commands.trigger(OpenSceneFileDialog);
-                }}>
-                <span>"Open"</span>
-            </button>
-            <iter>
-                {["File", "Edit", "View", "Help"].into_iter().map(|item| {
-                    let content = item.to_string();
-                    html_bundle! {
-                        <button
-                            variant="normal"
-                            corners="rounded"
-                            onActivate={move |_event: On<Activate>| {
-                                info!("Button Activated: {}", content);
-                            }}>
-                            <span>{item}</span>
-                        </button>
-                    }
-                })}
-            </iter>
-            <div flex-grow="20"></div>
-        </MenuBar>
-                    <div
-                        display="flex"
-                        flex-direction="row"
-                        flex-grow="1"
-                        flex-shrink="1"
-                        width="100%"
-                        height="50%">
-                        <div
-                            flex-grow="1"
-                            flex-shrink="1"
-                            width="50%"
-                            height="100%"
-                            justify-content="center"
-                            align-items={AlignItems::Center}
-                            border="1px"
-                            border-color="srgb(178 178 178)"
-                            components={ViewPort}>
-                        </div>
-                        <div
-                            padding="1px"
-                            display="flex"
-                            flex-direction="col"
-                            flex-grow="0"
-                            flex-shrink="0"
-                            width="40%"
-                            border="1px"
-                            border-color="srgb(178 178 178)">
-                            {scene_tree::view()}
-                            {entity_viewer::view()}
-                        </div>
-                    </div>
-                    {bottom_bar()}
+            height="100%"
+            font-size="12"
+            text-color="srgb(178 178 178)">
+            <MenuBar
+                padding="4px"
+                flex-grow="0"
+                display="flex"
+                flex-direction="row"
+                column-gap="8px"
+                width="100%"
+                border-bottom="1px"
+                border-color="srgb(178 178 178)">
+                <button
+                    variant="normal"
+                    corners="rounded"
+                    onActivate={move |_event: On<Activate>, mut commands: Commands| {
+                        commands.trigger(OpenSceneFileDialog);
+                    }}>
+                    <span>"Open"</span>
+                </button>
+                <button
+                    variant="normal"
+                    corners="rounded"
+                    onActivate={move |_event: On<Activate>| {
+                        info!("Button Activated: File");
+                    }}>
+                    <span>"File"</span>
+                </button>
+                <button
+                    variant="normal"
+                    corners="rounded"
+                    onActivate={move |_event: On<Activate>| {
+                        info!("Button Activated: Edit");
+                    }}>
+                    <span>"Edit"</span>
+                </button>
+                <button
+                    variant="normal"
+                    corners="rounded"
+                    onActivate={move |_event: On<Activate>| {
+                        info!("Button Activated: View");
+                    }}>
+                    <span>"View"</span>
+                </button>
+                <button
+                    variant="normal"
+                    corners="rounded"
+                    onActivate={move |_event: On<Activate>| {
+                        info!("Button Activated: Help");
+                    }}>
+                    <span>"Help"</span>
+                </button>
+                <div flex-grow="20"></div>
+            </MenuBar>
+            <div
+                display="flex"
+                flex-direction="row"
+                flex-grow="1"
+                flex-shrink="1"
+                width="100%"
+                height="50%">
+                <ViewPort
+                    flex-grow="1"
+                    flex-shrink="1"
+                    width="50%"
+                    height="100%"
+                    justify-content="center"
+                    align-items={AlignItems::Center}
+                    border="1px"
+                    border-color="srgb(178 178 178)">
+                </ViewPort>
+                <div
+                    padding="1px"
+                    display="flex"
+                    flex-direction="col"
+                    flex-grow="0"
+                    flex-shrink="0"
+                    width="40%"
+                    border="1px"
+                    border-color="srgb(178 178 178)">
+                    <SceneTreeView />
+                    <EntityViewer />
                 </div>
-        });
+            </div>
+            {bottom_bar_scene()}
+        </div>
+    });
 }
 
 /// Sets up the camera system for the editor UI.
@@ -229,8 +261,8 @@ impl DefaultTargetTexture for Image {
 }
 
 /// Renders the Application bottom status bar.
-fn bottom_bar() -> impl Bundle {
-    html_bundle! {
+fn bottom_bar_scene() -> impl Scene {
+    html! {
         <div
             padding="8px"
             padding-top="2px"
