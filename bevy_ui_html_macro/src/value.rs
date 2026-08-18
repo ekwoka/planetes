@@ -1,6 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Expr, ExprBlock, ExprLit, Ident, Lit, Path, parse_quote_spanned, spanned::Spanned};
+use syn::{
+    Expr, ExprBlock, ExprLit, Ident, Lit, Path, Stmt, parse_quote_spanned, spanned::Spanned,
+};
 
 use crate::color::to_color;
 
@@ -218,6 +220,42 @@ impl Value {
             if block.stmts.len() == 1 {
                 let stmt = &block.stmts[0];
                 Some(stmt.to_token_stream())
+            } else {
+                Some(block.into_token_stream())
+            }
+        } else {
+            Some(value.into_token_stream())
+        }
+    }
+
+    pub fn clean_components(&self, bsn: bool) -> Option<TokenStream> {
+        let value = &self.0;
+
+        if let syn::Expr::Block(ExprBlock { block, .. }) = value {
+            if block.stmts.len() == 1 {
+                let stmt = &block.stmts[0];
+                if let Stmt::Expr(Expr::Tuple(tuple), _) = stmt {
+                    let members = tuple
+                        .elems
+                        .iter()
+                        .map(|member| {
+                            quote! {
+                                #member
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    if bsn {
+                        Some(quote! {
+                            #(#members)*
+                        })
+                    } else {
+                        Some(quote! {
+                            (#(#members),*)
+                        })
+                    }
+                } else {
+                    Some(stmt.to_token_stream())
+                }
             } else {
                 Some(block.into_token_stream())
             }

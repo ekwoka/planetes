@@ -516,7 +516,7 @@ impl ToTokens for ElementNode {
         }
         components.push_some(
             Self::get_attr(&self.attributes, "components")
-                .and_then(|value| Value::new(value).clean_block()),
+                .and_then(|value| Value::new(value).clean_components(self.bsn)),
         );
         let mut children = self
             .children
@@ -1579,7 +1579,8 @@ mod tests {
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
-                (Checkable, Checked)
+                Checkable
+                Checked
                 Children[(bevy::ui::widget::Text("Hello"))]
             }
         };
