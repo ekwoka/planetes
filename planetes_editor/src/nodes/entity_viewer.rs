@@ -17,7 +17,7 @@ use planetes_input::prelude::*;
 use planetes_scene_state::{CanonicalScene, ComponentsChanged};
 
 use crate::{
-    atoms::{button, highlight_selected_input, input_field},
+    atoms::{button, highlight_selected_input, input_field, input_field_scene},
     events::AddComponentToEntity,
     nodes::{accordion, component_editor, component_selector::OpenAddComponent},
     prelude::*,
@@ -26,7 +26,7 @@ pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
         (
-            update_entity_viewer,
+            update_entity_viewer_scene,
             component_editor::update_component_editor,
             highlight_selected_input,
         )
@@ -122,6 +122,62 @@ pub fn update_entity_viewer(
                 </div>
             });
         });
+}
+
+pub fn update_entity_viewer_scene(
+    mut commands: Commands,
+    entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
+    canonical_scene: Res<CanonicalScene>,
+    scenes: Res<Assets<DynamicWorld>>,
+    assets: Res<AssetServer>,
+) {
+    let (editor, &Viewing(target)) = *entity_viewer;
+
+    let Some(entity) = canonical_scene.get_entity(&scenes, target) else {
+        return;
+    };
+
+    let components_data = &entity.components;
+
+    info!("Found Components: {}", components_data.len());
+    let name = components_data
+        .iter()
+        .find(|component| component.represents::<Name>())
+        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
+    let mut children: Vec<Box<dyn Scene>> = vec![Box::new(html! {
+        <div
+          display="flex"
+          flex-direction="row"
+          align-items={AlignItems::Center}
+          onInput={update_name}
+        >
+            <span>"Selected: "</span>
+            {
+                input_field_scene::<String>(if let Some(name) = name {
+                    format!("{name}")
+                } else {
+                    format!("{target}")
+                })
+            }
+        </div>
+    })];
+    components_data
+        .iter()
+        .filter(|component| !component.represents::<Name>())
+        .filter_map(|component| {
+            component.get_represented_type_info().map(|type_info| {
+                html! {
+                    <div>
+                      <span>{type_info.type_path()}</span>
+                    </div>
+                }
+            })
+        })
+        .for_each(|scene| children.push(Box::new(scene)));
+    commands
+        .entity(editor)
+        .despawn_children()
+        .queue_spawn_related_scenes::<Children>(children);
 }
 
 #[derive(Component)]

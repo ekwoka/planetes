@@ -11,11 +11,17 @@ use bevy::{
 };
 
 /// Component that manages the data managed by an input field.
-#[derive(Component, Debug, PartialEq, Eq)]
+#[derive(SceneComponent, Debug, PartialEq, Eq, Clone)]
 #[require(Node, TabIndex, EditableText::new(""), Validation)]
 pub struct InputField<T: Validable> {
     pub value: T,
     pub old_value: T,
+}
+
+impl<T: Validable> InputField<T> {
+    fn scene() -> impl Scene {
+        bsn! {}
+    }
 }
 
 impl<T: Validable> Default for InputField<T> {
