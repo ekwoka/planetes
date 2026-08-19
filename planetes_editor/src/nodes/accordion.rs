@@ -124,13 +124,42 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     }
 }
 
-#[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
+pub fn scene<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
+    label: impl Into<String> + Clone,
+    content: SpawnIter<I>,
+    asset_server: AssetServer,
+) -> impl Scene {
+    html! {
+        <div
+            name={Into::<String>::into(label.clone())}
+            display="flex"
+            flex-direction="col"
+            row-gap="8px"
+            components={template(|_| Ok(Propagate(AccordionState::Closed)))}>
+            <button
+                padding="2px"
+                display="flex"
+                flex-direction="row"
+                align-items={AlignItems::Center}
+                column-gap="8px">
+                <span>{label}</span>
+            </button>
+        </div>
+    }
+}
+
+#[derive(Component, PartialEq, Eq, Clone, Copy, Debug, Default)]
 pub enum AccordionState {
     Open,
+    #[default]
     Closed,
 }
 
 impl AccordionState {
+    pub fn default_closed() -> Self {
+        Self::Closed
+    }
+
     pub fn toggle(&mut self) {
         *self = match *self {
             AccordionState::Closed => AccordionState::Open,

@@ -168,7 +168,7 @@ pub fn update_entity_viewer_scene(
             component.get_represented_type_info().map(|type_info| {
                 html! {
                     <div>
-                      <span>{type_info.type_path()}</span>
+                      <span>{{type_info.type_path()}}</span>
                     </div>
                 }
             })

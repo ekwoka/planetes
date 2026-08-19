@@ -401,6 +401,7 @@ fn tag_name_as_expr(name: &NodeName) -> TokenStream {
 
 impl ToTokens for ElementNode {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let mut block_children = false;
         let tag_names = vec![
             "div",
             "img",
@@ -471,10 +472,15 @@ impl ToTokens for ElementNode {
             if self.tag_name.to_string() == "button" {
                 let button = feathers::Button::new(&self.attributes, self.bsn)
                     .with_children(self.children.clone());
-                tokens.extend(quote! {
-                    #button
-                });
-                return;
+                if !self.bsn {
+                    tokens.extend(quote! {
+                        #button
+                    });
+                    return;
+                } else {
+                    components.push_some(Some(button));
+                    block_children = true;
+                }
             }
             if self.tag_name.to_string() == "input" {
                 match self
@@ -518,31 +524,33 @@ impl ToTokens for ElementNode {
             Self::get_attr(&self.attributes, "components")
                 .and_then(|value| Value::new(value).clean_components(self.bsn)),
         );
-        let mut children = self
-            .children
-            .iter()
-            .map(|child| child.to_token_stream())
-            .collect::<Vec<_>>();
-        // Scenes attach observers to the entity itself, bundles spawn them as children.
-        let observer = Observer::new(&self.attributes, self.bsn).ok();
-        if self.bsn {
-            components.push_some(observer);
-        } else {
-            children.push_some(observer);
-        }
-        if !children.is_empty() {
+        if !block_children {
+            let mut children = self
+                .children
+                .iter()
+                .map(|child| child.to_token_stream())
+                .collect::<Vec<_>>();
+            // Scenes attach observers to the entity itself, bundles spawn them as children.
+            let observer = Observer::new(&self.attributes, self.bsn).ok();
             if self.bsn {
-                components.push(quote! {
-                    Children[
-                        #(#children),*
-                    ]
-                });
+                components.push_some(observer);
             } else {
-                components.push(quote! {
-                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
-                        #(#children),*
-                    ))
-                });
+                children.push_some(observer);
+            }
+            if !children.is_empty() {
+                if self.bsn {
+                    components.push(quote! {
+                        Children[
+                            #(#children),*
+                        ]
+                    });
+                } else {
+                    components.push(quote! {
+                        <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                            #(#children),*
+                        ))
+                    });
+                }
             }
         }
         // Scenes list their components bare, bundles need a tuple for more than one.
@@ -567,9 +575,17 @@ impl ToTokens for InlineNode {
             self.children
                 .iter()
                 .map(|child| match child {
-                    HtmlNode::Block(block) => quote! {
-                        bevy::ui::widget::Text::new(#block)
-                    },
+                    HtmlNode::Block(block) => {
+                        if self.bsn {
+                            quote! {
+                                bevy::ui::widget::Text(#block)
+                            }
+                        } else {
+                            quote! {
+                                bevy::ui::widget::Text::new(#block)
+                            }
+                        }
+                    }
                     _ => quote! {
                         #child
                     },
@@ -1504,8 +1520,8 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (bevy::ui::widget::Text::new("Hello")),
-                    (bevy::ui::widget::Text::new({let thing = true; if thing { "World" } else { "Mom" }}))
+                    (bevy::ui::widget::Text("Hello")),
+                    (bevy::ui::widget::Text({let thing = true; if thing { "World" } else { "Mom" }}))
                 ]
             }
         };
@@ -3178,11 +3194,64 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (@bevy::feathers::controls::FeathersButton {
-                            @variant: bevy::feathers::controls::ButtonVariant::Normal,
-                            @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
-                            @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
-                        })
+                        (
+                            @bevy::feathers::controls::FeathersButton {
+                                @variant: bevy::feathers::controls::ButtonVariant::Normal,
+                                @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
+                                @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
+                            }
+                            bevy::ui::Node
+                        )
+                    ]
+                }
+            };
+            assert_html(input, bundle, bsn);
+        }
+
+        #[test]
+        fn renders_button_with_node() {
+            let input = quote! {
+                <div>
+                    <button
+                        padding="2px"
+                        display="flex"
+                        flex-direction="row"
+                        align-items={AlignItems::Center}
+                        column-gap="8px">
+                        <span>{label}</span>
+                    </button>
+                </div>
+            };
+            let bundle = quote! {
+                (
+                    bevy::ui::Node::default(),
+                    <bevy::ecs::hierarchy::Children as bevy::ecs::spawn::SpawnRelated>::spawn((
+                        bevy::ecs::spawn::Spawn(
+                            bevy::feathers::controls::button_bundle(
+                                bevy::feathers::controls::ButtonBundleProps::default(),
+                                (),
+                                (bevy::ecs::spawn::Spawn(bevy::ui::widget::Text::new(label)))
+                            )
+                        )
+                    ))
+                )
+            };
+            let bsn = quote! {
+                bevy::scene::bsn!{
+                    bevy::ui::Node
+                    Children[
+                        (
+                            @bevy::feathers::controls::FeathersButton {
+                                @caption: bsn_list![(bevy::ui::widget::Text(label))]
+                            }
+                            bevy::ui::Node {
+                                padding: { bevy::ui::px(2.0).all() },
+                                column_gap: bevy::ui::px(8.0),
+                                display: bevy::ui::Display::Flex,
+                                flex_direction: bevy::ui::FlexDirection::Row,
+                                align_items: AlignItems::Center
+                            }
+                        )
                     ]
                 }
             };
@@ -3247,6 +3316,7 @@ mod tests {
                             on(|event: On<Activate>| {
                                 info!("{:?}",event.entity);
                             })
+                            bevy::ui::Node
                         )
                     ]
                 }
@@ -3287,12 +3357,13 @@ mod tests {
                     bevy::ui::Node
                     Children[
                         (
-                            Testing::new()
                             @bevy::feathers::controls::FeathersButton {
                                 @variant: bevy::feathers::controls::ButtonVariant::Normal,
                                 @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
                                 @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
                             }
+                            bevy::ui::Node
+                            Testing::new()
                         )
                     ]
                 }

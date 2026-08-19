@@ -60,9 +60,8 @@ impl ToTokens for Button {
         let observer = Observer::new(&self.attributes, self.bsn).ok();
         if self.bsn {
             tokens.extend(quote! {
-                #components
                 @bevy::feathers::controls::FeathersButton {
-                    #props,
+                    #props
                     @caption: bsn_list![
                         #(#children),*
                     ]
@@ -73,7 +72,7 @@ impl ToTokens for Button {
             children.push_some(observer);
             tokens.extend(quote! {
                 bevy::feathers::controls::button_bundle(
-                    #props,
+                    #props
                     #components,
                     (
                         #(#children),*
@@ -108,7 +107,9 @@ impl ButtonProps {
 impl ToTokens for ButtonProps {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.attributes.is_empty() {
-            tokens.extend(quote! { bevy::feathers::controls::ButtonBundleProps::default() })
+            if !self.bsn {
+                tokens.extend(quote! { bevy::feathers::controls::ButtonBundleProps::default(), })
+            }
         } else {
             let fields = self
                 .attributes
@@ -189,14 +190,14 @@ impl ToTokens for ButtonProps {
 
             if self.bsn {
                 tokens.extend(quote! {
-                    #(@#fields),*
+                    #(@#fields),*,
                 });
             } else {
                 tokens.extend(quote! {
                     bevy::feathers::controls::ButtonBundleProps {
                         #(#fields,)*
                         ..Default::default()
-                    }
+                    },
                 });
             }
         }
