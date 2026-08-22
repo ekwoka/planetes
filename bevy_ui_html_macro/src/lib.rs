@@ -188,7 +188,7 @@ impl ToTokens for ChildNode {
             _ => {
                 if self.bsn {
                     tokens.extend(quote! {
-                        (#node)
+                        #node
                     });
                 } else {
                     tokens.extend(quote! {
@@ -600,9 +600,15 @@ impl ToTokens for InlineNode {
                 #(#components),*
             });
         } else {
-            tokens.extend(quote! {
-                (#(#components),*)
-            });
+            if self.bsn {
+                tokens.extend(quote! {
+                    #(#components)*
+                });
+            } else {
+                tokens.extend(quote! {
+                    (#(#components),*)
+                });
+            }
         }
     }
 }
@@ -819,7 +825,7 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (bevy::ui::widget::Text("Hello"))
+                    bevy::ui::widget::Text("Hello")
                 ]
             }
         };
@@ -877,14 +883,14 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (
-                        bevy::ui::Node
-                        Children[(bevy::ui::widget::Text("Hello"))]
-                    ),
-                    (
-                        bevy::ui::Node
-                        Children[(bevy::ui::widget::Text("World"))]
-                    )
+                    bevy::ui::Node
+                    Children[
+                        bevy::ui::widget::Text("Hello")
+                    ],
+                    bevy::ui::Node
+                    Children[
+                        bevy::ui::widget::Text("World")
+                    ]
                 ]
             }
         };
@@ -912,7 +918,8 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (bevy::ui::widget::Text("Hello")),(bevy::ui::widget::Text("World"))
+                    bevy::ui::widget::Text("Hello"),
+                    bevy::ui::widget::Text("World")
                 ]
             }
         };
@@ -951,9 +958,9 @@ mod tests {
                     padding: { bevy::ui::px(10.0).all().with_bottom(bevy::ui::percent(20.0)) },
                     margin: { bevy::ui::vw(5.0).top().with_right(bevy::ui::vmax(20.0)).with_bottom(bevy::ui::vmin(15.0)).with_left(bevy::ui::vh(10.0)) }
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Hello")
-                )]
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -991,9 +998,9 @@ mod tests {
                     padding: { px(10.0).all().with_bottom(percent(20.0)) },
                     margin: { vw(5.0).top().with_right(vmax(20.0)).with_bottom(vmin(15.0)).with_left(vh(10.0)) }
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Hello")
-                )]
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -1039,9 +1046,9 @@ mod tests {
                     min_width: bevy::ui::px(10.0),
                     max_width: bevy::ui::px(200.0)
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Test")
-                )]
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -1087,9 +1094,9 @@ mod tests {
                     flex_grow: 1.0,
                     flex_shrink: 0.5
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Flex")
-                )]
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -1127,9 +1134,9 @@ mod tests {
                     row_gap: bevy::ui::px(10.0),
                     column_gap: bevy::ui::px(15.0)
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Borders")
-                )]
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -1166,9 +1173,9 @@ mod tests {
                     position_type: PositionType::Absolute,
                     aspect_ratio: Some(1.77)
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Aspect")
-                )]
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -1191,7 +1198,7 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (Text::new("Hello"))
+                    Text::new("Hello")
                 ]
             }
         };
@@ -1215,7 +1222,7 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (if show { Text::new("Visible") } else { Text::new("Hidden") })
+                    if show { Text::new("Visible") } else { Text::new("Hidden") }
                 ]
             }
         };
@@ -1239,7 +1246,7 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (bevy::scene::bsn!{ bevy::ui::widget::Text("Nested") })
+                    bevy::scene::bsn!{ bevy::ui::widget::Text("Nested") }
                 ]
             }
         };
@@ -1277,9 +1284,9 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (bevy::ui::widget::Text("Static text")),
-                    (dynamic_content),
-                    (MyComponent::new())
+                    bevy::ui::widget::Text("Static text"),
+                    dynamic_content,
+                    MyComponent::new()
                 ]
             }
         };
@@ -1359,9 +1366,9 @@ mod tests {
                     padding: { bevy::ui::px(4.0).all() },
                     border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px(2.0)) }
                 }
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Menu")
-                )]
+                ]
             }
         };
 
@@ -1395,9 +1402,9 @@ mod tests {
                     padding: { bevy::ui::px(4.0).all() }
                 }
                 bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Menu")
-                )]
+                ]
             }
         };
 
@@ -1431,9 +1438,9 @@ mod tests {
                     padding: { bevy::ui::px(4.0).all() }
                 }
                 bevy::ui::BackgroundColor(Color::linear_rgb(0.7, 0.7, 0.7))
-                Children[(
+                Children[
                     bevy::ui::widget::Text("Menu")
-                )]
+                ]
             }
         };
 
@@ -1481,17 +1488,17 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (
-                        bevy::ui::Node
-                        Children[(Text::new("Menu"))]
-                    ),
-                    (
-                        bevy::ui::Node
-                        Children[({
+                    bevy::ui::Node
+                    Children[
+                        Text::new("Menu")
+                    ],
+                    bevy::ui::Node
+                    Children[
+                        {
                             let thing = Text::new("Thing");
                             thing
-                        })]
-                    )
+                        }
+                    ]
                 ]
             }
         };
@@ -1520,8 +1527,8 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    (bevy::ui::widget::Text("Hello")),
-                    (bevy::ui::widget::Text({let thing = true; if thing { "World" } else { "Mom" }}))
+                    bevy::ui::widget::Text("Hello"),
+                    bevy::ui::widget::Text({let thing = true; if thing { "World" } else { "Mom" }})
                 ]
             }
         };
@@ -1575,6 +1582,57 @@ mod tests {
     }
 
     #[test]
+    fn supports_spawning_with_block_children() {
+        let input = quote! {
+            <div
+                name={Into::<String>::into(label.clone())}
+                display="flex"
+                flex-direction="col"
+                row-gap="8px">
+                <button
+                    padding="2px"
+                    display="flex"
+                    flex-direction="row"
+                    align-items={AlignItems::Center}
+                    column-gap="8px">
+                    <span>{label}</span>
+                </button>
+                <AccordionContainer>
+                    {content}
+                </AccordionContainer>
+            </div>
+        };
+        let bsn = quote! {
+            bevy::scene::bsn! {
+                bevy::ecs::name::Name(Into::<String>::into(label.clone()))
+                bevy::ui::Node {
+                    row_gap: bevy::ui::px (8.0),
+                    display: bevy::ui::Display::Flex,
+                    flex_direction: bevy::ui::FlexDirection::Column
+                }
+                Children [
+                    @bevy::feathers::controls::FeathersButton {
+                        @caption: bsn_list! [bevy::ui::widget::Text(label)]
+                    }
+                    bevy::ui::Node {
+                        padding: { bevy::ui::px (2.0).all() },
+                        column_gap: bevy::ui::px (8.0),
+                        display: bevy::ui::Display::Flex,
+                        flex_direction: bevy::ui::FlexDirection::Row,
+                        align_items: AlignItems::Center
+                    },
+                    @AccordionContainer
+                    bevy::ui::Node
+                    Children [
+                        content
+                    ]
+                ]
+            }
+        };
+        assert_eq!(html_inner(input, true).to_string(), bsn.to_string());
+    }
+
+    #[test]
     fn support_arbitrary_component_additions() {
         let input = quote! {
             <div
@@ -1597,7 +1655,9 @@ mod tests {
                 bevy::ui::Node
                 Checkable
                 Checked
-                Children[(bevy::ui::widget::Text("Hello"))]
+                Children[
+                    bevy::ui::widget::Text("Hello")
+                ]
             }
         };
         assert_html(input, bundle, bsn);
@@ -1628,10 +1688,10 @@ mod tests {
                 bevy::scene::bsn!{
                     #hash hello
                     bevy::ui::Node
-                    Children[(
+                    Children[
                         bevy::ecs::name::Name("other".trim())
                         bevy::ui::Node
-                    )]
+                    ]
                 }
             }
         };
@@ -1686,7 +1746,7 @@ mod tests {
                         border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px (2.0)) }
                     }
                     Children [
-                        (bevy::ui::widget::Text ("Menu"))
+                        bevy::ui::widget::Text ("Menu")
                     ]
                 }
             };
@@ -1714,7 +1774,7 @@ mod tests {
                         border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px (2.0)) }
                     }
                     Children [
-                        (bevy::ui::widget::Text ("Menu"))
+                        bevy::ui::widget::Text ("Menu")
                     ]
                 }
             };
@@ -1744,7 +1804,7 @@ mod tests {
                         border_radius: { bevy::ui::BorderRadius::all(bevy::ui::px (2.0)) }
                     }
                     Children [
-                        (bevy::ui::widget::Text ("Menu"))
+                        bevy::ui::widget::Text("Menu")
                     ]
                 }
             };
@@ -1782,9 +1842,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(Color::linear_rgb(0.7, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -1842,9 +1902,9 @@ mod tests {
                         bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
                         bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170))
                         bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))
-                        Children[(
+                        Children[
                             bevy::ui::widget::Text("Menu")
-                        )]
+                        ]
                     }
                 }
             } else {
@@ -1856,9 +1916,9 @@ mod tests {
                         bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
                         bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170))
                         bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))
-                        Children[(
+                        Children[
                             bevy::ui::widget::Text("Menu")
-                        )]
+                        ]
                     }
                 }
             };
@@ -1895,9 +1955,9 @@ mod tests {
                             padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::ui::BorderColor::all(bevy::color::Color::BLACK)
-                        Children[(
+                        Children[
                             bevy::ui::widget::Text("Menu")
-                        )]
+                        ]
                     }
                 };
 
@@ -1931,9 +1991,9 @@ mod tests {
                             padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::ui::BorderColor::all(bevy::color::Color::WHITE)
-                        Children[(
+                        Children[
                             bevy::ui::widget::Text("Menu")
-                        )]
+                        ]
                     }
                 };
 
@@ -1967,9 +2027,9 @@ mod tests {
                             padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::ui::BorderColor::all(bevy::color::Color::NONE)
-                        Children[(
+                        Children[
                             bevy::ui::widget::Text("Menu")
-                        )]
+                        ]
                     }
                 };
 
@@ -2004,9 +2064,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::linear_rgb(0.6666667, 0.6666667, 0.6666667))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2040,9 +2100,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::linear_rgba(0.6666667, 0.6666667, 0.6666667, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2076,9 +2136,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::srgb(0.7, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2112,9 +2172,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2148,9 +2208,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::srgba(0.7, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2184,9 +2244,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::srgba_u8(170, 170, 170, 127))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2220,9 +2280,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::hsl(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2256,9 +2316,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::hsla(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2292,9 +2352,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::hsv(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2328,9 +2388,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::hsva(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2364,9 +2424,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::hwb(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2400,9 +2460,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::hwba(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2436,9 +2496,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::lab(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2472,9 +2532,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::laba(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2508,9 +2568,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::lch(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2544,9 +2604,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::lcha(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2580,9 +2640,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::oklab(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2616,9 +2676,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::oklaba(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2652,9 +2712,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::oklch(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2688,9 +2748,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::oklcha(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2724,9 +2784,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::xyz(170.0, 0.7, 0.7))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2760,9 +2820,9 @@ mod tests {
                         padding: { bevy::ui::px(4.0).all() }
                     }
                     bevy::ui::BorderColor::all(bevy::color::Color::xyza(170.0, 0.7, 0.7, 0.5))
-                    Children[(
+                    Children[
                         bevy::ui::widget::Text("Menu")
-                    )]
+                    ]
                 }
             };
 
@@ -2820,21 +2880,21 @@ mod tests {
                         display: Display::Flex
                     }
                     Children[
-                        (bevy::ui::Node {
+                        bevy::ui::Node {
                             display: bevy::ui::Display::None
-                        }),
-                        (bevy::ui::Node {
+                        },
+                        bevy::ui::Node {
                             display: bevy::ui::Display::None
-                        }),
-                        (bevy::ui::Node {
+                        },
+                        bevy::ui::Node {
                             display: bevy::ui::Display::Flex
-                        }),
-                        (bevy::ui::Node {
+                        },
+                        bevy::ui::Node {
                             display: bevy::ui::Display::Grid
-                        }),
-                        (bevy::ui::Node {
+                        },
+                        bevy::ui::Node {
                             display: bevy::ui::Display::Block
-                        })
+                        }
                     ]
                 }
             };
@@ -2878,15 +2938,15 @@ mod tests {
                         position_type: bevy::ui::PositionType::Absolute
                     }
                     Children[
-                        (bevy::ui::Node {
+                        bevy::ui::Node {
                             position_type: bevy::ui::PositionType::Relative
-                        }),
-                        (bevy::ui::Node {
+                        },
+                        bevy::ui::Node {
                             position_type: bevy::ui::PositionType::Absolute
-                        }),
-                        (bevy::ui::Node {
+                        },
+                        bevy::ui::Node {
                             position_type: bevy::ui::PositionType::Relative
-                        })
+                        }
                     ]
                 }
             };
@@ -2971,7 +3031,7 @@ mod tests {
                             commands.entity(*text).insert(Text::new("Hi, Mom!"));
                         })
                     Children[
-                        (bevy::ui::widget::Text("Hello, World!"))
+                        bevy::ui::widget::Text("Hello, World!")
                     ]
                 }
             };
@@ -3033,7 +3093,9 @@ mod tests {
                         bevy::app::Propagate(bevy::text::TextFont {
                             font_size: bevy::text::FontSize::Px(10.0)
                         })
-                        Children[(bevy::ui::widget::Text("Menu"))]
+                        Children[
+                            bevy::ui::widget::Text("Menu")
+                        ]
                     }
                 }
             } else {
@@ -3045,7 +3107,9 @@ mod tests {
                         bevy::text::TextFont {
                             font_size: bevy::text::FontSize::Px(10.0)
                         }
-                        Children[(bevy::ui::widget::Text("Menu"))]
+                        Children[
+                            bevy::ui::widget::Text("Menu")
+                        ]
                     }
                 }
             };
@@ -3096,7 +3160,9 @@ mod tests {
                             padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))
-                        Children[(bevy::ui::widget::Text("Menu"))]
+                        Children[
+                            bevy::ui::widget::Text("Menu")
+                        ]
                     }
                 }
             } else {
@@ -3106,7 +3172,9 @@ mod tests {
                             padding: { bevy::ui::px(4.0).all() }
                         }
                         bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))
-                        Children[(bevy::ui::widget::Text("Menu"))]
+                        Children[
+                            bevy::ui::widget::Text("Menu")
+                        ]
                     }
                 }
             };
@@ -3146,12 +3214,10 @@ mod tests {
                         justify: Justify::Left
                     }
                     Children[
-                        ((
-                            bevy::ui::widget::Text("Hello"),
-                            bevy::text::TextLayout {
-                                linebreak: LineBreak::NoWrap
-                            }
-                        ))
+                        bevy::ui::widget::Text("Hello")
+                        bevy::text::TextLayout {
+                            linebreak: LineBreak::NoWrap
+                        }
                     ]
                 }
             };
@@ -3194,14 +3260,12 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (
-                            @bevy::feathers::controls::FeathersButton {
-                                @variant: bevy::feathers::controls::ButtonVariant::Normal,
-                                @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
-                                @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
-                            }
-                            bevy::ui::Node
-                        )
+                        @bevy::feathers::controls::FeathersButton {
+                            @variant: bevy::feathers::controls::ButtonVariant::Normal,
+                            @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
+                            @caption: bsn_list![bevy::ui::widget::Text("Hello")]
+                        }
+                        bevy::ui::Node
                     ]
                 }
             };
@@ -3240,18 +3304,16 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (
-                            @bevy::feathers::controls::FeathersButton {
-                                @caption: bsn_list![(bevy::ui::widget::Text(label))]
-                            }
-                            bevy::ui::Node {
-                                padding: { bevy::ui::px(2.0).all() },
-                                column_gap: bevy::ui::px(8.0),
-                                display: bevy::ui::Display::Flex,
-                                flex_direction: bevy::ui::FlexDirection::Row,
-                                align_items: AlignItems::Center
-                            }
-                        )
+                        @bevy::feathers::controls::FeathersButton {
+                            @caption: bsn_list![bevy::ui::widget::Text(label)]
+                        }
+                        bevy::ui::Node {
+                            padding: { bevy::ui::px(2.0).all() },
+                            column_gap: bevy::ui::px(8.0),
+                            display: bevy::ui::Display::Flex,
+                            flex_direction: bevy::ui::FlexDirection::Row,
+                            align_items: AlignItems::Center
+                        }
                     ]
                 }
             };
@@ -3305,19 +3367,17 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (
-                            @bevy::feathers::controls::FeathersButton {
-                                @variant: bevy::feathers::controls::ButtonVariant::Primary,
-                                @corners: bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
-                                @caption: bsn_list![
-                                    (bevy::ui::widget::Text("Hello"))
-                                ]
-                            }
-                            on(|event: On<Activate>| {
-                                info!("{:?}",event.entity);
-                            })
-                            bevy::ui::Node
-                        )
+                        @bevy::feathers::controls::FeathersButton {
+                            @variant: bevy::feathers::controls::ButtonVariant::Primary,
+                            @corners: bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
+                            @caption: bsn_list![
+                                bevy::ui::widget::Text("Hello")
+                            ]
+                        }
+                        on(|event: On<Activate>| {
+                            info!("{:?}",event.entity);
+                        })
+                        bevy::ui::Node
                     ]
                 }
             };
@@ -3356,15 +3416,13 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (
-                            @bevy::feathers::controls::FeathersButton {
-                                @variant: bevy::feathers::controls::ButtonVariant::Normal,
-                                @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
-                                @caption: bsn_list![(bevy::ui::widget::Text("Hello"))]
-                            }
-                            bevy::ui::Node
-                            Testing::new()
-                        )
+                        @bevy::feathers::controls::FeathersButton {
+                            @variant: bevy::feathers::controls::ButtonVariant::Normal,
+                            @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
+                            @caption: bsn_list![bevy::ui::widget::Text("Hello")]
+                        }
+                        bevy::ui::Node
+                        Testing::new()
                     ]
                 }
             };
@@ -3413,16 +3471,14 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (
-                            @bevy::feathers::controls::FeathersCheckbox {
-                                @caption: bsn_list![
-                                    bevy::ui::widget::Text("Hello")
-                                ]
-                            }
-                            on(|event: On<ValueChange<bool> >| {
-                                println!("Hello Changed {}", event.value)
-                            })
-                        )
+                        @bevy::feathers::controls::FeathersCheckbox {
+                            @caption: bsn_list![
+                                bevy::ui::widget::Text("Hello")
+                            ]
+                        }
+                        on(|event: On<ValueChange<bool> >| {
+                            println!("Hello Changed {}", event.value)
+                        })
                     ]
                 }
             };
@@ -3472,17 +3528,15 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     Children[
-                        (
-                            TestComponent
-                            @bevy::feathers::controls::FeathersRadio {
-                                @caption: bsn_list![
-                                    bevy::ui::widget::Text("Hello")
-                                ]
-                            }
-                            on(|event: On<ValueChange<bool> >| {
-                                println!("Hello True {}", event.value)
-                            })
-                        )
+                        TestComponent
+                        @bevy::feathers::controls::FeathersRadio {
+                            @caption: bsn_list![
+                                bevy::ui::widget::Text("Hello")
+                            ]
+                        }
+                        on(|event: On<ValueChange<bool> >| {
+                            println!("Hello True {}", event.value)
+                        })
                     ]
                 }
             };
