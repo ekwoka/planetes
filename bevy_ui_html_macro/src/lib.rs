@@ -513,7 +513,7 @@ impl ToTokens for ElementNode {
         }
         if !is_custom || self.bsn {
             components.push_some(NodeComponent::new(&self.attributes, self.bsn).ok());
-            components.push_some(Image::from(&self.attributes).ok());
+            components.push_some(Image::new(&self.attributes, self.bsn).ok());
             components.push_some(BorderColor::from(&self.attributes).ok());
             components.push_some(BackgroundColor::from(&self.attributes).ok());
             components.push_some(TextFont::new(&self.attributes, self.bsn).ok());
@@ -1699,7 +1699,7 @@ mod tests {
     }
 
     #[test]
-    fn supports_img_tags() {
+    fn supports_img_tags_bundle() {
         let input = quote! {
             <img src={asset_server
                 .load("embedded://planetes_editor/assets/filled_triangle.png")} />
@@ -1716,13 +1716,28 @@ mod tests {
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
-                bevy::ui::widget::ImageNode::new(
-                    asset_server
-                        .load("embedded://planetes_editor/assets/filled_triangle.png")
-                )
+                bevy::ui::widget::ImageNode {
+                    image: "embedded://planetes_editor/assets/filled_triangle.png"
+                }
             }
         };
-        assert_html(input, bundle, bsn);
+        assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
+    }
+
+    #[test]
+    fn supports_img_tags_scene() {
+        let input = quote! {
+            <img src="embedded://planetes_editor/assets/filled_triangle.png" />
+        };
+        let bsn = quote! {
+            bevy::scene::bsn!{
+                bevy::ui::Node
+                bevy::ui::widget::ImageNode {
+                    image: "embedded://planetes_editor/assets/filled_triangle.png"
+                }
+            }
+        };
+        assert_eq!(html_inner(input, true).to_string(), bsn.to_string());
     }
 
     mod scene_components {
@@ -1901,7 +1916,8 @@ mod tests {
                         }
                         bevy::ui::BorderColor::all(bevy::color::Color::srgb_u8(170, 170, 170))
                         bevy::ui::BackgroundColor(bevy::color::Color::srgb_u8(170, 170, 170))
-                        bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))
+                        template(|_| Ok(bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))))
+                        bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))
                         Children[
                             bevy::ui::widget::Text("Menu")
                         ]
@@ -3090,9 +3106,13 @@ mod tests {
                         bevy::ui::Node {
                             padding: { bevy::ui::px(4.0).all() }
                         }
-                        bevy::app::Propagate(bevy::text::TextFont {
+                        template(|_| Ok(bevy::app::Propagate(bevy::text::TextFont {
+                            font_size: bevy::text::FontSize::Px(10.0),
+                            ..Default::default()
+                        })))
+                        bevy::text::TextFont {
                             font_size: bevy::text::FontSize::Px(10.0)
-                        })
+                        }
                         Children[
                             bevy::ui::widget::Text("Menu")
                         ]
@@ -3159,7 +3179,8 @@ mod tests {
                         bevy::ui::Node {
                             padding: { bevy::ui::px(4.0).all() }
                         }
-                        bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))
+                        template(|_| Ok(bevy::app::Propagate(bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170)))))
+                        bevy::text::TextColor(bevy::color::Color::srgb_u8(170, 170, 170))
                         Children[
                             bevy::ui::widget::Text("Menu")
                         ]

@@ -67,14 +67,22 @@ impl ToTokens for TextFont {
                     }
                 }),
                 _ => None,
-            });
-
+            })
+            .collect::<Vec<_>>();
         if self.bsn {
             if cfg!(feature = "propagate") {
                 tokens.extend(quote! {
-                        bevy::app::Propagate<bevy::text::TextFont>(bevy::text::TextFont {
-                        #(#fields,)*
-                        })
+                        template(|_| Ok(
+                            bevy::app::Propagate(
+                                bevy::text::TextFont {
+                                    #(#fields,)*
+                                    ..Default::default()
+                                }
+                            )
+                        ))
+                        bevy::text::TextFont {
+                            #(#fields),*
+                        }
                 })
             } else {
                 tokens.extend(quote! {
@@ -208,7 +216,10 @@ impl ToTokens for TextColor {
             if self.bsn {
                 if cfg!(feature = "propagate") {
                     tokens.extend(quote! {
+                        template(|_| Ok(
                             bevy::app::Propagate(bevy::text::TextColor(#color))
+                        ))
+                        bevy::text::TextColor(#color)
                     })
                 } else {
                     tokens.extend(quote! {
