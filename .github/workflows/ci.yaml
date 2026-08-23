@@ -19,7 +19,7 @@ jobs:
   # Check formatting.
   format:
     name: Format
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -37,7 +37,7 @@ jobs:
   # Check documentation.
   docs:
     name: Docs
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -48,13 +48,17 @@ jobs:
         with:
           toolchain: ${{ env.toolchain }}
 
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update -y; sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev libwayland-dev
+
       - name: Check documentation
         run: cargo doc --locked --workspace --profile ci --no-default-features --document-private-items --no-deps
 
   # Run Clippy lints.
   clippy-lints:
     name: Clippy lints
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -73,13 +77,17 @@ jobs:
           shared-key: ci
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update -y; sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev libwayland-dev
+
       - name: Run Clippy lints
         run: cargo clippy --locked --workspace --all-targets --profile ci --all-features
 
   # Run tests.
   tests:
     name: Tests
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - name: Checkout repository
@@ -89,6 +97,9 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.toolchain }}
+
+      - name: Install build dependencies
+        run: sudo apt-get update -y; sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev libwayland-dev
 
       - name: Run tests
         run: cargo test --locked --workspace --all-targets --profile ci --no-default-features --no-fail-fast
@@ -96,7 +107,7 @@ jobs:
   # Run tests.
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - name: Checkout repository
@@ -107,13 +118,16 @@ jobs:
         with:
           toolchain: ${{ env.toolchain }}
 
+      - name: Install build dependencies
+        run: sudo apt-get update -y; sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev libwayland-dev
+
       - name: Build
         run: cargo build --release --no-default-features --features editor
 
   # Check that the web build compiles.
   check-web:
     name: Check web
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -124,6 +138,10 @@ jobs:
         with:
           toolchain: ${{ env.toolchain }}
           targets: wasm32-unknown-unknown
+
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update -y; sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev libwayland-dev
 
       - name: Check web
         run: cargo check --config 'profile.web.inherits="dev"' --profile ci --no-default-features --features dev --target wasm32-unknown-unknown
