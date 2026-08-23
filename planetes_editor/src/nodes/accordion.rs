@@ -124,11 +124,7 @@ pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
     }
 }
 
-pub fn scene<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
-    label: impl Into<String> + Clone,
-    content: SpawnIter<I>,
-    asset_server: AssetServer,
-) -> impl Scene {
+pub fn scene(label: impl Into<String> + Clone, content: impl SceneList) -> impl Scene + Sized {
     html! {
         <div
             name={Into::<String>::into(label.clone())}
@@ -136,15 +132,40 @@ pub fn scene<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
             flex-direction="col"
             row-gap="8px"
             components={template(|_| Ok(Propagate(AccordionState::Closed)))}>
-            <button
+            <AccordionControl>
+                <img
+                    src="embedded://planetes_editor/assets/filled_triangle.png"
+                    height="8px"
+                    width="8px"
+                    components={
+                        (
+                            AccordionIcon,
+                            UiTransform::from_rotation(Rot2::degrees(90.0))
+                        )
+                    }/>
+                <span>{label}</span>
+            </AccordionControl>
+            <AccordionContainer>
+                {{content}}
+            </AccordionContainer>
+        </div>
+    }
+}
+
+#[derive(SceneComponent, Clone, Default)]
+pub struct AccordionControl;
+
+impl AccordionControl {
+    fn scene() -> impl Scene {
+        html! {
+            <div
                 padding="2px"
                 display="flex"
                 flex-direction="row"
                 align-items={AlignItems::Center}
-                column-gap="8px">
-                <span>{label}</span>
-            </button>
-        </div>
+                column-gap="8px"
+                components={Button} />
+        }
     }
 }
 
@@ -174,8 +195,21 @@ impl AccordionState {
     }
 }
 
-#[derive(Component, HtmlComponent)]
+#[derive(SceneComponent, HtmlComponent, Clone, Default)]
 pub struct AccordionContainer;
 
-#[derive(Component, HtmlComponent)]
+impl AccordionContainer {
+    fn scene() -> impl Scene {
+        html! {
+            <div
+                padding-left="2px"
+                margin-left="16px"
+                display="none"
+                flex-direction="col"
+                row-gap="8px"/>
+        }
+    }
+}
+
+#[derive(Component, HtmlComponent, Default, Clone)]
 pub struct AccordionIcon;

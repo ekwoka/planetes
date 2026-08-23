@@ -129,7 +129,6 @@ pub fn update_entity_viewer_scene(
     entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
     canonical_scene: Res<CanonicalScene>,
     scenes: Res<Assets<DynamicWorld>>,
-    assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
 

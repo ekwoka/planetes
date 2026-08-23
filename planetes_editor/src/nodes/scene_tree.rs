@@ -35,8 +35,22 @@ impl SceneTreeView {
     }
 }
 
-#[derive(Component, HtmlComponent)]
+#[derive(SceneComponent, HtmlComponent, Clone, Default)]
 pub struct SceneTreeBranch;
+
+impl SceneTreeBranch {
+    fn scene() -> impl Scene {
+        html! {
+            <div padding-left="2px"
+            flex-grow="0"
+            flex-shrink="1"
+            display="flex"
+            flex-direction="col"
+            row-gap="8px"
+            width="100%" />
+        }
+    }
+}
 
 pub fn scene() -> impl Scene {
     html! {
@@ -114,27 +128,18 @@ pub fn update_tree(
                         .collect::<Vec<Entity>>();
 
                     let asset_server = asset_server.clone();
+                    let mut children: Vec<Box<dyn Scene>> = vec![];
+                    root_entities
+                        .into_iter()
+                        .filter_map(|entity| {
+                            branch_scene(entity, scene_children.clone(), asset_server.clone())
+                        })
+                        .for_each(|scene| children.push(Box::new(scene)));
                     view_commands
                         .despawn_children()
-                        .with_children(move |parent| {
-                            parent.spawn(accordion::view(
-                                "Root:",
-                                SpawnIter(
-                                    root_entities
-                                        .into_iter()
-                                        .filter_map(|entity| {
-                                            branch(
-                                                entity,
-                                                scene_children.clone(),
-                                                asset_server.clone(),
-                                            )
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .into_iter(),
-                                ),
-                                asset_server,
-                            ));
-                        });
+                        .queue_spawn_related_scenes::<Children>(vec![accordion::scene(
+                            "Root:", children,
+                        )]);
                 } else {
                     info!("No SceneTreeView");
                 }
@@ -203,6 +208,53 @@ pub fn branch(
     }
 }
 
+pub fn branch_scene(
+    target_entity: Entity,
+    scene_children: HashMap<Entity, (Option<Name>, Option<Vec<Entity>>)>,
+    asset_server: AssetServer,
+) -> Option<impl Scene> {
+    if let Some((name, children)) = scene_children.get(&target_entity) {
+        let name = name.clone().map_or_else(
+            || format!("{target_entity}"),
+            |name| format!("{name} ({target_entity})"),
+        );
+        let children = children.clone();
+        let text = format!("{name}:");
+        let child: Box<dyn Scene> = if let Some(children) = children
+            && !children.is_empty()
+        {
+            let mut content: Vec<Box<dyn Scene>> = vec![];
+            children
+                .into_iter()
+                .filter_map(|entity| {
+                    branch_scene(entity, scene_children.clone(), asset_server.clone())
+                })
+                .for_each(|scene| content.push(Box::new(scene)));
+            Box::new(accordion::scene(text, content))
+        } else {
+            (html! {
+                <div
+                    name={name}
+                    padding="2px"
+                    display="flex"
+                    flex-direction="row"
+                    align-items={AlignItems::Center}
+                    column-gap="8px">
+                    <span>{text}</span>
+                </div>
+            })
+            .into()
+        };
+        Some(html! {
+            <SceneTreeBranch components={Represents(target_entity)}>
+                {child}
+            </SceneTreeBranch>
+        })
+    } else {
+        None
+    }
+}
+
 pub fn select_entity(
     mut event: On<Pointer<Click>>,
     mut commands: Commands,
@@ -218,7 +270,7 @@ pub fn select_entity(
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone, FromTemplate)]
 #[relationship(relationship_target = RepresentedBy)]
 pub struct Represents(pub Entity);
 

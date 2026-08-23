@@ -1713,14 +1713,6 @@ mod tests {
                 )
             )
         };
-        let bsn = quote! {
-            bevy::scene::bsn!{
-                bevy::ui::Node
-                bevy::ui::widget::ImageNode {
-                    image: "embedded://planetes_editor/assets/filled_triangle.png"
-                }
-            }
-        };
         assert_eq!(html_inner(input, false).to_string(), bundle.to_string());
     }
 
