@@ -140,11 +140,20 @@ impl TextLayout {
 
 impl ToTokens for TextLayout {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let bsn = self.bsn;
         let fields = self.attributes.iter().map(|attr| {
             let key = syn::Ident::new(&attr.key, attr.span);
             let value = Value::new(&attr.value).clean_block();
-            quote! {
-                #key: #value
+            if bsn {
+                // Braced so `bsn!` reads the value as an opaque Rust expression rather than
+                // trying to build an enum variant patch out of it.
+                quote! {
+                    #key: {#value}
+                }
+            } else {
+                quote! {
+                    #key: #value
+                }
             }
         });
 

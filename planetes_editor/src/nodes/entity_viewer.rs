@@ -1,6 +1,6 @@
 //! Core Entity Viewer/Editor
 
-use std::{any::TypeId, iter::once};
+use std::any::TypeId;
 
 use bevy::{
     input::{
@@ -12,12 +12,11 @@ use bevy::{
     prelude::*,
     ui_widgets::Activate,
 };
-use bevy_ui_html::HtmlComponent;
 use planetes_input::prelude::*;
 use planetes_scene_state::{CanonicalScene, ComponentsChanged};
 
 use crate::{
-    atoms::{button, highlight_selected_input, input_field, input_field_scene},
+    atoms::{button, highlight_selected_input, input_field},
     events::AddComponentToEntity,
     nodes::{accordion, component_editor, component_selector::OpenAddComponent},
     prelude::*,
@@ -36,92 +35,78 @@ pub fn plugin(app: &mut App) {
     .add_observer(update_required_components);
 }
 
-pub fn update_entity_viewer(
-    mut commands: Commands,
-    entity_viewer: Single<(Entity, &Viewing), (Changed<Viewing>, With<EntityEditor>)>,
-    canonical_scene: Res<CanonicalScene>,
-    scenes: Res<Assets<DynamicWorld>>,
-    assets: Res<AssetServer>,
-) {
-    let (editor, &Viewing(target)) = *entity_viewer;
-
-    let Some(entity) = canonical_scene.get_entity(&scenes, target) else {
-        return;
-    };
-
-    let components_data = &entity.components;
-
+/// Builds the contents of the [EntityEditor] for the entity being viewed
+fn entity_editor_scenes(
+    target: Entity,
+    components_data: &[Box<dyn PartialReflect>],
+) -> Vec<Box<dyn Scene>> {
     info!("Found Components: {}", components_data.len());
+    let name = components_data
+        .iter()
+        .find(|component| component.represents::<Name>())
+        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
     let components = components_data
         .iter()
         .filter(|component| !component.represents::<Name>())
         .filter_map(|component| {
             component.get_represented_type_info().map(|type_info| {
-                accordion::view(
+                let editor: Box<dyn Scene> = Box::new(component_editor::base(type_info.type_id()));
+                let accordion: Box<dyn Scene> = Box::new(accordion::scene(
                     type_info
                         .type_path_table()
                         .ident()
                         .map(|ident| ident.to_string())
                         .unwrap_or("Unknown".into()),
-                    SpawnIter(once(component_editor::base(type_info.type_id()))),
-                    assets.clone(),
-                )
+                    vec![editor],
+                ));
+                accordion
             })
         })
         .collect::<Vec<_>>();
-    let name = components_data
-        .iter()
-        .find(|component| component.represents::<Name>())
-        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
-    commands
-        .entity(editor)
-        .despawn_children()
-        .with_children(move |parent| {
-            parent.spawn(html_bundle! {
-                <div
-                  display="flex"
-                  flex-direction="row"
-                  align-items={AlignItems::Center}
-                  onInput={update_name}
-                >
-                    <span>"Selected: "</span>
-                    {
-                        input_field::<String>(if let Some(name) = name {
-                            format!("{name}")
-                        } else {
-                            format!("{target}")
-                        })
-                    }
-                </div>
-            });
-
-
-            parent.spawn(html_bundle! {
-                <div
+    vec![
+        Box::new(html! {
+            <div
+              display="flex"
+              flex-direction="row"
+              align-items={AlignItems::Center}
+              onInput={update_name}
+            >
+                <span>"Selected: "</span>
+                {
+                    input_field::<String>(if let Some(name) = name {
+                        format!("{name}")
+                    } else {
+                        format!("{target}")
+                    })
+                }
+            </div>
+        }),
+        Box::new(html! {
+            <div
+               display="flex"
+               flex-direction="col"
+               row-gap="4px">
+               {{components}}
+            </div>
+        }),
+        Box::new(html! {
+            <div>
+                {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
+                    commands.trigger(OpenAddComponent { entity: target.0 });
+                })}
+            </div>
+        }),
+        Box::new(html! {
+            <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(180 180 180)">
+               <span>"Required Components:"</span>
+               <div
                    display="flex"
                    flex-direction="col"
-                   row-gap="4px">
-                   <iter>
-                    {components.into_iter()}
-                   </iter>
-                </div>
-            });
-            parent.spawn(html_bundle! {
-                <div>
-                    {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
-                        commands.trigger(OpenAddComponent { entity: target.0 });
-                    })}
-                </div>
-            });
-            parent.spawn(html_bundle! {
-                <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(180 180 180)">
-                   <span>"Required Components:"</span>
-                   <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
-
-                   </div>
-                </div>
-            });
-        });
+                   row-gap="4px"
+                   components={RequiredComponentsUI(target)}/>
+            </div>
+        }),
+    ]
 }
 
 pub fn update_entity_viewer_scene(
@@ -136,50 +121,13 @@ pub fn update_entity_viewer_scene(
         return;
     };
 
-    let components_data = &entity.components;
-
-    info!("Found Components: {}", components_data.len());
-    let name = components_data
-        .iter()
-        .find(|component| component.represents::<Name>())
-        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
-    let mut children: Vec<Box<dyn Scene>> = vec![Box::new(html! {
-        <div
-          display="flex"
-          flex-direction="row"
-          align-items={AlignItems::Center}
-          onInput={update_name}
-        >
-            <span>"Selected: "</span>
-            {
-                input_field_scene::<String>(if let Some(name) = name {
-                    format!("{name}")
-                } else {
-                    format!("{target}")
-                })
-            }
-        </div>
-    })];
-    components_data
-        .iter()
-        .filter(|component| !component.represents::<Name>())
-        .filter_map(|component| {
-            component.get_represented_type_info().map(|type_info| {
-                html! {
-                    <div>
-                      <span>{{type_info.type_path()}}</span>
-                    </div>
-                }
-            })
-        })
-        .for_each(|scene| children.push(Box::new(scene)));
     commands
         .entity(editor)
         .despawn_children()
-        .queue_spawn_related_scenes::<Children>(children);
+        .queue_spawn_related_scenes::<Children>(entity_editor_scenes(target, &entity.components));
 }
 
-#[derive(Component)]
+#[derive(Component, Clone, FromTemplate)]
 pub struct RequiredComponentsUI(pub Entity);
 
 #[derive(Component)]
@@ -232,23 +180,27 @@ pub fn update_required_components(
             ));
         }
     }
-    commands.entity(event.entity).with_children(|parent| {
-        for (name, id) in required_components.into_iter() {
-            parent.spawn(html_bundle! {
+    let rows = required_components
+        .into_iter()
+        .map(|(name, id)| {
+            html! {
                 <div
                     display="flex"
                     flex-direction="row"
                     justify-items="space-between"
                     align-items={AlignItems::Center}
                     column-gap="2px"
-                    components={RequiredComponent(target, id)}>
+                    components={template(move |_| Ok(RequiredComponent(target, id)))}>
                     <span>{name}</span>
                     <div flex-grow="100"/>
                     {button::render("Include", handle_include_required_component)}
                 </div>
-            });
-        }
-    });
+            }
+        })
+        .collect::<Vec<_>>();
+    commands
+        .entity(event.entity)
+        .queue_spawn_related_scenes::<Children>(rows);
 }
 
 pub fn handle_include_required_component(
@@ -275,7 +227,6 @@ pub fn handle_components_changed(
     entity_viewer: Single<(Entity, &Viewing), With<EntityEditor>>,
     scenes: Res<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
-    assets: Res<AssetServer>,
 ) {
     let (editor, &Viewing(target)) = *entity_viewer;
     if event.event().0 != target {
@@ -286,86 +237,10 @@ pub fn handle_components_changed(
         return;
     };
 
-    let components_data = &entity.components;
-
-    info!("Found Components: {}", components_data.len());
-    let components = components_data
-        .iter()
-        .filter(|component| !component.represents::<Name>())
-        .filter_map(|component| {
-            component.get_represented_type_info().map(|type_info| {
-                accordion::view(
-                    type_info
-                        .type_path_table()
-                        .ident()
-                        .map(|ident| ident.to_string())
-                        .unwrap_or("Unknown".into()),
-                    SpawnIter(once(component_editor::base(type_info.type_id()))),
-                    assets.clone(),
-                )
-            })
-        })
-        .collect::<Vec<_>>();
-    let name = components_data
-        .iter()
-        .find(|component| component.represents::<Name>())
-        .and_then(|name| Name::from_reflect(name.as_partial_reflect()));
     commands
         .entity(editor)
         .despawn_children()
-        .with_children(move |parent| {
-            parent.spawn(html_bundle! {
-                <div
-                  display="flex"
-                  flex-direction="row"
-                  align-items={AlignItems::Center}
-                  onInput={update_name}
-                >
-                    <span>"Selected: "</span>
-                    {
-                        input_field::<String>(if let Some(name) = name {
-                            format!("{name}")
-                        } else {
-                            format!("{target}")
-                        })
-                    }
-                </div>
-            });
-
-
-            parent.spawn(html_bundle! {
-                <div
-                    display="flex"
-                    flex-direction="col"
-                    row-gap="4px">
-                    <iter>
-                    {components.into_iter()}
-                    </iter>
-                </div>
-            });
-            parent.spawn(html_bundle! {
-                <div
-                    display="block"
-                >
-                    <button
-                       variant="normal"
-                       corners="rounded"
-                       onActivate={|_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
-                           commands.trigger(OpenAddComponent { entity: target.0 });
-                       }}>
-                       "+ Add Component"
-                    </button>
-                </div>
-            });
-            parent.spawn(html_bundle! {
-                <div display="flex" flex-direction="col" row-gap="4px" text-color="srgb(120 120 120)">
-                    <span>"Required Components:"</span>
-                    <div display="flex" flex-direction="col" row-gap="4px" components={RequiredComponentsUI(target)}>
-
-                    </div>
-                </div>
-            });
-        });
+        .queue_spawn_related_scenes::<Children>(entity_editor_scenes(target, &entity.components));
 }
 
 /// Handles committing an Entity Name Change
@@ -398,7 +273,7 @@ fn update_name(
     }
 }
 
-#[derive(SceneComponent, HtmlComponent, Default, Clone)]
+#[derive(SceneComponent, Default, Clone)]
 pub struct EntityViewer;
 
 impl EntityViewer {
@@ -423,7 +298,7 @@ impl EntityViewer {
     }
 }
 
-#[derive(SceneComponent, HtmlComponent, Default, Clone)]
+#[derive(SceneComponent, Default, Clone)]
 pub struct EntityEditor;
 
 impl EntityEditor {

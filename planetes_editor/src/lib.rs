@@ -31,5 +31,5 @@ pub enum EditorMode {
 }
 
 pub mod prelude {
-    pub use bevy_ui_html::{HtmlComponent, html, html_bundle};
+    pub use bevy_ui_html::html;
 }

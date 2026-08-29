@@ -138,11 +138,17 @@ impl NodeComponent {
         }
     }
 
-    fn parse_enum_value(value: &syn::Expr) -> Option<TokenStream> {
+    fn parse_enum_value(value: &syn::Expr, bsn: bool) -> Option<TokenStream> {
         // Handle block expressions - extract the inner content
         let value_tokens = if let syn::Expr::Block(expr_block) = value {
             let stmts = &expr_block.block.stmts;
-            quote! { #(#stmts)* }
+            // `bsn!` reparses field values, and would read a struct literal as a nested patch.
+            // Keeping the braces marks the value as an opaque Rust expression.
+            if bsn {
+                quote! { { #(#stmts)* } }
+            } else {
+                quote! { #(#stmts)* }
+            }
         } else {
             quote! { #value }
         };
@@ -374,8 +380,8 @@ impl ToTokens for NodeComponent {
                 "box-sizing",
                 "grid-auto-flow",
             ] {
-                if let Some(value) =
-                    Self::get_attr(&self.attributes, prop).and_then(Self::parse_enum_value)
+                if let Some(value) = Self::get_attr(&self.attributes, prop)
+                    .and_then(|value| Self::parse_enum_value(value, self.bsn))
                 {
                     let field_name = Self::kebab_to_snake(prop);
                     let field = syn::Ident::new(&field_name, proc_macro2::Span::call_site());
@@ -408,8 +414,8 @@ impl ToTokens for NodeComponent {
             }
 
             // Process overflow (special struct)
-            if let Some(value) =
-                Self::get_attr(&self.attributes, "overflow").and_then(Self::parse_enum_value)
+            if let Some(value) = Self::get_attr(&self.attributes, "overflow")
+                .and_then(|value| Self::parse_enum_value(value, self.bsn))
             {
                 fields.push(quote! {
                     overflow: #value
@@ -418,7 +424,7 @@ impl ToTokens for NodeComponent {
 
             // Process overflow-clip-margin (special struct)
             if let Some(value) = Self::get_attr(&self.attributes, "overflow-clip-margin")
-                .and_then(Self::parse_enum_value)
+                .and_then(|value| Self::parse_enum_value(value, self.bsn))
             {
                 fields.push(quote! {
                     overflow_clip_margin: #value

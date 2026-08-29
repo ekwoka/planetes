@@ -8,6 +8,41 @@ fn test_app() -> App {
 }
 
 #[test]
+fn test_simple_iter() {
+    let mut app = test_app();
+
+    let mut text = app.world_mut().query::<&Text>();
+
+    let root = app
+        .world_mut()
+        .spawn_scene(html! {
+            <div>
+                <iter>
+                    {
+                        (1..3).map(|i| html! { <span>{format!("Item {i}")}</span> })
+                    }
+                </iter>
+            </div>
+        })
+        .unwrap()
+        .id();
+
+    let children = app
+        .world_mut()
+        .query::<&Children>()
+        .get(app.world(), root)
+        .unwrap();
+
+    assert_eq!(children.len(), 2);
+
+    assert_eq!(
+        text.iter_many(app.world(), children)
+            .collect::<Vec<&Text>>(),
+        vec![&Text::new("Item 1"), &Text::new("Item 2")]
+    );
+}
+
+#[test]
 fn test_editor_menu_button() {
     #[derive(SceneComponent, Clone, Default)]
     struct MenuButton;

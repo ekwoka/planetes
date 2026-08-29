@@ -372,6 +372,22 @@
 //!
 //! Children are wrapped in `Spawn`, iterators in `SpawnIter`, and imperative
 //! blocks in `SpawnWith`, leveraging Bevy's spawn-related traits.
+//!
+//! ## Scenes
+//!
+//! [`html!`] takes the same markup and produces a `Scene` (via `bsn!`) instead of a `Bundle`,
+//! for use with `spawn_scene` and friends:
+//!
+//! ```ignore
+//! fn setup(mut commands: Commands) {
+//!     commands.spawn_scene(html! {
+//!         <div padding="10px">"Hello, Bevy!"</div>
+//!     });
+//! }
+//! ```
+//!
+//! Scenes describe entities rather than spawning them, so a few things differ. See the
+//! [`html!`] docs for the full list.
 
 use bevy::prelude::*;
 pub use bevy_ui_html_macro::{HtmlComponent, html, html_bundle};

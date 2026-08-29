@@ -36,9 +36,10 @@ impl ToTokens for Image {
         let name = Value::new(&self.attributes[0].value);
         if let Some(name) = name.clean_block() {
             if self.bsn {
+                // Braced so `bsn!` reads the value as an opaque Rust expression.
                 tokens.extend(quote! {
                     bevy::ui::widget::ImageNode {
-                        image: #name
+                        image: {#name}
                     }
                 })
             } else {

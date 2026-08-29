@@ -19,8 +19,27 @@ pub struct CloseAddComponent;
 #[derive(Component)]
 pub struct AddComponentButton(pub TypeId);
 
-#[derive(Component, HtmlComponent)]
+#[derive(SceneComponent, Clone, Default)]
 pub struct AddComponentModal;
+
+impl AddComponentModal {
+    fn scene() -> impl Scene {
+        html! {
+            <div
+              display="flex"
+              flex-direction="column"
+              justify-content="center"
+              align-items={AlignItems::Center}
+              position-type={PositionType::Absolute}
+              top="0px"
+              left="0px"
+              right="0px"
+              bottom="0px"
+              font-size="12"
+              components={ZIndex(1)} />
+        }
+    }
+}
 
 pub fn handle_open_add_component(
     _event: On<OpenAddComponent>,
@@ -30,20 +49,8 @@ pub fn handle_open_add_component(
     let mut all_components = collect_default_components(&registry);
     all_components
         .sort_by_cached_key(|info| info.type_path_table().crate_name().unwrap_or("Unknown"));
-    commands.spawn(html_bundle! {
-        <AddComponentModal
-          display="flex"
-          flex-direction="column"
-          justify-content="center"
-          align-items={AlignItems::Center}
-          position-type={PositionType::Absolute}
-          top="0px"
-          left="0px"
-          right="0px"
-          bottom="0px"
-          font-size="12"
-          components={ZIndex(1)}
-        >
+    commands.spawn_scene(html! {
+        <AddComponentModal>
             <div
                 display="flex"
                 flex-direction="column"
@@ -66,13 +73,14 @@ pub fn handle_open_add_component(
                   components={ScrollPosition(Vec2::new(0.0, 10.0))}>
                     <iter>
                         {all_components.into_iter().map(|info| {
-                            html_bundle!{
+                            let type_id = info.type_id();
+                            html!{
                                 <div
                                     display="flex"
                                     justify-content="space-between"
                                     column-gap="12px"
                                     onClick={handle_add_component}
-                                    components={AddComponentButton(info.type_id())}>
+                                    components={template(move |_| Ok(AddComponentButton(type_id)))}>
                                     <span>{
                                         info.type_path_table().ident().unwrap_or("Unknown")
                                     }</span>

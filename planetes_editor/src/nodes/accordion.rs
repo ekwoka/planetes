@@ -4,7 +4,6 @@ use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
     prelude::*,
 };
-use bevy_ui_html::HtmlComponent;
 
 use crate::{
     nodes::{
@@ -82,48 +81,6 @@ pub fn actuate_accordion(
     }
 }
 
-pub fn view<I: Iterator<Item = impl Bundle> + Send + Sync + 'static>(
-    label: impl Into<String> + Clone,
-    content: SpawnIter<I>,
-    asset_server: AssetServer,
-) -> impl Bundle {
-    html_bundle! {
-        <div
-            name={Into::<String>::into(label.clone())}
-            display="flex"
-            flex-direction="col"
-            row-gap="8px"
-            components={Propagate(AccordionState::Closed)}>
-            <Button
-                padding="2px"
-                display="flex"
-                flex-direction="row"
-                align-items={AlignItems::Center}
-                column-gap="8px">
-                <img
-                    src={asset_server
-                        .load("embedded://planetes_editor/assets/filled_triangle.png")}
-                    height="8px"
-                    width="8px"
-                    components={
-                        (
-                            AccordionIcon,
-                            UiTransform::from_rotation(Rot2::degrees(90.0))
-                        )
-                    }/>
-                <span>{label}</span>
-            </Button>
-            <AccordionContainer
-                padding-left="2px"
-                margin-left="16px"
-                display="none"
-                flex-direction="col"
-                row-gap="8px"
-                components={Children::spawn(content)}/>
-        </div>
-    }
-}
-
 pub fn scene(label: impl Into<String> + Clone, content: impl SceneList) -> impl Scene + Sized {
     html! {
         <div
@@ -195,7 +152,7 @@ impl AccordionState {
     }
 }
 
-#[derive(SceneComponent, HtmlComponent, Clone, Default)]
+#[derive(SceneComponent, Clone, Default)]
 pub struct AccordionContainer;
 
 impl AccordionContainer {
@@ -211,5 +168,5 @@ impl AccordionContainer {
     }
 }
 
-#[derive(Component, HtmlComponent, Default, Clone)]
+#[derive(Component, Default, Clone)]
 pub struct AccordionIcon;

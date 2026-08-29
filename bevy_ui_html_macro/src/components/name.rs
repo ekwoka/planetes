@@ -41,8 +41,9 @@ impl ToTokens for Name {
                     #hash #name
                 })
             } else if let Some(name) = name.clean_block() {
+                // Braced so `bsn!` reads the value as an opaque Rust expression.
                 tokens.extend(quote! {
-                    bevy::ecs::name::Name(#name)
+                    bevy::ecs::name::Name({#name})
                 })
             }
         } else if let Some(name) = name.clean_block() {

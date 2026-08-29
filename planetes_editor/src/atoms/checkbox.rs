@@ -7,13 +7,15 @@ use bevy::{
 use planetes_input::prelude::InputValue;
 
 /// Represents a checkbox component and current state.
-#[derive(Component, Debug, PartialEq, Eq)]
+///
+/// [Clone] and [Default] are what make this usable as a template in `html!`.
+#[derive(Component, Debug, PartialEq, Eq, Clone, Default)]
 #[require(Node, TabIndex)]
 pub struct Checkbox(pub bool);
 
 /// Renders a checkbox
-pub fn check_box(value: bool) -> impl Bundle {
-    html_bundle! {
+pub fn check_box(value: bool) -> impl Scene {
+    html! {
         <input type="checkbox" components={Checkbox(value)} />
     }
 }

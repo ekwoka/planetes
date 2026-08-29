@@ -70,7 +70,10 @@ pub fn update_component_editor(
             commands
                 .entity(editor)
                 .despawn_children()
-                .with_child(full(type_info.clone(), reflected.to_dynamic()));
+                .queue_spawn_related_scenes::<Children>(vec![full(
+                    type_info.clone(),
+                    reflected.to_dynamic(),
+                )]);
         };
     }
 }
@@ -80,12 +83,14 @@ pub fn update_component_editor(
 pub struct ComponentEditor(pub TypeId);
 
 /// Tracks the path from the root of the component to the current input
-#[derive(Component)]
+///
+/// [Clone] and [Default] are what make this usable as a template in `html!`.
+#[derive(Component, Clone, Default)]
 pub struct Path(pub String);
 
 /// Renders a base Component Editor without content
-pub fn base(type_id: TypeId) -> impl Bundle {
-    html_bundle! {
+pub fn base(type_id: TypeId) -> impl Scene {
+    html! {
         <div
             padding-left="2px"
             flex-grow="0"
@@ -94,7 +99,7 @@ pub fn base(type_id: TypeId) -> impl Bundle {
             flex-direction="col"
             row-gap="4px"
             width="100%"
-            components={ComponentEditor(type_id)}>
+            components={template(move |_| Ok(ComponentEditor(type_id)))}>
             <span linebreak={LineBreak::WordBoundary}>
               "Hello World"
             </span>
@@ -106,34 +111,27 @@ pub fn base(type_id: TypeId) -> impl Bundle {
 pub struct RemoveComponentButton(pub TypeId);
 
 /// Builds out the full Component Editor with content
-pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
-    let cloned_type_info = type_info.clone();
-    html_bundle! {
-        <div display="flex" flex-direction="column" row-gap="2px" width="100%" onenter={handle_commit}>
-            <with>
-            {
-                match cloned_type_info {
-                    TypeInfo::Struct(info) => {
-                        if info.field_len() != 0 {
-                            parent.spawn(struct_component(info, reflect))
-                        } else {
-                            parent.spawn(unit_component())
-                        }
-                    },
-                    TypeInfo::TupleStruct(info) => {
-                        parent.spawn(tuple_struct_component(info, reflect))
-                    }
-                    TypeInfo::Enum(info) => {
-                        parent.spawn(enum_component(info, reflect))
-                    }
-                    _ => parent.spawn(unknown_component()),
-                };
+pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
+    let type_id = type_info.type_id();
+    let content: Box<dyn Scene> = match type_info {
+        TypeInfo::Struct(info) => {
+            if info.field_len() != 0 {
+                Box::new(struct_component(info, reflect))
+            } else {
+                Box::new(unit_component())
             }
-            </with>
+        }
+        TypeInfo::TupleStruct(info) => Box::new(tuple_struct_component(info, reflect)),
+        TypeInfo::Enum(info) => Box::new(enum_component(info, reflect)),
+        _ => Box::new(unknown_component()),
+    };
+    html! {
+        <div display="flex" flex-direction="column" row-gap="2px" width="100%" onenter={handle_commit}>
+            {content}
             <button
                 variant="normal"
                 corners="rounded"
-                components={RemoveComponentButton(type_info.type_id())}
+                components={template(move |_| Ok(RemoveComponentButton(type_id)))}
                 onActivate={handle_remove_component}>
                 "X Remove"
             </button>
@@ -220,24 +218,47 @@ fn handle_commit(
 }
 
 /// Renders the editor for a Unit Component
-fn unit_component() -> impl Bundle {
-    html_bundle! {
+fn unit_component() -> impl Scene {
+    html! {
         <span linebreak={LineBreak::WordBoundary}>"Unit Struct"</span>
     }
 }
 
 /// Renders the editor for an Unknown Component
-fn unknown_component() -> impl Bundle {
-    html_bundle! {
+fn unknown_component() -> impl Scene {
+    html! {
         <span linebreak={LineBreak::WordBoundary}>"Unknown Struct"</span>
     }
 }
 
+/// Renders the value side of a reflected field, based on what kind of type it holds
+fn field_value(value: Option<Box<dyn PartialReflect>>) -> Vec<Box<dyn Scene>> {
+    let unknown = |label: &'static str| -> Vec<Box<dyn Scene>> {
+        vec![Box::new(html! { <span>{label}</span> })]
+    };
+    match value {
+        None => unknown("Unknown Field"),
+        Some(value) => match value.get_represented_type_info() {
+            Some(TypeInfo::TupleStruct(info)) => {
+                vec![Box::new(reflected_tuple_struct(info, value))]
+            }
+            Some(TypeInfo::Struct(info)) => vec![Box::new(reflected_struct(info, value))],
+            Some(TypeInfo::Tuple(_)) => unknown("Unknown Tuple"),
+            Some(TypeInfo::List(_)) => unknown("Unknown List"),
+            Some(TypeInfo::Opaque(info)) => vec![Box::new(reflected_opaque(info, value))],
+            other => vec![
+                Box::new(html! { <span>"Unknown Type"</span> }),
+                Box::new(html! { <span>{format!("{other:?}")}</span> }),
+            ],
+        },
+    }
+}
+
 /// Renders the editor for a Struct Component
-fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let struct_data = reflect.reflect_owned().into_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
-    html_bundle! {
+    html! {
         <div
             width="100%"
             display="flex"
@@ -247,48 +268,21 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
             {
                fields.into_iter().map(move |field| {
                    let name = format!("{}: ", field.name().capitalize_words());
-                   let value = struct_data
+                   let path = format!(".{}", field.name());
+                   let value = field_value(struct_data
                        .field(field.name())
-                       .map(|partial| partial.to_dynamic());
-                   html_bundle! {
+                       .map(|partial| partial.to_dynamic()));
+                   html! {
                        <div
                           display="flex"
                           flex-direction="row"
                           align-items={AlignItems::Center}
                           column-gap="4px"
-                          components={Path(format!(".{}", field.name()))}>
+                          components={Path(path)}>
                           <div flex-grow="1">
                             <span>{name}</span>
                           </div>
-                          <with>
-                          {
-                              match value {
-                                  None => {
-                                      parent.spawn(Text::new("Unknown Field"));
-                                  }
-                                  Some(value) => match value.get_represented_type_info() {
-                                      Some(TypeInfo::TupleStruct(info)) => {
-                                          parent.spawn(reflected_tuple_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Struct(info)) => {
-                                          parent.spawn(reflected_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Tuple(_)) => {
-                                          parent.spawn(Text::new("Unknown Tuple"));
-                                      }
-                                      Some(TypeInfo::List(_)) => {
-                                          parent.spawn(Text::new("Unknown List"));
-                                      }
-                                      Some(TypeInfo::Opaque(info)) => {
-                                          parent.spawn(reflected_opaque(info, value));
-                                      }
-                                      _ => {
-                                          parent.spawn(Text::new("Unknown Type"));
-                                      }
-                                  },
-                              };
-                          }
-                          </with>
+                          {{value}}
                        </div>
                    }
                })
@@ -299,10 +293,10 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
 }
 
 /// Renders the editor for a Tuple Struct Component
-fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let struct_data = reflect.reflect_owned().into_tuple_struct().unwrap();
     let fields = info.iter().cloned().collect::<Vec<_>>();
-    html_bundle! {
+    html! {
         <div
             width="100%"
             display="flex"
@@ -312,10 +306,10 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
             {
                fields.into_iter().map(move |field| {
                    let name = format!("{}: ", field.index());
-                   let value = struct_data
+                   let value = field_value(struct_data
                        .field(field.index())
-                       .map(|partial| partial.to_dynamic());
-                   html_bundle! {
+                       .map(|partial| partial.to_dynamic()));
+                   html! {
                        <div
                           display="flex"
                           flex-direction="row"
@@ -323,36 +317,7 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
                           <div flex-grow="1">
                             <span>{name}</span>
                           </div>
-                          <with>
-                          {
-                              match value {
-                                  None => {
-                                      parent.spawn(Text::new("Unknown Field"));
-                                  }
-                                  Some(value) => match value.get_represented_type_info() {
-                                      Some(TypeInfo::TupleStruct(info)) => {
-                                          parent.spawn(reflected_tuple_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Struct(info)) => {
-                                          parent.spawn(reflected_struct(info, value));
-                                      }
-                                      Some(TypeInfo::Tuple(_)) => {
-                                          parent.spawn(Text::new("Unknown Tuple"));
-                                      }
-                                      Some(TypeInfo::List(_)) => {
-                                          parent.spawn(Text::new("Unknown List"));
-                                      }
-                                      Some(TypeInfo::Opaque(info)) => {
-                                          parent.spawn(reflected_opaque(info, value));
-                                      }
-                                      other => {
-                                          parent.spawn(Text::new("Unknown Type"));
-                                          parent.spawn(Text::new(format!("{other:?}")));
-                                      }
-                                  },
-                              };
-                          }
-                          </with>
+                          {{value}}
                        </div>
                    }
                })
@@ -363,10 +328,42 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
 }
 
 /// Renders the editor for Enum Components
-fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let enum_data = reflect.reflect_owned().into_enum().unwrap();
-    let variants = info.iter().cloned().collect::<Vec<_>>();
-    html_bundle! {
+    let variants = info
+        .iter()
+        .map(|variant| {
+            let name = format!("{}: ", variant.name());
+            let is_this = enum_data.variant_name() == variant.name();
+            let row: Box<dyn Scene> = if is_this {
+                Box::new(html! {
+                    <div
+                    display="flex"
+                    flex-direction="row"
+                    column-gap="4px">
+                        <div flex-grow="1">
+                            <span>{name}</span>
+                        </div>
+                        <input type="radio" components={Checked} />
+                    </div>
+                })
+            } else {
+                Box::new(html! {
+                    <div
+                    display="flex"
+                    flex-direction="row"
+                    column-gap="4px">
+                        <div flex-grow="1">
+                            <span>{name}</span>
+                        </div>
+                        <input type="radio" />
+                    </div>
+                })
+            };
+            row
+        })
+        .collect::<Vec<_>>();
+    html! {
         <div
             width="100%"
             display="flex"
@@ -385,45 +382,12 @@ fn enum_component(info: EnumInfo, reflect: Box<dyn PartialReflect>) -> impl Bund
                         }
                     }
             }}>
-            <with>
-            {
-                for variant in variants.into_iter() {
-                    let name = format!("{}: ", variant.name());
-                    let is_this = enum_data
-                        .variant_name() == variant.name();
-                    if is_this {
-                        parent.spawn(html_bundle! {
-                            <div
-                            display="flex"
-                            flex-direction="row"
-                            column-gap="4px">
-                                <div flex-grow="1">
-                                    <span>{name}</span>
-                                </div>
-                                <input type="radio" components={Checked} />
-                            </div>
-                        });
-                    } else {
-                        parent.spawn(html_bundle! {
-                            <div
-                            display="flex"
-                            flex-direction="row"
-                            column-gap="4px">
-                                <div flex-grow="1">
-                                    <span>{name}</span>
-                                </div>
-                                <input type="radio" />
-                            </div>
-                        });
-                    }
-                }
-            }
-           </with>
+            {{variants}}
         </div>
     }
 }
 
-fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
     let tuple_struct = reflect
         .reflect_ref()
@@ -432,7 +396,7 @@ fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflec
         .iter_fields()
         .map(|field| format!("{field:?}"))
         .collect::<Vec<String>>();
-    html_bundle! {
+    html! {
         <div
            display="flex"
            flex-direction="row"
@@ -445,7 +409,7 @@ fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflec
               <iter>
               {
                   tuple_struct.into_iter().map(|field| {
-                      Text::new(field)
+                      html! { <span>{field}</span> }
                   })
               }
               </iter>
@@ -454,7 +418,7 @@ fn reflected_tuple_struct(info: &TupleStructInfo, reflect: Box<dyn PartialReflec
     }
 }
 
-fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let name = info.type_path_table().ident().unwrap_or("Unknown Ident");
     let reflect_struct = reflect.reflect_owned().into_struct().unwrap();
     let children = info
@@ -467,28 +431,27 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                 TypeInfo::Opaque(info) => Some(info),
                 _ => None,
             });
-            html_bundle! {
+            let field_name = field.name().capitalize_words().to_string();
+            let path = format!(".{}", field.name());
+            let input: Box<dyn Scene> = if let Some(input_type) = input {
+                Box::new(reflected_opaque(input_type, value))
+            } else {
+                Box::new(html! { <span>{format!("{value:?}")}</span> })
+            };
+            html! {
                 <div
                    display="flex"
                    flex-direction="row"
                    align-items={AlignItems::Center}
                    column-gap="4px"
-                   components={Path(format!(".{}", field.name()))}>
-                   <span>{field.name().capitalize_words().to_string()}</span>
-                   <with>
-                       {
-                           if let Some(input_type) = input {
-                               parent.spawn(reflected_opaque(input_type, value));
-                           } else {
-                               parent.spawn(Text::new(format!("{value:?}")));
-                           }
-                       }
-                   </with>
+                   components={Path(path)}>
+                   <span>{field_name}</span>
+                   {input}
                 </div>
             }
         })
         .collect::<Vec<_>>();
-    html_bundle! {
+    html! {
         <div
            display="flex"
            flex-direction="row"
@@ -499,40 +462,63 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                 display={Display::Flex}
                 flex-direction="row"
                 column-gap="8px">
-                <iter>
-                {
-                    children.into_iter()
-                }
-                </iter>
+                {{children}}
             </div>
         </div>
     }
 }
 
-fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -> impl Bundle {
+fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let input_type = input_type.clone();
     let reflect = reflect.to_dynamic();
-    html_bundle! {
+    let input: Box<dyn Scene> = if input_type.is::<String>() {
+        Box::new(input_field::<String>(format!("{reflect:?}")))
+    } else if input_type.is::<f32>() {
+        Box::new(input_field::<f32>(
+            reflect
+                .as_partial_reflect()
+                .try_downcast_ref::<f32>()
+                .cloned()
+                .unwrap(),
+        ))
+    } else if input_type.is::<u32>() {
+        Box::new(input_field::<u32>(
+            reflect
+                .as_partial_reflect()
+                .try_downcast_ref::<u32>()
+                .cloned()
+                .unwrap(),
+        ))
+    } else if input_type.is::<u64>() {
+        Box::new(input_field::<u64>(
+            reflect
+                .as_partial_reflect()
+                .try_downcast_ref::<u64>()
+                .cloned()
+                .unwrap(),
+        ))
+    } else if input_type.is::<i32>() {
+        Box::new(input_field::<i32>(
+            reflect
+                .as_partial_reflect()
+                .try_downcast_ref::<i32>()
+                .cloned()
+                .unwrap(),
+        ))
+    } else if input_type.is::<bool>() {
+        Box::new(check_box(
+            reflect
+                .as_partial_reflect()
+                .try_downcast_ref::<bool>()
+                .cloned()
+                .unwrap(),
+        ))
+    } else {
+        Box::new(html! { <span>{format!("{reflect:?}")}</span> })
+    };
+    html! {
         <div>
-           <with>
-               {
-                    if input_type.is::<String>() {
-                        parent.spawn(input_field::<String>(format!("{reflect:?}")));
-                    } else if input_type.is::<f32>() {
-                        parent.spawn(input_field::<f32>(reflect.as_partial_reflect().try_downcast_ref::<f32>().cloned().unwrap()));
-                    } else if input_type.is::<u32>() {
-                        parent.spawn(input_field::<u32>(reflect.as_partial_reflect().try_downcast_ref::<u32>().cloned().unwrap()));
-                    } else if input_type.is::<u64>() {
-                        parent.spawn(input_field::<u64>(reflect.as_partial_reflect().try_downcast_ref::<u64>().cloned().unwrap()));
-                    } else if input_type.is::<i32>() {
-                        parent.spawn(input_field::<i32>(reflect.as_partial_reflect().try_downcast_ref::<i32>().cloned().unwrap()));
-                    } else if input_type.is::<bool>() {
-                        parent.spawn(check_box(reflect.as_partial_reflect().try_downcast_ref::<bool>().cloned().unwrap()));
-                    } else {
-                       parent.spawn(Text::new(format!("{reflect:?}")));
-                   }
-               }
-           </with>
+           {input}
         </div>
     }
 }

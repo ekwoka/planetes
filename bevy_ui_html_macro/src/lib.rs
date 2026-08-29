@@ -178,13 +178,32 @@ impl ToTokens for ChildNode {
         let node = self.node.clone();
         match node {
             HtmlNode::Iter(node) => {
-                tokens.extend(quote! {
-                    bevy::ecs::spawn::SpawnIter(#node)
-                });
+                if self.bsn {
+                    // Scenes have no `SpawnIter`. A `Vec` of scenes is a `SceneList`, and a braced
+                    // expression inside `Children[...]` is spliced in as one, so collect the
+                    // iterator into a `Vec`.
+                    tokens.extend(quote! {
+                        { ::std::vec::Vec::from_iter(#node) }
+                    });
+                } else {
+                    tokens.extend(quote! {
+                        bevy::ecs::spawn::SpawnIter(#node)
+                    });
+                }
             }
-            HtmlNode::With(node) => tokens.extend(quote! {
-                bevy::ecs::spawn::SpawnWith(#node)
-            }),
+            HtmlNode::With(node) => {
+                if self.bsn {
+                    // `SpawnWith` spawns imperatively, which a `Scene` cannot do: it describes
+                    // entities, it does not spawn them.
+                    tokens.extend(quote! {
+                        compile_error!("`<with>` is not supported by `html!`; build a `Vec<Box<dyn Scene>>` and inline it as `{{scenes}}` instead")
+                    });
+                } else {
+                    tokens.extend(quote! {
+                        bevy::ecs::spawn::SpawnWith(#node)
+                    });
+                }
+            }
             _ => {
                 if self.bsn {
                     tokens.extend(quote! {
@@ -577,8 +596,10 @@ impl ToTokens for InlineNode {
                 .map(|child| match child {
                     HtmlNode::Block(block) => {
                         if self.bsn {
+                            // Braces mark the value as an opaque Rust expression, so `bsn!` does
+                            // not try to read something like `foo.bar()` as a patch.
                             quote! {
-                                bevy::ui::widget::Text(#block)
+                                bevy::ui::widget::Text({#block})
                             }
                         } else {
                             quote! {
@@ -758,6 +779,22 @@ pub fn html_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// This procedural macro parses an HTML/JSX-like syntax and generates component tuples
 /// that can be spawned directly with Bevy's `commands.spawn_scene()`.
+///
+/// The syntax matches [`html_bundle!`], with the differences that come from scenes describing
+/// entities rather than spawning them:
+///
+/// - Custom tags resolve to `SceneComponent`s (`@Tag`) instead of [`bevy_ui_html::HtmlComponent`]s.
+/// - `<iter>` collects its iterator into a `Vec`, which is a `SceneList`. The items must all be
+///   the same `Scene` type, so mixed children need `Box<dyn Scene>`.
+/// - `<with>` has no equivalent, as there is nothing to imperatively spawn into. Build a
+///   `Vec<Box<dyn Scene>>` and inline it as a child with `{{scenes}}` instead.
+/// - A single-braced child (`{scene}`) is one child entity; a double-braced child (`{{scenes}}`)
+///   is a `SceneList` splatted into the children.
+/// - Observer attributes (`onClick={…}`) become `on(…)` on the entity itself, so their handlers
+///   must be `Clone`, and the event must be an `EntityEvent`.
+/// - Components given to `components={…}` are `bsn!` entries, so they need to be templates
+///   (`Clone + Default`, or `#[derive(FromTemplate)]`). Anything else can be inserted with
+///   `components={template(move |_| Ok(MyComponent(value)))}`.
 #[proc_macro]
 pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     html_inner(input.into(), true).into()
@@ -1090,7 +1127,7 @@ mod tests {
                     display: Display::Flex,
                     flex_direction: FlexDirection::Column,
                     justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::Center,
+                    align_items: { AlignItems::Center },
                     flex_grow: 1.0,
                     flex_shrink: 0.5
                 }
@@ -1326,13 +1363,15 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    bevy::ecs::spawn::SpawnIter(
-                        items.map(|item| {
-                            html_bundle! {
-                                <div>{item.name}</div>
-                            }
-                        })
-                    )
+                    {
+                        ::std::vec::Vec::from_iter(
+                            items.map(|item| {
+                                html_bundle! {
+                                    <div>{item.name}</div>
+                                }
+                            })
+                        )
+                    }
                 ]
             }
         };
@@ -1527,8 +1566,8 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    bevy::ui::widget::Text("Hello"),
-                    bevy::ui::widget::Text({let thing = true; if thing { "World" } else { "Mom" }})
+                    bevy::ui::widget::Text({"Hello"}),
+                    bevy::ui::widget::Text({{let thing = true; if thing { "World" } else { "Mom" }}})
                 ]
             }
         };
@@ -1564,17 +1603,12 @@ mod tests {
                 ))
             )
         };
+        // Scenes describe entities rather than spawning them, so `<with>` has no scene form.
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    bevy::ecs::spawn::SpawnWith(move |parent: &mut bevy::ecs::relationship::RelatedSpawner<bevy::ecs::hierarchy::ChildOf>| {
-                        if true {
-                            parent.spawn(html_bundle! { <div>"Hello World"</div>});
-                        } else {
-                            parent.spawn(html_bundle! { <div>"Hello Mom"</div>});
-                        }
-                    })
+                    compile_error!("`<with>` is not supported by `html!`; build a `Vec<Box<dyn Scene>>` and inline it as `{{scenes}}` instead")
                 ]
             }
         };
@@ -1604,7 +1638,7 @@ mod tests {
         };
         let bsn = quote! {
             bevy::scene::bsn! {
-                bevy::ecs::name::Name(Into::<String>::into(label.clone()))
+                bevy::ecs::name::Name({Into::<String>::into(label.clone())})
                 bevy::ui::Node {
                     row_gap: bevy::ui::px (8.0),
                     display: bevy::ui::Display::Flex,
@@ -1612,14 +1646,14 @@ mod tests {
                 }
                 Children [
                     @bevy::feathers::controls::FeathersButton {
-                        @caption: bsn_list! [bevy::ui::widget::Text(label)]
+                        @caption: bsn_list! [bevy::ui::widget::Text({label})]
                     }
                     bevy::ui::Node {
                         padding: { bevy::ui::px (2.0).all() },
                         column_gap: bevy::ui::px (8.0),
                         display: bevy::ui::Display::Flex,
                         flex_direction: bevy::ui::FlexDirection::Row,
-                        align_items: AlignItems::Center
+                        align_items: { AlignItems::Center }
                     },
                     @AccordionContainer
                     bevy::ui::Node
@@ -1689,7 +1723,7 @@ mod tests {
                     #hash hello
                     bevy::ui::Node
                     Children[
-                        bevy::ecs::name::Name("other".trim())
+                        bevy::ecs::name::Name({"other".trim()})
                         bevy::ui::Node
                     ]
                 }
@@ -1725,7 +1759,7 @@ mod tests {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 bevy::ui::widget::ImageNode {
-                    image: "embedded://planetes_editor/assets/filled_triangle.png"
+                    image: {"embedded://planetes_editor/assets/filled_triangle.png"}
                 }
             }
         };
@@ -3224,12 +3258,12 @@ mod tests {
                 bevy::scene::bsn!{
                     bevy::ui::Node
                     bevy::text::TextLayout {
-                        justify: Justify::Left
+                        justify: {Justify::Left}
                     }
                     Children[
                         bevy::ui::widget::Text("Hello")
                         bevy::text::TextLayout {
-                            linebreak: LineBreak::NoWrap
+                            linebreak: {LineBreak::NoWrap}
                         }
                     ]
                 }
@@ -3318,14 +3352,14 @@ mod tests {
                     bevy::ui::Node
                     Children[
                         @bevy::feathers::controls::FeathersButton {
-                            @caption: bsn_list![bevy::ui::widget::Text(label)]
+                            @caption: bsn_list![bevy::ui::widget::Text({label})]
                         }
                         bevy::ui::Node {
                             padding: { bevy::ui::px(2.0).all() },
                             column_gap: bevy::ui::px(8.0),
                             display: bevy::ui::Display::Flex,
                             flex_direction: bevy::ui::FlexDirection::Row,
-                            align_items: AlignItems::Center
+                            align_items: { AlignItems::Center }
                         }
                     ]
                 }

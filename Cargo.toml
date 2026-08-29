@@ -41,7 +41,7 @@ bevy_gizmos = "0.19"
 
 # Physics
 avian3d = "0.7"
-avian_pickup = "0.5"
+avian_pickup = "0.6"
 
 
 

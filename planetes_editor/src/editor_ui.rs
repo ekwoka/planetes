@@ -11,7 +11,6 @@ use bevy::{
     render::render_resource::TextureFormat,
     ui_widgets::Activate,
 };
-use bevy_ui_html::HtmlComponent;
 
 use crate::{
     EditorMode, ReflectPlanetesComponent,
@@ -97,7 +96,7 @@ pub struct MainView;
 pub struct UiView;
 
 /// Indicates the UI Node that the [MainView] is rendered to.
-#[derive(SceneComponent, HtmlComponent, Clone, Default)]
+#[derive(SceneComponent, Clone, Default)]
 pub struct ViewPort;
 
 impl ViewPort {
@@ -107,7 +106,7 @@ impl ViewPort {
 }
 
 /// Marker component for the MenuBar UI
-#[derive(SceneComponent, HtmlComponent, Clone, Default)]
+#[derive(SceneComponent, Clone, Default)]
 pub struct MenuBar;
 
 impl MenuBar {
