@@ -7,7 +7,10 @@ use crate::{
     },
     prelude::*,
 };
-use bevy::{platform::collections::HashMap, prelude::*};
+use bevy::{
+    feathers::cursor::EntityCursor, platform::collections::HashMap, prelude::*, ui_widgets::Button,
+    window::SystemCursorIcon,
+};
 use planetes_scene_state::{CanonicalScene, ReflectHiddenComponent};
 
 pub fn plugin(app: &mut App) {
@@ -165,18 +168,20 @@ pub fn branch(
                 .for_each(|scene| content.push(Box::new(scene)));
             Box::new(accordion::scene(text, content))
         } else {
-            (html! {
+            <Box<dyn Scene>>::from(html! {
                 <div
                     name={name}
                     padding="2px"
                     display="flex"
                     flex-direction="row"
                     align-items={AlignItems::Center}
-                    column-gap="8px">
+                    column-gap="8px"
+                    components={
+                        (Button, EntityCursor::System(SystemCursorIcon::Pointer))
+                    }>
                     <span>{text}</span>
                 </div>
             })
-            .into()
         };
         Some(html! {
             <SceneTreeBranch components={Represents(target_entity)}>

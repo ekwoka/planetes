@@ -42,8 +42,8 @@ pub fn plugin(app: &mut App) {
         scene_tree::plugin,
         accordion::plugin,
         entity_viewer::plugin,
-        HierarchyPropagatePlugin::<TextFont>::new(Update),
-        HierarchyPropagatePlugin::<TextColor>::new(Update),
+        HierarchyPropagatePlugin::<TextFont>::new(PostUpdate),
+        HierarchyPropagatePlugin::<TextColor>::new(PostUpdate),
         planetes_input::plugin,
         component_selector::plugin,
     ))
@@ -144,38 +144,20 @@ pub fn build_ui_scene(mut commands: Commands) {
                     }}>
                     <span>"Open"</span>
                 </button>
-                <button
-                    variant="normal"
-                    corners="rounded"
-                    onActivate={move |_event: On<Activate>| {
-                        info!("Button Activated: File");
-                    }}>
-                    <span>"File"</span>
-                </button>
-                <button
-                    variant="normal"
-                    corners="rounded"
-                    onActivate={move |_event: On<Activate>| {
-                        info!("Button Activated: Edit");
-                    }}>
-                    <span>"Edit"</span>
-                </button>
-                <button
-                    variant="normal"
-                    corners="rounded"
-                    onActivate={move |_event: On<Activate>| {
-                        info!("Button Activated: View");
-                    }}>
-                    <span>"View"</span>
-                </button>
-                <button
-                    variant="normal"
-                    corners="rounded"
-                    onActivate={move |_event: On<Activate>| {
-                        info!("Button Activated: Help");
-                    }}>
-                    <span>"Help"</span>
-                </button>
+                <iter>
+                  {["File", "Edit", "View", "Help"].into_iter().map(|label| {
+                      html! {
+                          <button
+                              variant="normal"
+                              corners="rounded"
+                              onActivate={move |_event: On<Activate>| {
+                                  info!("Button Activated: {label}");
+                              }}>
+                              <span>{label}</span>
+                          </button>
+                      }
+                  })}
+                </iter>
                 <div flex-grow="20"></div>
             </MenuBar>
             <div

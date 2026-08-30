@@ -2,7 +2,10 @@
 
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
+    feathers::cursor::EntityCursor,
     prelude::*,
+    ui_widgets::{Activate, Button},
+    window::SystemCursorIcon,
 };
 
 use crate::{
@@ -52,28 +55,28 @@ pub fn update_accordion(
 }
 
 pub fn actuate_accordion(
-    mut event: On<Pointer<Click>>,
+    event: On<Activate>,
     mut commands: Commands,
-    accordions: Query<&Propagate<AccordionState>>,
+    accordions: Query<(Entity, &Propagate<AccordionState>)>,
     containers: Query<&AccordionContainer>,
     parents: Query<&ChildOf>,
     representations: Query<&Represents>,
     editors: Query<Entity, With<EntityEditor>>,
 ) {
-    if containers.contains(event.entity) {
-        event.propagate(false);
-    } else if let Ok(state) = accordions.get(event.entity) {
-        info!("Actuating Accordion: {:?}", state.0);
+    if let Some((entity, state)) = parents
+        .iter_ancestors(event.entity)
+        .take_while(|&ancestor| containers.get(ancestor).ok().is_none())
+        .filter_map(|ancestor| accordions.get(ancestor).ok())
+        .next()
+    {
         commands
-            .entity(event.entity)
+            .entity(entity)
             .try_insert(Propagate(state.0.toggled()));
-        event.propagate(false);
         if let Some(&Represents(scene_entity)) = parents
-            .iter_ancestors(event.entity)
+            .iter_ancestors(entity)
             .filter_map(|ancestor| representations.get(ancestor).ok())
             .next()
         {
-            info!("Found representing ancestor");
             if let Ok(editor) = editors.single() {
                 commands.entity(editor).insert(Viewing(scene_entity));
             }
@@ -90,16 +93,7 @@ pub fn scene(label: impl Into<String> + Clone, content: impl SceneList) -> impl 
             row-gap="8px"
             components={template(|_| Ok(Propagate(AccordionState::Closed)))}>
             <AccordionControl>
-                <img
-                    src="embedded://planetes_editor/assets/filled_triangle.png"
-                    height="8px"
-                    width="8px"
-                    components={
-                        (
-                            AccordionIcon,
-                            UiTransform::from_rotation(Rot2::degrees(90.0))
-                        )
-                    }/>
+                <AccordionIcon/>
                 <span>{label}</span>
             </AccordionControl>
             <AccordionContainer>
@@ -121,7 +115,9 @@ impl AccordionControl {
                 flex-direction="row"
                 align-items={AlignItems::Center}
                 column-gap="8px"
-                components={Button} />
+                components={
+                    (Button, EntityCursor::System(SystemCursorIcon::Pointer))
+                } />
         }
     }
 }
@@ -168,5 +164,17 @@ impl AccordionContainer {
     }
 }
 
-#[derive(Component, Default, Clone)]
+#[derive(SceneComponent, Default, Clone)]
 pub struct AccordionIcon;
+
+impl AccordionIcon {
+    fn scene() -> impl Scene {
+        html! {
+            <img
+                src="embedded://planetes_editor/assets/filled_triangle.png"
+                height="8px"
+                width="8px"
+                components={UiTransform::from_rotation(Rot2::degrees(90.0))}/>
+        }
+    }
+}
