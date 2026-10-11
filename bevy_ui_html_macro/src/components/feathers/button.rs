@@ -1,7 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-use crate::{Attribute, ChildNode, Observer, PushSomeTokens, Value};
+use crate::{
+    Attribute, ChildNode, Observer, PushSomeTokens, Value, children::punctuate_bsn_children,
+};
 
 #[derive(Clone, Debug)]
 pub struct Button {
@@ -59,12 +61,13 @@ impl ToTokens for Button {
             });
         let observer = Observer::new(&self.attributes, self.bsn).ok();
         if self.bsn {
+            let children_stream = punctuate_bsn_children(&children);
             tokens.extend(quote! {
                 @bevy::feathers::controls::FeathersButton {
                     #props
-                    @caption: bsn_list![
-                        #(#children),*
-                    ]
+                    @caption: bsn_list! {
+                        #children_stream
+                    }
                 }
                 #observer
             });

@@ -275,7 +275,7 @@
 //!
 //! ```ignore
 //! html_bundle! {
-//!     <div onClick={|_: On<Pointer<Click>>, mut commands: Commands| {
+//!     <div onClick={|_: On<PointerClick>, mut commands: Commands| {
 //!         // Handle click
 //!     }}>
 //!         "Clickable"

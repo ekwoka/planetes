@@ -6,6 +6,7 @@ use rstml::{
 };
 use syn::spanned::Spanned;
 
+mod children;
 mod color;
 mod components;
 mod value;
@@ -750,7 +751,7 @@ fn html_inner(input: TokenStream, bsn: bool) -> TokenStream {
 ///
 /// ```ignore
 /// html_bundle! {
-///     <div onClick={|_: On<Pointer<Click>>| { /* handle click */ }}>
+///     <div onClick={|_: On<PointerClick>| { /* handle click */ }}>
 ///         "Click me"
 ///     </div>
 /// }
@@ -1646,7 +1647,7 @@ mod tests {
                 }
                 Children [
                     @bevy::feathers::controls::FeathersButton {
-                        @caption: bsn_list! [bevy::ui::widget::Text({label})]
+                        @caption: bsn_list! { bevy::ui::widget::Text({label}) }
                     }
                     bevy::ui::Node {
                         padding: { bevy::ui::px (2.0).all() },
@@ -3035,7 +3036,7 @@ mod tests {
         #[test]
         fn adds_observers() {
             let input = quote! {
-                <div onClick={|_event: On<Pointer<Click>>,
+                <div onClick={|_event: On<PointerClick>,
                     mut commands: Commands,
                     text: Single<Entity, With<Text>>| {
                         commands.entity(*text).insert(Text::new("Hi, Mom!"));
@@ -3052,7 +3053,7 @@ mod tests {
                             let entity = parent.target_entity();
                             parent.spawn(
                                 bevy::ecs::observer::Observer::new(
-                                    |_event: On<Pointer<Click> >,
+                                    |_event: On<PointerClick>,
                                     mut commands: Commands,
                                     text: Single<Entity, With<Text> >| {
                                         commands.entity(*text).insert(Text::new("Hi, Mom!"));
@@ -3067,7 +3068,7 @@ mod tests {
             let bsn = quote! {
                 bevy::scene::bsn!{
                     bevy::ui::Node
-                    on(|_event: On<Pointer<Click> >,
+                    on(|_event: On<PointerClick>,
                         mut commands: Commands,
                         text: Single<Entity, With<Text> >| {
                             commands.entity(*text).insert(Text::new("Hi, Mom!"));
@@ -3310,7 +3311,7 @@ mod tests {
                         @bevy::feathers::controls::FeathersButton {
                             @variant: bevy::feathers::controls::ButtonVariant::Normal,
                             @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
-                            @caption: bsn_list![bevy::ui::widget::Text("Hello")]
+                            @caption: bsn_list! { bevy::ui::widget::Text("Hello") }
                         }
                         bevy::ui::Node
                     ]
@@ -3352,7 +3353,7 @@ mod tests {
                     bevy::ui::Node
                     Children[
                         @bevy::feathers::controls::FeathersButton {
-                            @caption: bsn_list![bevy::ui::widget::Text({label})]
+                            @caption: bsn_list! { bevy::ui::widget::Text({label}) }
                         }
                         bevy::ui::Node {
                             padding: { bevy::ui::px(2.0).all() },
@@ -3417,9 +3418,9 @@ mod tests {
                         @bevy::feathers::controls::FeathersButton {
                             @variant: bevy::feathers::controls::ButtonVariant::Primary,
                             @corners: bevy::feathers::rounded_corners::RoundedCorners::TopLeft,
-                            @caption: bsn_list![
+                            @caption: bsn_list! {
                                 bevy::ui::widget::Text("Hello")
-                            ]
+                            }
                         }
                         on(|event: On<Activate>| {
                             info!("{:?}",event.entity);
@@ -3466,7 +3467,7 @@ mod tests {
                         @bevy::feathers::controls::FeathersButton {
                             @variant: bevy::feathers::controls::ButtonVariant::Normal,
                             @corners: bevy::feathers::rounded_corners::RoundedCorners::All,
-                            @caption: bsn_list![bevy::ui::widget::Text("Hello")]
+                            @caption: bsn_list! { bevy::ui::widget::Text("Hello") }
                         }
                         bevy::ui::Node
                         Testing::new()
@@ -3519,9 +3520,9 @@ mod tests {
                     bevy::ui::Node
                     Children[
                         @bevy::feathers::controls::FeathersCheckbox {
-                            @caption: bsn_list![
+                            @caption: bsn_list! {
                                 bevy::ui::widget::Text("Hello")
-                            ]
+                            }
                         }
                         on(|event: On<ValueChange<bool> >| {
                             println!("Hello Changed {}", event.value)
@@ -3577,9 +3578,9 @@ mod tests {
                     Children[
                         TestComponent
                         @bevy::feathers::controls::FeathersRadio {
-                            @caption: bsn_list![
+                            @caption: bsn_list! {
                                 bevy::ui::widget::Text("Hello")
-                            ]
+                            }
                         }
                         on(|event: On<ValueChange<bool> >| {
                             println!("Hello True {}", event.value)
