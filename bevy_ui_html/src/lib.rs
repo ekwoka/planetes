@@ -490,7 +490,7 @@ pub trait HtmlComponent {
     fn build(self, props: HtmlBundle, additional_attributes: HtmlAttributes) -> impl Bundle;
 }
 
-impl HtmlComponent for Button {
+impl HtmlComponent for bevy::ui_widgets::Button {
     fn build(self, props: HtmlBundle, _: HtmlAttributes) -> impl Bundle {
         (self, props)
     }

@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 use bevy::{
-    feathers::cursor::EntityCursor, input_focus::InputFocus, prelude::*, window::SystemCursorIcon,
+    input_focus::InputFocus, picking::cursor::EntityCursor, prelude::*, window::SystemCursorIcon,
 };
 use planetes_input::prelude::{EditableText, InputField, Validable};
 

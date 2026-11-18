@@ -3,12 +3,7 @@
 use crate::prelude::*;
 use bevy::{ecs::system::IntoObserverSystem, prelude::*};
 
-pub fn render<
-    E: EntityEvent,
-    B: Bundle,
-    M: 'static,
-    I: IntoObserverSystem<E, B, M> + Clone + Send + Sync,
->(
+pub fn render<E: EntityEvent, M: 'static, I: IntoObserverSystem<E, M> + Clone + Send + Sync>(
     text: impl Into<String>,
     handler: I,
 ) -> impl Scene {

@@ -47,7 +47,7 @@ pub struct InputValue(Option<Box<dyn PartialReflect + 'static>>);
 impl InputValue {
     /// Create a new validated input field with the given value
     pub fn new(value: &dyn PartialReflect) -> Self {
-        Self(Some(value.to_dynamic()))
+        Self(value.to_dynamic().ok())
     }
 
     /// Gets the inner value

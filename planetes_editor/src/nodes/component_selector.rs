@@ -100,12 +100,11 @@ pub fn handle_open_add_component(
 }
 
 pub fn handle_scroll(
-    event: On<Pointer<Scroll>>,
+    event: On<PointerScroll>,
     mut scroll_position: Query<(&ComputedNode, &mut ScrollPosition)>,
 ) {
     if let Ok((layout, mut scroll_pos)) = scroll_position.get_mut(event.entity) {
-        scroll_pos.0.y =
-            layout.scroll_position.y * layout.inverse_scale_factor + event.event.y * 10.0;
+        scroll_pos.0.y = layout.scroll_position.y * layout.inverse_scale_factor + event.y * 10.0;
     }
 }
 
@@ -120,7 +119,7 @@ pub fn handle_close_add_component(
 }
 
 pub fn handle_add_component(
-    event: On<Pointer<Click>>,
+    event: On<PointerClick>,
     mut commands: Commands,
     buttons: Query<&AddComponentButton>,
     editing: Single<&Viewing>,

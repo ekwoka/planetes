@@ -21,7 +21,7 @@ pub fn check_box(value: bool) -> impl Scene {
 }
 
 pub fn on_checkbox_add(
-    event: On<Add, Checkbox>,
+    event: On<Add<Checkbox>>,
     mut commands: Commands,
     checkboxes: Query<(Entity, &Checkbox)>,
 ) {

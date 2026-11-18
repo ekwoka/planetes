@@ -21,6 +21,7 @@ use bevy::{
     reflect::{
         OpaqueInfo, TypeInfo, enums::EnumInfo, structs::StructInfo, tuple_struct::TupleStructInfo,
     },
+    scene::EntityScene,
     ui::Checked,
     ui_widgets::{Activate, RadioButton, RadioGroup, ValueChange},
 };
@@ -67,13 +68,14 @@ pub fn update_component_editor(
                     component_with_view.add_to_parent(parent);
                 });
         } else {
+            let Ok(reflected) = reflected.to_dynamic() else {
+                warn!("Not cloneable");
+                continue;
+            };
             commands
                 .entity(editor)
                 .despawn_children()
-                .queue_spawn_related_scenes::<Children>(vec![full(
-                    type_info.clone(),
-                    reflected.to_dynamic(),
-                )]);
+                .queue_spawn_related_scenes::<Children>(vec![full(type_info.clone(), reflected)]);
         };
     }
 }
@@ -127,7 +129,7 @@ pub fn full(type_info: TypeInfo, reflect: Box<dyn PartialReflect>) -> impl Scene
     };
     html! {
         <div display="flex" flex-direction="column" row-gap="2px" width="100%" onenter={handle_commit}>
-            {content}
+            {{EntityScene(content)}}
             <button
                 variant="normal"
                 corners="rounded"
@@ -271,7 +273,7 @@ fn struct_component(info: StructInfo, reflect: Box<dyn PartialReflect>) -> impl 
                    let path = format!(".{}", field.name());
                    let value = field_value(struct_data
                        .field(field.name())
-                       .map(|partial| partial.to_dynamic()));
+                       .and_then(|partial| partial.to_dynamic().ok()));
                    html! {
                        <div
                           display="flex"
@@ -308,7 +310,7 @@ fn tuple_struct_component(info: TupleStructInfo, reflect: Box<dyn PartialReflect
                    let name = format!("{}: ", field.index());
                    let value = field_value(struct_data
                        .field(field.index())
-                       .map(|partial| partial.to_dynamic()));
+                       .and_then(|partial| partial.to_dynamic().ok()));
                    html! {
                        <div
                           display="flex"
@@ -426,17 +428,16 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
         .zip(reflect_struct.iter_fields())
         .map(|(field, value)| {
             let type_info = field.clone().type_info();
-            let value = value.1.to_dynamic();
             let input = type_info.and_then(|type_info| match type_info {
                 TypeInfo::Opaque(info) => Some(info),
                 _ => None,
             });
             let field_name = field.name().capitalize_words().to_string();
             let path = format!(".{}", field.name());
-            let input: Box<dyn Scene> = if let Some(input_type) = input {
-                Box::new(reflected_opaque(input_type, value))
-            } else {
-                Box::new(html! { <span>{format!("{value:?}")}</span> })
+            let input: Box<dyn Scene> = match (input, value.1.to_dynamic()) {
+                (Some(input_type), Ok(value)) => Box::new(reflected_opaque(input_type, value)),
+                (_, Ok(value)) => Box::new(html! { <span>{format!("{value:?}")}</span> }),
+                (_, Err(_)) => Box::new(html! { <span>{format!("{:?}", value.1)}</span> }),
             };
             html! {
                 <div
@@ -446,7 +447,7 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
                    column-gap="4px"
                    components={Path(path)}>
                    <span>{field_name}</span>
-                   {input}
+                   {{EntityScene(input)}}
                 </div>
             }
         })
@@ -470,7 +471,6 @@ fn reflected_struct(info: &StructInfo, reflect: Box<dyn PartialReflect>) -> impl
 
 fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -> impl Scene {
     let input_type = input_type.clone();
-    let reflect = reflect.to_dynamic();
     let input: Box<dyn Scene> = if input_type.is::<String>() {
         Box::new(input_field::<String>(format!("{reflect:?}")))
     } else if input_type.is::<f32>() {
@@ -518,7 +518,7 @@ fn reflected_opaque(input_type: &OpaqueInfo, reflect: Box<dyn PartialReflect>) -
     };
     html! {
         <div>
-           {input}
+           {{EntityScene(input)}}
         </div>
     }
 }

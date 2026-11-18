@@ -351,6 +351,9 @@ fn children_still_spawn_correctly() {
         .expect("root must have children");
     assert_eq!(children.len(), 1);
 
-    let texts: Vec<&Text> = text_query.iter_many(app.world(), children).collect();
+    let texts: Vec<&Text> = text_query
+        .iter_many(app.world(), children)
+        .flatten()
+        .collect();
     assert_eq!(texts, vec![&Text::new("Hello")]);
 }

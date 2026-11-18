@@ -65,6 +65,7 @@ fn test_simple_iter() {
 
     assert_eq!(
         text.iter_many(app.world(), children)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Item 1"), &Text::new("Item 2")]
     );
@@ -111,6 +112,7 @@ fn test_editor_menu_button() {
     assert_eq!(root_entity.1.len(), 1);
     assert_eq!(
         text.iter_many(app.world(), root_entity.1)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Menu")]
     )
@@ -147,6 +149,7 @@ fn test_simple_with() {
 
     assert_eq!(
         text.iter_many(app.world(), children)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Hello World")]
     );
@@ -161,7 +164,7 @@ fn allows_listeners() {
     let root = app
         .world_mut()
         .spawn(html_bundle! {
-            <div onClick={|_event: On<Pointer<Click>>,
+            <div onClick={|_event: On<PointerClick>,
                 mut commands: Commands,
                 text: Single<Entity, With<Text>>| {
                     commands.entity(*text).insert(Text::new("Hi, Mom!"));
@@ -173,9 +176,9 @@ fn allows_listeners() {
 
     app.update();
 
-    app.world_mut()
-        .commands()
-        .trigger(Pointer::new_without_propagate(
+    app.world_mut().commands().trigger(PointerClick {
+        entity: root,
+        pointer: Pointer::new(
             bevy::picking::backend::prelude::PointerId::Mouse,
             Location {
                 target: NormalizedRenderTarget::None {
@@ -184,20 +187,18 @@ fn allows_listeners() {
                 },
                 position: Vec2::ZERO,
             },
-            Click {
-                button: PointerButton::Primary,
-                hit: bevy::picking::backend::HitData {
-                    camera: root,
-                    depth: 0.0,
-                    position: None,
-                    normal: None,
-                    extra: None,
-                },
-                duration: Duration::from_millis(100),
-                count: 1,
-            },
-            root,
-        ));
+        ),
+        button: PointerButton::Primary,
+        hit: bevy::picking::backend::HitData {
+            camera: root,
+            depth: 0.0,
+            position: None,
+            normal: None,
+            extra: None,
+        },
+        duration: Duration::from_millis(100),
+        count: 1,
+    });
 
     app.update();
 
@@ -222,7 +223,7 @@ fn allows_listeners_no_macro() {
                     let entity = parent.target_entity();
                     parent.spawn(
                         Observer::new(
-                            |_event: On<Pointer<Click>>,
+                            |_event: On<PointerClick>,
                              mut commands: Commands,
                              text: Single<Entity, With<Text>>| {
                                 commands.entity(*text).insert(Text::new("Hi, Mom!"));
@@ -238,9 +239,9 @@ fn allows_listeners_no_macro() {
 
     app.update();
 
-    app.world_mut()
-        .commands()
-        .trigger(Pointer::new_without_propagate(
+    app.world_mut().commands().trigger(PointerClick {
+        entity: root,
+        pointer: Pointer::new(
             bevy::picking::backend::prelude::PointerId::Mouse,
             Location {
                 target: NormalizedRenderTarget::None {
@@ -249,20 +250,18 @@ fn allows_listeners_no_macro() {
                 },
                 position: Vec2::ZERO,
             },
-            Click {
-                button: PointerButton::Primary,
-                hit: bevy::picking::backend::HitData {
-                    camera: root,
-                    depth: 0.0,
-                    position: None,
-                    normal: None,
-                    extra: None,
-                },
-                count: 1,
-                duration: Duration::from_millis(100),
-            },
-            root,
-        ));
+        ),
+        button: PointerButton::Primary,
+        hit: bevy::picking::backend::HitData {
+            camera: root,
+            depth: 0.0,
+            position: None,
+            normal: None,
+            extra: None,
+        },
+        count: 1,
+        duration: Duration::from_millis(100),
+    });
 
     app.update();
 

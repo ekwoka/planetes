@@ -37,6 +37,7 @@ fn test_simple_iter() {
 
     assert_eq!(
         text.iter_many(app.world(), children)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Item 1"), &Text::new("Item 2")]
     );
@@ -78,6 +79,7 @@ fn test_editor_menu_button() {
     assert_eq!(root_entity.1.len(), 1);
     assert_eq!(
         text.iter_many(app.world(), root_entity.1)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Menu")]
     )
@@ -120,6 +122,7 @@ fn test_scene_component() {
     assert_eq!(root_entity.1.len(), 1);
     assert_eq!(
         text.iter_many(app.world(), root_entity.1)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Menu")]
     )
@@ -170,6 +173,7 @@ fn test_scene_component_props() {
     assert_eq!(root_entity.2.len(), 1);
     assert_eq!(
         text.iter_many(app.world(), root_entity.2)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Menu")]
     )
@@ -220,6 +224,7 @@ fn test_scene_component_scene_props() {
     assert_eq!(root_entity.2.len(), 1);
     assert_eq!(
         text.iter_many(app.world(), root_entity.2)
+            .flatten()
             .collect::<Vec<&Text>>(),
         vec![&Text::new("Menu")]
     )

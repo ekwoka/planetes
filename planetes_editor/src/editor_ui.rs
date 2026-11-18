@@ -5,10 +5,11 @@
 use bevy::{
     app::HierarchyPropagatePlugin,
     asset::embedded_asset,
-    camera::{ImageRenderTarget, RenderTarget, visibility::RenderLayers},
+    camera::{ImageRenderTarget, RenderTarget},
     feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme},
     prelude::*,
     render::render_resource::TextureFormat,
+    scene::EntityScene,
     ui_widgets::Activate,
 };
 
@@ -190,7 +191,7 @@ pub fn build_ui_scene(mut commands: Commands) {
                     <EntityViewer />
                 </div>
             </div>
-            {bottom_bar_scene()}
+            {{EntityScene(bottom_bar_scene())}}
         </div>
     });
 }
@@ -200,7 +201,6 @@ pub fn setup_camera_system(mut commands: Commands) {
     commands.spawn((
         Camera2d,
         UiView,
-        RenderLayers::layer(1),
         Camera {
             order: 1,
             is_active: true,

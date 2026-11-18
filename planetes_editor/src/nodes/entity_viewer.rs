@@ -10,6 +10,7 @@ use bevy::{
     input_focus::{FocusedInput, InputFocus},
     platform::collections::HashSet,
     prelude::*,
+    scene::EntityScene,
     ui_widgets::Activate,
 };
 use planetes_input::prelude::*;
@@ -72,13 +73,13 @@ fn entity_editor_scenes(
               onInput={update_name}
             >
                 <span>"Selected: "</span>
-                {
-                    input_field::<String>(if let Some(name) = name {
+                {{
+                    EntityScene(input_field::<String>(if let Some(name) = name {
                         format!("{name}")
                     } else {
                         format!("{target}")
-                    })
-                }
+                    }))
+                }}
             </div>
         }),
         Box::new(html! {
@@ -91,9 +92,9 @@ fn entity_editor_scenes(
         }),
         Box::new(html! {
             <div>
-                {button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
+                {{EntityScene(button::render("+ Add Component", |_event: On<Activate>, mut commands: Commands, target: Single<&Viewing>| {
                     commands.trigger(OpenAddComponent { entity: target.0 });
-                })}
+                }))}}
             </div>
         }),
         Box::new(html! {
@@ -134,7 +135,7 @@ pub struct RequiredComponentsUI(pub Entity);
 pub struct RequiredComponent(pub Entity, pub TypeId);
 
 pub fn update_required_components(
-    event: On<Add, RequiredComponentsUI>,
+    event: On<Add<RequiredComponentsUI>>,
     query: Query<&RequiredComponentsUI>,
     world: &World,
     canonical: Res<CanonicalScene>,
@@ -193,7 +194,7 @@ pub fn update_required_components(
                     components={template(move |_| Ok(RequiredComponent(target, id)))}>
                     <span>{name}</span>
                     <div flex-grow="100"/>
-                    {button::render("Include", handle_include_required_component)}
+                    {{EntityScene(button::render("Include", handle_include_required_component))}}
                 </div>
             }
         })

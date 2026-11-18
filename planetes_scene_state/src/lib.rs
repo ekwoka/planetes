@@ -79,13 +79,14 @@ pub fn plugin(app: &mut App) {
 /// # use bevy::prelude::*;
 /// fn read_canonical_transform(
 ///     canonical: Res<CanonicalScene>,
+///     assets: Res<Assets<DynamicWorld>>,
 ///     mut transforms: Query<&mut Transform>,
 ///     entity: Entity,
 /// ) {
-///     if let Some(transform_data) = canonical.get_component::<Transform>(entity)
+///     if let Some(canonical_transform) = canonical.get_component::<Transform>(&assets, entity)
 ///         && let Ok(mut transform) = transforms.get_mut(entity) {
 ///         // Update the live Transform with the Canonical State
-///         transform.apply(transform_data.data.as_ref());
+///         *transform = *canonical_transform;
 ///     }
 /// }
 /// ```
@@ -590,26 +591,30 @@ fn collect_edit_history(
             } => canonical_scene
                 .get_component_by_id(&assets, *entity, *component_type)
                 .and_then(|component_state| {
-                    if field_path.is_empty() {
-                        Some(component_state.to_dynamic())
+                    let old_value = if field_path.is_empty() {
+                        component_state.to_dynamic()
                     } else {
                         match field_path.as_str().reflect_element(component_state) {
-                            Ok(field) => Some(field.to_dynamic()),
+                            Ok(field) => field.to_dynamic(),
                             Err(e) => {
                                 warn!("Cannot read field path '{}': {:?}", field_path, e);
-                                None
+                                return None;
                             }
                         }
+                    };
+                    match (old_value, new_value.to_dynamic()) {
+                        (Ok(old_value), Ok(new_value)) => Some(EditOp::FieldEdit(FieldEdit {
+                            entity: *entity,
+                            component_type: *component_type,
+                            field_path: field_path.clone(),
+                            old_value,
+                            new_value,
+                        })),
+                        (Err(e), _) | (_, Err(e)) => {
+                            warn!("Cannot record field edit '{}': {}", field_path, e);
+                            None
+                        }
                     }
-                })
-                .map(|old_value| {
-                    EditOp::FieldEdit(FieldEdit {
-                        entity: *entity,
-                        component_type: *component_type,
-                        field_path: field_path.clone(),
-                        old_value,
-                        new_value: new_value.to_dynamic(),
-                    })
                 }),
             ApplyEdit::AddComponent {
                 entity,
@@ -623,12 +628,16 @@ fn collect_edit_history(
                 component_type,
             } => canonical_scene
                 .get_component_by_id(&assets, *entity, *component_type)
-                .map(|component_state| {
-                    EditOp::RemoveComponent(RemoveComponent {
+                .and_then(|component_state| match component_state.to_dynamic() {
+                    Ok(component_data) => Some(EditOp::RemoveComponent(RemoveComponent {
                         entity: *entity,
                         component_type: *component_type,
-                        component_data: component_state.to_dynamic(),
-                    })
+                        component_data,
+                    })),
+                    Err(e) => {
+                        warn!("Cannot record component removal: {}", e);
+                        None
+                    }
                 }),
         }
     }));
@@ -711,7 +720,13 @@ fn handle_undo(
                     continue;
                 };
 
-                entity_data.components.push(op.component_data.to_dynamic());
+                match op.component_data.to_dynamic() {
+                    Ok(component_data) => entity_data.components.push(component_data),
+                    Err(e) => {
+                        warn!("Cannot undo remove: {}", e);
+                        continue;
+                    }
+                }
 
                 commands.trigger(ComponentsChanged(op.entity));
                 history.push_redo(EditOp::RemoveComponent(op));
@@ -816,8 +831,10 @@ fn handle_redo(
                         .unwrap_or(true)
                 });
 
-                if let Some(snapshot) = component_snapshot {
-                    op.component_data = snapshot;
+                match component_snapshot {
+                    Some(Ok(snapshot)) => op.component_data = snapshot,
+                    Some(Err(e)) => warn!("Cannot re-snapshot removed component: {}", e),
+                    None => {}
                 }
 
                 commands.trigger(ComponentsChanged(op.entity));

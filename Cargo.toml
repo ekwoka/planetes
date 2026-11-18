@@ -1,10 +1,10 @@
 [workspace]
-members = ["avian_bullet_trajectory", "bevy_ui_html", "bevy_ui_html_macro", "derelict", "planetes_editor", "planetes_input", "planetes_scene_state"]
+members = ["avian_bullet_trajectory", "bevy_ui_html", "bevy_ui_html_macro", "derelict", "planetes_editor", "planetes_input", "planetes_scene_state", "vendor/bevy_file_dialog"]
 
 [workspace.package]
 authors = ["Eric Kwoka <43540491+ekwoka@users.noreply.github.com>"]
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.100"
 
 [workspace.dependencies]
 # Local Packages
@@ -15,13 +15,14 @@ planetes_scene_state = { path = "planetes_scene_state" }
 planetes_editor = { path = "planetes_editor" }
 planetes_input = { path = "planetes_input" }
 
-bevy = { version = "0.19", features = [
+bevy = { version = "0.20", features = [
     "serialize",
     "x11"
 ] }
-bevy_enhanced_input = "0.26"
+bevy_enhanced_input = "0.27"
 
-bevy_file_dialog = { git = "https://github.com/superjesse07/bevy_file_dialog" }
+# Vendored from https://github.com/superjesse07/bevy_file_dialog @ 3736222
+bevy_file_dialog = { path = "vendor/bevy_file_dialog" }
 
 # Keep this in sync with Bevy
 rand = "0.10"
@@ -36,12 +37,12 @@ tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
-bevy_gizmos = "0.19"
+bevy_gizmos = "0.20"
 # bevy_ui_anchor = "0.12"
 
 # Physics
-avian3d = "0.7"
-avian_pickup = "0.6"
+avian3d = "0.8"
+avian_pickup = "0.7"
 
 
 

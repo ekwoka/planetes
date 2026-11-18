@@ -8,8 +8,8 @@ use crate::{
     prelude::*,
 };
 use bevy::{
-    feathers::cursor::EntityCursor, platform::collections::HashMap, prelude::*, ui_widgets::Button,
-    window::SystemCursorIcon,
+    picking::cursor::EntityCursor, platform::collections::HashMap, prelude::*, scene::EntityScene,
+    ui_widgets::Button, window::SystemCursorIcon,
 };
 use planetes_scene_state::{CanonicalScene, ReflectHiddenComponent};
 
@@ -185,7 +185,7 @@ pub fn branch(
         };
         Some(html! {
             <SceneTreeBranch components={Represents(target_entity)}>
-                {child}
+                {{EntityScene(child)}}
             </SceneTreeBranch>
         })
     } else {
@@ -194,7 +194,7 @@ pub fn branch(
 }
 
 pub fn select_entity(
-    mut event: On<Pointer<Click>>,
+    mut event: On<PointerClick>,
     mut commands: Commands,
     representations: Query<&Represents>,
     editors: Query<Entity, With<EntityEditor>>,

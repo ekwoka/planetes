@@ -2,7 +2,7 @@
 
 use bevy::{
     app::{HierarchyPropagatePlugin, Propagate, PropagateSet},
-    feathers::cursor::EntityCursor,
+    picking::cursor::EntityCursor,
     prelude::*,
     ui_widgets::{Activate, Button},
     window::SystemCursorIcon,
