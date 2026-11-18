@@ -12,12 +12,11 @@
 //! - [`EditHistory`] - Undo/redo stacks for edit operations
 //! - [`ApplyEdit`] - Message to request applying an edit to canonical state
 
-use std::{any::TypeId, collections::HashMap};
+use std::any::TypeId;
 
 use bevy::{
-    ecs::component::ComponentId,
     prelude::*,
-    reflect::{PartialReflect, ReflectPath},
+    reflect::{PartialReflect, ReflectCloneError, ReflectPath},
     world_serialization::DynamicEntity,
 };
 
@@ -54,13 +53,7 @@ pub fn plugin(app: &mut App) {
         .add_message::<Redo>()
         .add_systems(
             Update,
-            (
-                collect_edit_history,
-                apply_edit_messages,
-                handle_undo,
-                handle_redo,
-            )
-                .chain(),
+            (apply_edit_messages, handle_undo, handle_redo).chain(),
         );
     register_hidden_components!(app, GlobalTransform, TransformTreeChanged);
 }
@@ -92,8 +85,7 @@ pub fn plugin(app: &mut App) {
 /// ```
 #[derive(Resource, Default)]
 pub struct CanonicalScene {
-    /// Maps entities to their canonical component data.
-    /// Inner map: TypeId -> Reflected component data
+    /// Handle to the [`DynamicWorld`] asset holding the canonical entity data.
     handle: Handle<DynamicWorld>,
 }
 
@@ -244,47 +236,6 @@ impl CanonicalScene {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default()
-    }
-}
-
-/// Contains all the canonical data for an Entity
-pub struct CanonicalEntityState {
-    pub entity: Entity,
-    pub components: HashMap<TypeId, CanonicalComponentState>,
-    /// Whether the entity has been modified. Makes it easier to apply changes without extra work.
-    pub changed: bool,
-}
-
-impl CanonicalEntityState {
-    pub fn new(entity: Entity) -> Self {
-        CanonicalEntityState {
-            entity,
-            components: HashMap::new(),
-            changed: false,
-        }
-    }
-}
-
-/// Tracks the state of a specific Component.
-pub struct CanonicalComponentState {
-    id: ComponentId,
-    name: DebugName,
-    type_id: TypeId,
-    /// The data that the component holds.
-    pub data: Box<dyn PartialReflect>,
-}
-
-impl CanonicalComponentState {
-    pub fn id(&self) -> ComponentId {
-        self.id
-    }
-
-    pub fn name(&self) -> &DebugName {
-        &self.name
-    }
-
-    pub fn type_id(&self) -> TypeId {
-        self.type_id
     }
 }
 
@@ -472,11 +423,28 @@ pub struct Redo;
 #[derive(Event)]
 pub struct ComponentsChanged(pub Entity);
 
-/// System that applies edit messages to the canonical scene.
+/// Clones reflected data, preserving the concrete type when possible.
+///
+/// [`PartialReflect::to_dynamic`] always produces a dynamic proxy (e.g. `DynamicStruct`),
+/// which can't be downcast to the concrete type. Prefer [`PartialReflect::reflect_clone`]
+/// and only fall back to a dynamic representation when the type can't be cloned.
+fn clone_reflect(value: &dyn PartialReflect) -> Result<Box<dyn PartialReflect>, ReflectCloneError> {
+    value
+        .reflect_clone()
+        .map(PartialReflect::into_partial_reflect)
+        .or_else(|_| value.to_dynamic())
+}
+
+/// System that applies edit messages to the canonical scene and records them in the history,
+/// to provide Undo/Redo functionality.
+///
+/// An edit is only applied if it can be recorded, so the history never gets out of sync with
+/// the canonical scene.
 fn apply_edit_messages(
     mut messages: MessageReader<ApplyEdit>,
     mut assets: ResMut<Assets<DynamicWorld>>,
     canonical_scene: Res<CanonicalScene>,
+    mut history: ResMut<EditHistory>,
     registry: Res<AppTypeRegistry>,
     mut commands: Commands,
 ) {
@@ -489,12 +457,37 @@ fn apply_edit_messages(
                 new_value,
             } => {
                 let Some(component_data) =
-                    canonical_scene.get_component_mut_by_id(&mut assets, *entity, *component_type)
+                    canonical_scene.get_component_by_id(&assets, *entity, *component_type)
                 else {
                     warn!(
                         "Cannot apply edit: no canonical data for entity {:?} component {:?}",
                         entity, component_type
                     );
+                    continue;
+                };
+
+                let old_value = if field_path.is_empty() {
+                    component_data.to_dynamic()
+                } else {
+                    match field_path.as_str().reflect_element(component_data) {
+                        Ok(field) => field.to_dynamic(),
+                        Err(e) => {
+                            warn!("Cannot apply edit to field path '{}': {:?}", field_path, e);
+                            continue;
+                        }
+                    }
+                };
+                let (old_value, recorded_new_value) = match (old_value, new_value.to_dynamic()) {
+                    (Ok(old_value), Ok(new_value)) => (old_value, new_value),
+                    (Err(e), _) | (_, Err(e)) => {
+                        warn!("Cannot record field edit '{}': {}", field_path, e);
+                        continue;
+                    }
+                };
+
+                let Some(component_data) =
+                    canonical_scene.get_component_mut_by_id(&mut assets, *entity, *component_type)
+                else {
                     continue;
                 };
 
@@ -513,6 +506,13 @@ fn apply_edit_messages(
                     continue;
                 }
 
+                history.push(EditOp::FieldEdit(FieldEdit {
+                    entity: *entity,
+                    component_type: *component_type,
+                    field_path: field_path.clone(),
+                    old_value,
+                    new_value: recorded_new_value,
+                }));
                 info!(
                     "Applied field edit to {:?}.{} on entity {:?}",
                     component_type, field_path, entity
@@ -539,6 +539,10 @@ fn apply_edit_messages(
                 };
 
                 entity_data.components.push(component_default.default());
+                history.push(EditOp::AddComponent(AddComponent {
+                    entity: *entity,
+                    component_type: *component_type,
+                }));
                 commands.trigger(ComponentsChanged(*entity));
                 info!(
                     "Added component {:?} to entity {:?}",
@@ -549,6 +553,24 @@ fn apply_edit_messages(
                 entity,
                 component_type,
             } => {
+                let Some(component_data) =
+                    canonical_scene.get_component_by_id(&assets, *entity, *component_type)
+                else {
+                    warn!(
+                        "Cannot remove component: no canonical data for entity {:?} component {:?}",
+                        entity, component_type
+                    );
+                    continue;
+                };
+
+                let component_data = match clone_reflect(component_data) {
+                    Ok(component_data) => component_data,
+                    Err(e) => {
+                        warn!("Cannot record component removal: {}", e);
+                        continue;
+                    }
+                };
+
                 let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, *entity) else {
                     warn!("Cannot remove component: no canonical entity {:?}", entity);
                     continue;
@@ -560,6 +582,11 @@ fn apply_edit_messages(
                         .map(|info| info.type_id() != *component_type)
                         .unwrap_or(true)
                 });
+                history.push(EditOp::RemoveComponent(RemoveComponent {
+                    entity: *entity,
+                    component_type: *component_type,
+                    component_data,
+                }));
                 commands.trigger(ComponentsChanged(*entity));
                 info!(
                     "Removed component {:?} from entity {:?}",
@@ -568,79 +595,6 @@ fn apply_edit_messages(
             }
         }
     }
-}
-
-/// Collects all edit events and records them in the history, to provide Undo/Redo functionality.
-fn collect_edit_history(
-    mut messages: MessageReader<ApplyEdit>,
-    mut history: ResMut<EditHistory>,
-    assets: Res<Assets<DynamicWorld>>,
-    canonical_scene: Res<CanonicalScene>,
-) {
-    if messages.is_empty() {
-        return;
-    }
-
-    history.extend(messages.read().filter_map(|msg| {
-        match msg {
-            ApplyEdit::FieldEdit {
-                entity,
-                component_type,
-                field_path,
-                new_value,
-            } => canonical_scene
-                .get_component_by_id(&assets, *entity, *component_type)
-                .and_then(|component_state| {
-                    let old_value = if field_path.is_empty() {
-                        component_state.to_dynamic()
-                    } else {
-                        match field_path.as_str().reflect_element(component_state) {
-                            Ok(field) => field.to_dynamic(),
-                            Err(e) => {
-                                warn!("Cannot read field path '{}': {:?}", field_path, e);
-                                return None;
-                            }
-                        }
-                    };
-                    match (old_value, new_value.to_dynamic()) {
-                        (Ok(old_value), Ok(new_value)) => Some(EditOp::FieldEdit(FieldEdit {
-                            entity: *entity,
-                            component_type: *component_type,
-                            field_path: field_path.clone(),
-                            old_value,
-                            new_value,
-                        })),
-                        (Err(e), _) | (_, Err(e)) => {
-                            warn!("Cannot record field edit '{}': {}", field_path, e);
-                            None
-                        }
-                    }
-                }),
-            ApplyEdit::AddComponent {
-                entity,
-                component_type,
-            } => Some(EditOp::AddComponent(AddComponent {
-                entity: *entity,
-                component_type: *component_type,
-            })),
-            ApplyEdit::RemoveComponent {
-                entity,
-                component_type,
-            } => canonical_scene
-                .get_component_by_id(&assets, *entity, *component_type)
-                .and_then(|component_state| match component_state.to_dynamic() {
-                    Ok(component_data) => Some(EditOp::RemoveComponent(RemoveComponent {
-                        entity: *entity,
-                        component_type: *component_type,
-                        component_data,
-                    })),
-                    Err(e) => {
-                        warn!("Cannot record component removal: {}", e);
-                        None
-                    }
-                }),
-        }
-    }));
 }
 
 /// System that handles undo requests.
@@ -720,7 +674,7 @@ fn handle_undo(
                     continue;
                 };
 
-                match op.component_data.to_dynamic() {
+                match clone_reflect(op.component_data.as_ref()) {
                     Ok(component_data) => entity_data.components.push(component_data),
                     Err(e) => {
                         warn!("Cannot undo remove: {}", e);
@@ -816,7 +770,7 @@ fn handle_redo(
                 // Redo remove = remove the component again, re-snapshot data
                 let component_snapshot = canonical_scene
                     .get_component_by_id(&assets, op.entity, op.component_type)
-                    .map(|c| c.to_dynamic());
+                    .map(clone_reflect);
 
                 let Some(entity_data) = canonical_scene.get_entity_mut(&mut assets, op.entity)
                 else {
@@ -1157,6 +1111,22 @@ mod tests {
                 }
                 _ => panic!("Unexpected edit operation"),
             }
+        }
+
+        #[test]
+        fn failed_edit_is_not_recorded() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::FieldEdit {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+                field_path: "missing_field".to_string(),
+                new_value: Box::new(1.0f32),
+            });
+            app.update();
+
+            let history = app.world().resource::<EditHistory>();
+            assert!(!history.can_undo());
         }
 
         #[test]
@@ -1755,6 +1725,27 @@ mod tests {
             let history = app.world().resource::<EditHistory>();
             assert!(history.can_undo());
             assert!(!history.can_redo());
+        }
+
+        #[test]
+        fn undo_remove_component_restores_concrete_type() {
+            let mut app = setup_test_app();
+
+            app.world_mut().write_message(ApplyEdit::RemoveComponent {
+                entity: TEST_ENTITY,
+                component_type: TypeId::of::<TestComponent>(),
+            });
+            app.update();
+
+            app.world_mut().write_message(Undo);
+            app.update();
+
+            let assets = app.world().resource::<Assets<DynamicWorld>>();
+            let canonical = app.world().resource::<CanonicalScene>();
+            let component = canonical
+                .get_component::<TestComponent>(&assets, TEST_ENTITY)
+                .expect("Restored component should downcast to its concrete type");
+            assert_eq!(component.value, 42.0);
         }
 
         #[test]

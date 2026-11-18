@@ -559,9 +559,10 @@ impl ToTokens for ElementNode {
             }
             if !children.is_empty() {
                 if self.bsn {
+                    let children_stream = children::punctuate_bsn_children(&children);
                     components.push(quote! {
                         Children[
-                            #(#children),*
+                            #children_stream
                         ]
                     });
                 } else {
@@ -835,6 +836,15 @@ pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::Toke
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proc_macro2::{Punct, Spacing};
+
+    /// The `--` entity separator as `bsn!` parses it: two `-` joined into one token.
+    /// `quote! { -- }` emits two unjoined `-`, which would not match the generated output.
+    fn bsn_separator() -> TokenStream {
+        let first = Punct::new('-', Spacing::Joint);
+        let second = Punct::new('-', Spacing::Alone);
+        quote! { #first #second }
+    }
 
     /// Expands `input` both ways and checks each against the form it should
     /// take: `bundle` for the component-tuple path, `bsn` for the scene path.
@@ -917,6 +927,7 @@ mod tests {
                 ))
             )
         };
+        let sep = bsn_separator();
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
@@ -924,7 +935,7 @@ mod tests {
                     bevy::ui::Node
                     Children[
                         bevy::ui::widget::Text("Hello")
-                    ],
+                    ] #sep
                     bevy::ui::Node
                     Children[
                         bevy::ui::widget::Text("World")
@@ -952,11 +963,12 @@ mod tests {
                 ))
             )
         };
+        let sep = bsn_separator();
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    bevy::ui::widget::Text("Hello"),
+                    bevy::ui::widget::Text("Hello") #sep
                     bevy::ui::widget::Text("World")
                 ]
             }
@@ -1318,12 +1330,13 @@ mod tests {
                 ))
             )
         };
+        let sep = bsn_separator();
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    bevy::ui::widget::Text("Static text"),
-                    dynamic_content,
+                    bevy::ui::widget::Text("Static text") #sep
+                    dynamic_content #sep
                     MyComponent::new()
                 ]
             }
@@ -1524,6 +1537,7 @@ mod tests {
                 ))
             )
         };
+        let sep = bsn_separator();
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
@@ -1531,7 +1545,7 @@ mod tests {
                     bevy::ui::Node
                     Children[
                         Text::new("Menu")
-                    ],
+                    ] #sep
                     bevy::ui::Node
                     Children[
                         {
@@ -1563,11 +1577,12 @@ mod tests {
                 ))
             )
         };
+        let sep = bsn_separator();
         let bsn = quote! {
             bevy::scene::bsn!{
                 bevy::ui::Node
                 Children[
-                    bevy::ui::widget::Text({"Hello"}),
+                    bevy::ui::widget::Text({"Hello"}) #sep
                     bevy::ui::widget::Text({{let thing = true; if thing { "World" } else { "Mom" }}})
                 ]
             }
@@ -1637,6 +1652,7 @@ mod tests {
                 </AccordionContainer>
             </div>
         };
+        let sep = bsn_separator();
         let bsn = quote! {
             bevy::scene::bsn! {
                 bevy::ecs::name::Name({Into::<String>::into(label.clone())})
@@ -1655,7 +1671,7 @@ mod tests {
                         display: bevy::ui::Display::Flex,
                         flex_direction: bevy::ui::FlexDirection::Row,
                         align_items: { AlignItems::Center }
-                    },
+                    } #sep
                     @AccordionContainer
                     bevy::ui::Node
                     Children [
@@ -2917,6 +2933,7 @@ mod tests {
                     ))
                 )
             };
+            let sep = bsn_separator();
             let bsn = quote! {
                 bevy::scene::bsn!{
                     bevy::ui::Node {
@@ -2925,16 +2942,16 @@ mod tests {
                     Children[
                         bevy::ui::Node {
                             display: bevy::ui::Display::None
-                        },
+                        } #sep
                         bevy::ui::Node {
                             display: bevy::ui::Display::None
-                        },
+                        } #sep
                         bevy::ui::Node {
                             display: bevy::ui::Display::Flex
-                        },
+                        } #sep
                         bevy::ui::Node {
                             display: bevy::ui::Display::Grid
-                        },
+                        } #sep
                         bevy::ui::Node {
                             display: bevy::ui::Display::Block
                         }
@@ -2975,6 +2992,7 @@ mod tests {
                     ))
                 )
             };
+            let sep = bsn_separator();
             let bsn = quote! {
                 bevy::scene::bsn!{
                     bevy::ui::Node {
@@ -2983,10 +3001,10 @@ mod tests {
                     Children[
                         bevy::ui::Node {
                             position_type: bevy::ui::PositionType::Relative
-                        },
+                        } #sep
                         bevy::ui::Node {
                             position_type: bevy::ui::PositionType::Absolute
-                        },
+                        } #sep
                         bevy::ui::Node {
                             position_type: bevy::ui::PositionType::Relative
                         }
